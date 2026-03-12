@@ -1143,7 +1143,7 @@ textarea{resize:vertical;min-height:65px;}
 .map-toolbar{
   background:var(--navy-mid);border-bottom:1px solid var(--border-soft);
   padding:7px 12px;display:flex;align-items:center;gap:7px;
-  flex-wrap:wrap;flex-shrink:0;z-index:10;
+  flex-wrap:nowrap;flex-shrink:0;z-index:10;overflow-x:auto;
 }
 .mtb{
   font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:600;
@@ -1163,8 +1163,8 @@ textarea{resize:vertical;min-height:65px;}
   font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:5px;color:var(--muted);
 }
 .map-search-bar{
-  display:flex;gap:6px;padding:7px 12px;
-  background:var(--navy-mid);border-bottom:1px solid var(--border-soft);
+  display:flex;gap:8px;padding:8px 12px;
+  background:var(--navy);border-bottom:1px solid var(--border);
   flex-shrink:0;z-index:10;
 }
 .map-search-bar input{
