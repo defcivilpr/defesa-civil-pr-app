@@ -1163,18 +1163,20 @@ textarea{resize:vertical;min-height:65px;}
   font-weight:600;letter-spacing:1px;display:flex;align-items:center;gap:5px;color:var(--muted);
 }
 .map-search-bar{
-  position:absolute;top:10px;left:50%;transform:translateX(-50%);
-  z-index:1000;display:flex;gap:6px;width:400px;max-width:88%;
+  display:flex;gap:6px;padding:7px 12px;
+  background:var(--navy-mid);border-bottom:1px solid var(--border-soft);
+  flex-shrink:0;z-index:10;
 }
 .map-search-bar input{
-  background:rgba(20,32,56,.95);border:1px solid var(--border);
-  border-radius:8px;padding:9px 14px;font-size:12px;color:var(--text);
-  outline:none;box-shadow:0 4px 20px rgba(0,0,0,.5);backdrop-filter:blur(8px);
+  background:var(--navy-light);border:1px solid var(--border-soft);
+  border-radius:8px;padding:8px 14px;font-size:12px;color:var(--text);
+  outline:none;transition:border-color .2s;flex:1;
 }
-.map-search-bar input:focus{border-color:var(--orange);}
-.map-search-bar .btn{padding:9px 12px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);}
+.map-search-bar input:focus{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange-glow);}
+.map-search-bar .btn{padding:8px 14px;border-radius:8px;white-space:nowrap;flex-shrink:0;}
+.map-search-bar > div{position:relative;flex:1;}
 .search-results{
-  position:absolute;top:38px;left:0;right:60px;
+  position:absolute;top:calc(100% + 4px);left:0;right:0;
   background:var(--navy-mid);border:1px solid var(--border);
   border-radius:8px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.5);
   display:none;z-index:1001;max-height:200px;overflow-y:auto;
@@ -1927,7 +1929,7 @@ textarea{resize:vertical;min-height:65px;}
                 <input type="text" id="mapSearchInput" placeholder="🔍  Buscar cidade ou zona..." onkeydown="if(event.key==='Enter')searchLocation()">
                 <div class="search-results" id="searchResults"></div>
               </div>
-              <button class="btn btn-primary" style="white-space:nowrap" onclick="searchLocation()">Buscar</button>
+              <button class="btn btn-primary" onclick="searchLocation()">Buscar</button>
             </div>
             <div id="leaflet-map"></div>
             <div class="map-hint" id="hintDraw" style="color:var(--orange)"></div>
