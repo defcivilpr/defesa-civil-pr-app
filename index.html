@@ -2943,9 +2943,9 @@ function mostrarResultado(nome, role) {
   }, 100);
 
   setTimeout(() => {
-    const destino = CONFIG.DESTINO_ROLE[role];
+    const destino = CONFIG.DESTINO_ROLE[role.toLowerCase()];
     mostrarTela(destino);
-    if (role === CONFIG.ROLES.COORD) {
+    if (role.toLowerCase() === CONFIG.ROLES.COORD) {
       inicializarCoordenador();
     } else {
       inicializarVoluntario();
