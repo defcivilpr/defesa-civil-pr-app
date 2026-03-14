@@ -2970,11 +2970,9 @@ function sairSessao() {
 // ════════════════════════════════════════════════════════════════
 // Função única para chamadas ao backend — usa POST para garantir suporte a payloads grandes
 async function chamarBackend(params) {
-  const res = await fetch(CONFIG.BACKEND_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(params),
-  });
+  const url = new URL(CONFIG.BACKEND_URL);
+  Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+  const res = await fetch(url.toString());
   return await res.json();
 }
 
