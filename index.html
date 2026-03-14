@@ -5601,10 +5601,10 @@ window.addEventListener('load', () => {
   if (sessao) {
     ESTADO.sessao = sessao;
     // Restaurar sessão: ir direto para a tela correta sem animação de redirect
-    const destino = CONFIG.DESTINO_ROLE[sessao.tipo];
-    mostrarTela(destino || CONFIG.TELAS.LOGIN);
-    if (destino) {
-      if (sessao.tipo === CONFIG.ROLES.COORD) {
+    const destino = CONFIG.DESTINO_ROLE[sessao.tipo.toLowerCase()];
+mostrarTela(destino || CONFIG.TELAS.LOGIN);
+if (destino) {
+  if (sessao.tipo.toLowerCase() === CONFIG.ROLES.COORD) {
         inicializarCoordenador();
       } else {
         inicializarVoluntario();
