@@ -38,6 +38,8 @@ const CONFIG = {
 
   // ── Backend ──────────────────────────────────────────────────
   BACKEND_URL: "https://script.google.com/macros/s/AKfycbyo8h_fG4HRzkxCXHceswAHZNujSv0989BUdxqirZv8_HrJj1wvcZGN12YpqzEnkHuCpA/exec",
+  HTTP_METHOD: 'POST',
+  HTTP_CONTENT_TYPE: 'text/plain;charset=utf-8',
 
   // ── Sessão ───────────────────────────────────────────────────
   SESSAO: {
@@ -2970,9 +2972,12 @@ function sairSessao() {
 // ════════════════════════════════════════════════════════════════
 // Função única para chamadas ao backend — usa POST para garantir suporte a payloads grandes
 async function chamarBackend(params) {
-  const url = new URL(CONFIG.BACKEND_URL);
-  Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
-  const res = await fetch(url.toString(), { redirect: 'follow' });
+  const res = await fetch(CONFIG.BACKEND_URL, {
+    method:   CONFIG.HTTP_METHOD,
+    redirect: 'follow',
+    headers:  { 'Content-Type': CONFIG.HTTP_CONTENT_TYPE },
+    body:     JSON.stringify(params),
+  });
   const text = await res.text();
   try {
     return JSON.parse(text);
