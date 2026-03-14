@@ -2972,8 +2972,13 @@ function sairSessao() {
 async function chamarBackend(params) {
   const url = new URL(CONFIG.BACKEND_URL);
   Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
-  const res = await fetch(url.toString());
-  return await res.json();
+  const res = await fetch(url.toString(), { redirect: 'follow' });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
+  }
 }
 
 // BUG-11: postarBackend() removida — era dead code (wrapper de chamarBackend não referenciado)
