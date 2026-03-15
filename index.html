@@ -20,11 +20,14 @@
 <body>
 
 <!-- ============================================================
-     SEÇÃO 1: CONFIG — ÚNICA FONTE DE VERDADE
-     Para mudar qualquer valor, texto, rota ou regra:
-     edite APENAS este bloco. Nunca toque na Lógica ou na Estética.
+     SECCIÓN 1 — CONFIG GLOBAL
+     ÚNICA FUENTE DE VERDAD del programa completo.
+     Para cambiar cualquier valor, texto, ruta o regla:
+     edite SOLO este bloque. Nunca toque la lógica.
+     Posición: primera — no depende de nada.
      ============================================================ -->
-<script id="config-section">
+<script id="s1-config">
+
 const CONFIG = {
 
   // ── Identidade ───────────────────────────────────────────────
@@ -230,7 +233,7 @@ const CONFIG = {
     { id:"voluntarios", icon:"👥",  label:"Voluntários",     grupo:"Gestão",         badge:"nb-vols",  badgeClass:"g" },
     { id:"monitoreo",   icon:"📊",  label:"Progresso",       grupo:"Monitoramento",  badge:"nb-mon",   badgeClass:"y" },
     { id:"exportar",    icon:"📤",  label:"Exportar",        grupo:"Monitoramento" },
-    { id:"usuarios",    icon:"🔑",  label:"Usuários",         grupo:"Administração",  badge:"nb-users" },
+    { id:"usuarios",    icon:"🔑",  label:"Usuários",        grupo:"Administração",  badge:"nb-users" },
   ],
 
   // ── Views do voluntário (bottom nav) ────────────────────────
@@ -589,7 +592,6 @@ const CONFIG = {
   },
 
   // ── Textos Sprint 5 ──────────────────────────────────────────
-  // Placeholders de login
   UI_LOGIN_PLACEHOLDER: {
     USUARIO: "Digite seu usuário",
     SENHA:   "Digite sua senha",
@@ -688,9 +690,6 @@ const CONFIG = {
     ALERTA_BTN:        "🔔 Configurar",
   },
 
-  // ── Textos extras Sprint 3 ────────────────────────────────────
-  // (adicionados sem tocar nos textos existentes)
-
   // ── Duração do toast (ms) ────────────────────────────────────
   TOAST_DURACAO: 2800,
 
@@ -713,10 +712,12 @@ const CONFIG = {
   FMT_HORA: { hour:"2-digit", minute:"2-digit" },
 
 };
+
 </script>
 <!-- ============================================================
-     FIM SEÇÃO 1: CONFIG
+     FIM SECCIÓN 1 — CONFIG GLOBAL
      ============================================================ -->
+
 
 
 
@@ -2536,10 +2537,23 @@ textarea{resize:vertical;min-height:65px;}
      SEÇÃO 2: LÓGICA — Toda função referencia CONFIG.*
      Nenhum valor fixo aqui. Altere apenas o bloco CONFIG.
      ============================================================ -->
-<script id="logica-section">
+
+
+<!-- ============================================================
+     SECCIÓN 2 — UI / HELPERS
+     Variables globales de estado + funciones compartidas por
+     todo el programa + renderizarTextos + window.load listener.
+     Posición: segunda — depende solo de S1 (CONFIG).
+     Requerida por: S3, S4, S5, S6, S7, S8, S9.
+     ============================================================ -->
+<script id="s2-ui-helpers">
+
 // ════════════════════════════════════════════════════════════════
-// ESTADO GLOBAL — referencia CONFIG, nunca valores literais
+// VARIABLES GLOBALES DE ESTADO
+// Todas declaradas aquí para que estén disponibles en todo el programa.
 // ════════════════════════════════════════════════════════════════
+
+// ── Estado general de la aplicación ─────────────────────────────
 const ESTADO = {
   sessao:     null,    // { nome, usuario, tipo, area, timestamp }
   mapas:      [],      // lista de mapas do backend
@@ -2558,9 +2572,116 @@ const ESTADO = {
   syncInfo: { enviados:0, fotos:0, pendentes:0, ultima:null },
 };
 
+// ── Estado de usuarios (Admin) ───────────────────────────────────
+let ESTADO_USERS = { lista: [] };
+
+// ── Variables globales — Coordenador ────────────────────────────
+let mapCoord       = null;
+let pingMarkers    = [];
+let drawTempLine   = null;
+let drawTempMarkers = [];
+let offlineCoord   = false;
+let _clockInterval = null; // BUG-10: referência ao timer do relógio para evitar acúmulo
+
+// ── Variables globales — Voluntario ─────────────────────────────
+let mapVol       = null;
+let newPingMapVol = null;
+let offlineVol   = false;
+let viewAtual    = 'mapa';
+
+// ── Variables globales — Formulario ─────────────────────────────
+let pingAtualForm  = null;
+let pingAtualDados = null; // dados completos do ping atual
+
+// ── Variables globales — Dashboard ──────────────────────────────
+let _dashTimer = null;
+
+// ── Variables globales — Toast ───────────────────────────────────
+let _toastQueue   = [];
+let _toastRunning = false;
+
+// ── Variables globales — Fotos ───────────────────────────────────
+let _fotosBase64 = []; // array de { nome, tipo, base64, descricao }
+
+// ── Variables globales — IndexedDB ──────────────────────────────
+let _idb = null;
+
+// ── Variables globales — PWA ─────────────────────────────────────
+let _deferredInstall = null;
+
+// ── Variable de role seleccionado en login ───────────────────────
+let roleSelecionado = CONFIG.ROLES.VOL;
+
+
+// ════════════════════════════════════════════════════════════════
+// HELPERS DOM — base de todo el programa
+// ════════════════════════════════════════════════════════════════
+
+function _txt(id, val) { const e = document.getElementById(id); if(e) e.textContent = val; }
+function _html(id, val){ const e = document.getElementById(id); if(e) e.innerHTML = val; }
+
+// BUG-05: _esc() — neutraliza caracteres especiais HTML para evitar XSS stored
+function _esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
+function _populateSelect(id, opts) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// HELPERS COMPARTIDOS
+// ════════════════════════════════════════════════════════════════
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// BUG-19: toast com fila — evita que mensagens simultâneas se sobrescrevam
+function toast(msg) {
+  _toastQueue.push(msg);
+  if (!_toastRunning) _processToastQueue();
+}
+
+function _processToastQueue() {
+  if (!_toastQueue.length) { _toastRunning = false; return; }
+  _toastRunning = true;
+  const el  = document.getElementById('toast');
+  const msg = _toastQueue.shift();
+  el.textContent   = msg;
+  el.style.display = 'block';
+  clearTimeout(window._toast);
+  window._toast = setTimeout(() => {
+    el.style.display = 'none';
+    setTimeout(_processToastQueue, 200); // pausa de 200ms entre mensagens
+  }, CONFIG.TOAST_DURACAO);
+}
+
+function formatarData(valor) {
+  if (!valor) return '—';
+  try {
+    const d = new Date(valor);
+    return d.toLocaleDateString(CONFIG.APP.LOCALE, CONFIG.FMT_DATA);
+  } catch(e) { return valor; }
+}
+
+
 // ════════════════════════════════════════════════════════════════
 // RENDERIZAÇÃO DE TEXTOS (CONFIG → DOM)
-// Popula todos os textos da interface a partir do CONFIG
+// Popula todos os textos da interface a partir do CONFIG.
+// Llamada desde window.load — para ese momento el DOM completo ya existe.
 // ════════════════════════════════════════════════════════════════
 function renderizarTextos() {
   const U = CONFIG.UI;
@@ -2770,24 +2891,108 @@ function renderizarTextos() {
   _txt('syncStatusTxt', U.SYNC_OK);
 }
 
-// ── helpers DOM ──
-function _txt(id, val) { const e = document.getElementById(id); if(e) e.textContent = val; }
-function _html(id, val){ const e = document.getElementById(id); if(e) e.innerHTML = val; }
-// BUG-05: _esc() — neutraliza caracteres especiais HTML para evitar XSS stored
-function _esc(s) {
-  if (s == null) return '';
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+
+// ════════════════════════════════════════════════════════════════
+// INICIALIZAÇÃO GERAL — window.load
+// Se registra aquí en S2, se ejecuta cuando todo el DOM y todos
+// los scripts (S3–S9) ya están cargados en memoria.
+// ════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  // 1. PWA: manifest dinâmico + service worker (definidos en S8)
+  injetarManifest();
+  registrarServiceWorker();
+
+  // 2. Renderizar todos os textos a partir do CONFIG
+  renderizarTextos();
+  renderizarFiltrosPontos();
+
+  // 3. Inicializar upload de fotos — input oculto (definido en S9)
+  inicializarUploadFotos();
+
+  // 4. Fechar modais ao clicar fora
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+    if (e.key==='Enter' && document.getElementById('tela-login').style.display !== 'none') doLogin();
+  });
+
+  // 5. Verificar sessão ativa (carregarSessao definido en S4)
+  // IMPORTANTE: renderizarTextos() já foi chamado acima (passo 2)
+  // então os elementos dinâmicos (pendBadge, nav-mapas, etc.) já existem
+  const sessao = carregarSessao();
+  if (sessao) {
+    ESTADO.sessao = sessao;
+    // Restaurar sessão: ir direto para a tela correta sem animação de redirect
+    const destino = CONFIG.DESTINO_ROLE[sessao.tipo.toLowerCase()];
+    mostrarTela(destino || CONFIG.TELAS.LOGIN);
+    if (destino) {
+      if (sessao.tipo.toLowerCase() === CONFIG.ROLES.COORD) {
+        inicializarCoordenador();
+      } else {
+        inicializarVoluntario();
+      }
+    }
+  } else {
+    mostrarTela(CONFIG.TELAS.LOGIN);
+  }
+
+  // 6. IDB: abrir base antecipado para uso offline imediato (definido en S8)
+  abrirIDB().catch(() => {});
+});
+
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 2 — UI / HELPERS
+     ============================================================ -->
+
+
+<!-- ============================================================
+     SECCIÓN 3 — BACKEND / API
+     Comunicación con Google AppScript.
+     Función única de acceso al backend — todas las llamadas
+     del programa pasan por aquí sin excepción.
+     Posición: tercera — depende de S1 (CONFIG) y S2 (helpers).
+     Requerida por: S4, S5, S6, S7, S8, S9.
+     ============================================================ -->
+<script id="s3-backend">
+
+// ════════════════════════════════════════════════════════════════
+// BACKEND — chamadas genéricas
+// Função única para chamadas ao backend — usa POST para garantir
+// suporte a payloads grandes (fotos em base64).
+// BUG-11: postarBackend() removida — era dead code.
+// ════════════════════════════════════════════════════════════════
+async function chamarBackend(params) {
+  const res = await fetch(CONFIG.BACKEND_URL, {
+    method:   CONFIG.HTTP_METHOD,
+    redirect: 'follow',
+    headers:  { 'Content-Type': CONFIG.HTTP_CONTENT_TYPE },
+    body:     JSON.stringify(params),
+  });
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
+  }
 }
-function _populateSelect(id, opts) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
-}
+
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 3 — BACKEND / API
+     ============================================================ -->
+
+
+<!-- ============================================================
+     SECCIÓN 4 — AUTH / LOGIN
+     Sesión, navegación de telas, login y logout.
+     Posición: cuarta — depende de S1, S2, S3.
+     Requerida por: S5 (inicializarCoordenador),
+                    S9 (inicializarVoluntario) — en runtime.
+     ============================================================ -->
+<script id="s4-auth-login">
 
 // ════════════════════════════════════════════════════════════════
 // SESSÃO
@@ -2855,8 +3060,6 @@ function mostrarTela(id) {
 // ════════════════════════════════════════════════════════════════
 // LOGIN
 // ════════════════════════════════════════════════════════════════
-let roleSelecionado = CONFIG.ROLES.VOL;
-
 function selecionarRole(role) {
   roleSelecionado = role;
   Object.values(CONFIG.ROLES).forEach(r => {
@@ -2946,9 +3149,9 @@ function mostrarResultado(nome, role) {
     const destino = CONFIG.DESTINO_ROLE[role.toLowerCase()];
     mostrarTela(destino);
     if (role.toLowerCase() === CONFIG.ROLES.COORD) {
-      inicializarCoordenador();
+      inicializarCoordenador(); // definido en S5 — runtime call ✅
     } else {
-      inicializarVoluntario();
+      inicializarVoluntario();  // definido en S9 — runtime call ✅
     }
   }, CONFIG.REDIR_DELAY);
 }
@@ -2967,37 +3170,25 @@ function sairSessao() {
   }, 800);
 }
 
-// ════════════════════════════════════════════════════════════════
-// BACKEND — chamadas genéricas
-// ════════════════════════════════════════════════════════════════
-// Função única para chamadas ao backend — usa POST para garantir suporte a payloads grandes
-async function chamarBackend(params) {
-  const res = await fetch(CONFIG.BACKEND_URL, {
-    method:   CONFIG.HTTP_METHOD,
-    redirect: 'follow',
-    headers:  { 'Content-Type': CONFIG.HTTP_CONTENT_TYPE },
-    body:     JSON.stringify(params),
-  });
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch(e) {
-    return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
-  }
-}
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 4 — AUTH / LOGIN
+     ============================================================ -->
 
-// BUG-11: postarBackend() removida — era dead code (wrapper de chamarBackend não referenciado)
+
+<!-- ============================================================
+     SECCIÓN 5 — COORD: Mapas / Áreas / Pings
+     Inicialización del coordinador, mapa Leaflet, dibujo de
+     áreas, gestión de pings, búsqueda y herramientas de mapa.
+     Posición: quinta — depende de S1, S2, S3, S4.
+     NOTA: renderizarTudoCoord → movida a S6 (auditoría ①)
+           navegarCoord        → movida a S7 (auditoría ②)
+     ============================================================ -->
+<script id="s5-coord-mapas">
 
 // ════════════════════════════════════════════════════════════════
 // COORDENADOR — INICIALIZAÇÃO
 // ════════════════════════════════════════════════════════════════
-let mapCoord = null;
-let pingMarkers = [];
-let drawTempLine = null;
-let drawTempMarkers = [];
-let offlineCoord = false;
-let _clockInterval = null; // BUG-10: referência ao timer do relógio para evitar acúmulo
-
 function inicializarCoordenador() {
   const s = ESTADO.sessao;
   if (!s) return;
@@ -3057,7 +3248,7 @@ async function carregarDadosCoord() {
       );
     }
 
-    // Áreas (usa o mapa atual se houver)
+    // Áreas
     const resAreas = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
     if (resAreas.sucesso) ESTADO.areas = resAreas.dados || [];
 
@@ -3065,22 +3256,8 @@ async function carregarDadosCoord() {
     toast(CONFIG.UI.TOAST_BACKEND_ERR);
   }
 
-  renderizarTudoCoord();
+  renderizarTudoCoord(); // definida en S6 — runtime call ✅
   carregarPoligonosAreas();
-}
-
-function renderizarTudoCoord() {
-  renderizarListaMapas();
-  renderizarAreas();
-  renderizarPings(ESTADO.pings);
-  renderizarVoluntarios();
-  // renderizarMonitoramento é async (faz fetch) — chamada sem await intencional
-  // para não bloquear a renderização síncrona; a UI se atualiza quando o fetch conclui
-  renderizarMonitoramento().catch(() => {});
-  atualizarBadges();
-  atualizarProgressoGeral();
-  carregarMarcadoresPings();
-  preencherSelectsCoord();
 }
 
 function preencherSelectsCoord() {
@@ -3102,8 +3279,9 @@ function preencherSelectsCoord() {
   _populateSelect('volAreaInput',   nomesAreas);
 }
 
-// ── RENDERIZAÇÕES ──
-
+// ════════════════════════════════════════════════════════════════
+// RENDERIZAÇÕES — Listas y tablas del coordinador
+// ════════════════════════════════════════════════════════════════
 function renderizarListaMapas() {
   const el = document.getElementById('mapsList');
   if (!ESTADO.mapas.length) {
@@ -3189,156 +3367,9 @@ function renderizarPings(lista) {
   }).join('');
 }
 
-function renderizarVoluntarios() {
-  const el = document.getElementById('volsGrid');
-  if (!ESTADO.voluntarios.length) {
-    el.innerHTML = `<div style="color:var(--muted);font-size:12px">${CONFIG.UI.SEM_DADOS}</div>`;
-    return;
-  }
-  const statusLabel = CONFIG.STATUS_VOL_LABEL;
-  const statusTag   = CONFIG.STATUS_VOL_CSS;
-  el.innerHTML = ESTADO.voluntarios.map(v => {
-    const ini = (v.Nome||'?').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
-    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
-    const nomeVNorm = (v.Nome || '').trim().toLowerCase();
-    const pingsFeitosVol = ESTADO.pings.filter(p =>
-      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
-    const pingsTotalVol  = ESTADO.pings.filter(p =>
-      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm).length;
-    const pingsCrit      = ESTADO.pings.filter(p =>
-      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CRITICO).length;
-    return `
-    <div class="vol-card">
-      <div class="vc-top">
-        <div class="vc-ava ${pingsFeitosVol>0?'av':''}">${ini}</div>
-        <div>
-          <div class="vc-name">${_esc(v.Nome)||'—'}</div>
-          <div class="vc-area">${_esc(v.Areas_Permitidas)||'—'}</div>
-          <span class="tag tag-done" style="margin-top:3px">${CONFIG.VOL_STATUS_ATIVO_LABEL}</span>
-        </div>
-      </div>
-      <div class="vc-stats">
-        <div class="vcs"><div class="vcs-v">${pingsTotalVol}</div><div class="vcs-l">Total</div></div>
-        <div class="vcs"><div class="vcs-v" style="color:var(--green)">${pingsFeitosVol}</div><div class="vcs-l">Feitos</div></div>
-        <div class="vcs"><div class="vcs-v" style="color:${pingsCrit>0?'var(--red)':'var(--muted)'}">${pingsCrit}</div><div class="vcs-l">Críticos</div></div>
-      </div>
-      <div class="vc-acts">
-        <button class="btn btn-ghost" onclick="openModal('modalDesignar')">📐 Redesignar</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function renderizarMonitoramento() {
-  // Carregar formulários do backend se ainda não carregados
-  if (!ESTADO.formularios || ESTADO.formularios.length === 0) {
-    try {
-      const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_FORMULARIOS });
-      if (r.sucesso && r.dados) ESTADO.formularios = r.dados;
-    } catch(e) { /* silencioso — pings continuam funcionando */ }
-  }
-
-  // Stats cards
-  const total    = ESTADO.pings.length;
-  const concluidos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-  const emCurso  = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.EM_CURSO).length;
-  const criticos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
-  const pendentes= ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE).length;
-
-  const SL = CONFIG.STATS_LABELS;
-  document.getElementById('statsGrid').innerHTML = [
-    { lbl:SL.TOTAL,      val:total,      cor:'sc-orange', ico:'📍' },
-    { lbl:SL.CONCLUIDOS, val:concluidos, cor:'sc-green',  ico:'✅', style:'color:var(--green)' },
-    { lbl:SL.EM_CURSO,   val:emCurso,    cor:'sc-yellow', ico:'🔄', style:'color:var(--yellow)' },
-    { lbl:SL.CRITICOS,   val:criticos,   cor:'sc-red',    ico:'🚨', style:'color:var(--red)' },
-    { lbl:SL.PENDENTES,  val:pendentes,  cor:'sc-blue',   ico:'⏳', style:'color:var(--blue)' },
-  ].map(c => `
-    <div class="stat-card ${c.cor}">
-      <div class="stat-ico">${c.ico}</div>
-      <div class="stat-lbl">${c.lbl}</div>
-      <div class="stat-val" ${c.style?'style="'+c.style+'"':''}>${c.val}</div>
-    </div>`).join('');
-
-  // Progresso por área
-  let areaProg = ESTADO.areas.map(a => {
-    const pa   = ESTADO.pings.filter(p=>p.ID_Area===a.ID_Area);
-    const feitos = pa.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-    const pct  = pa.length>0 ? Math.round(feitos/pa.length*100) : 0;
-    return `<div class="pli">
-      <div class="pli-name">${a.Nome}</div>
-      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
-      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${pct}%</div>
-    </div>`;
-  }).join('');
-
-  // Progresso por voluntário
-  let volProg = ESTADO.voluntarios.map(v => {
-    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
-    const nomeVNorm = (v.Nome || '').trim().toLowerCase();
-    const pv   = ESTADO.pings.filter(p=>(p.Voluntario_Responsavel||'').trim().toLowerCase()===nomeVNorm);
-    const feitos = pv.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-    const pct  = pv.length>0 ? Math.round(feitos/pv.length*100) : 0;
-    return `<div class="pli">
-      <div class="pli-name">${_esc(v.Nome)}</div>
-      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
-      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${feitos}/${pv.length}</div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('monitorGrid').innerHTML = `
-    <div class="card">
-      <div class="card-hdr"><div class="card-hdr-title">📐 Progresso por Área</div></div>
-      ${areaProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
-    </div>
-    <div class="card">
-      <div class="card-hdr"><div class="card-hdr-title">👥 Progresso por Voluntário</div></div>
-      ${volProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
-    </div>`;
-
-  // Alertas críticos
-  const critList = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO);
-  _txt('alertasBadge', `${critList.length} alertas`);
-  document.getElementById('alertasList').innerHTML = critList.map(p => `
-    <div class="alert-item">
-      <div style="font-size:16px">🔴</div>
-      <div class="alert-body">
-        <div class="alert-title">${p.Endereco||'—'} — ${p.ID_Area||'—'}</div>
-        <div class="alert-sub">${p.Voluntario_Responsavel||'—'}</div>
-      </div>
-      <span class="tag tag-critical">CRÍTICO</span>
-    </div>`).join('') || `<div style="padding:14px;color:var(--muted);font-size:11px">Nenhuma situação crítica.</div>`;
-
-  // B-23: Renderizar dashboard avançado (cards grandes, barra progresso, alertas visuais)
-  await renderizarDashboardAvancado();
-}
-
-function atualizarBadges() {
-  _txt('nb-mapas', ESTADO.mapas.length);
-  _txt('nb-areas', ESTADO.areas.length);
-  _txt('nb-pings', ESTADO.pings.length);
-  _txt('nb-vols',  ESTADO.voluntarios.length);
-  _txt('nb-mon',   ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length);
-  _txt('nb-users', ESTADO_USERS.lista.length || '');
-  const notifN = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
-  _txt('notifBadgeNum', notifN);
-}
-
-function atualizarProgressoGeral() {
-  const total = ESTADO.pings.length;
-  const feitos= ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-  const pct   = total>0 ? Math.round(feitos/total*100) : 0;
-  _txt('progPct', pct+'%');
-  document.getElementById('progFill').style.width = pct+'%';
-  _txt('progSub', feitos + CONFIG.UI.DE + total + CONFIG.UI.PONTOS_CONCLUIDOS);
-}
-
-async function atualizarDados() {
-  toast(CONFIG.UI.TOAST_ATUALIZAR);
-  await carregarDadosCoord();
-}
-
-// ── MAPA COORDENADOR ──
-
+// ════════════════════════════════════════════════════════════════
+// MAPA COORDENADOR — carga, marcadores, polígonos
+// ════════════════════════════════════════════════════════════════
 function carregarMapa(m) {
   ESTADO.mapaAtual = m;
   _txt('incidentName', m.Nome || CONFIG.UI.COORD_SEM_MAPA);
@@ -3404,12 +3435,15 @@ function pingIcon(cor) {
 }
 
 function focarPingMapa(lat, lng) {
-  navegarCoord('mapas', _navEl('mapas'));
+  navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
   setTimeout(() => {
     mapCoord && mapCoord.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
   }, 100);
 }
 
+// ════════════════════════════════════════════════════════════════
+// HERRAMIENTAS DE DIBUJO
+// ════════════════════════════════════════════════════════════════
 function setTool(t) {
   // F-06: bloquear ferramenta 'draw' se nenhum mapa estiver selecionado
   if (t === 'draw' && !ESTADO.mapaAtual) {
@@ -3674,7 +3708,6 @@ async function confirmarPing() {
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_PING_CRIADO_COORD);
       closeModal('modalPing');
-      // Limpar campos do modal
       document.getElementById('pingAddr').value = '';
       await carregarDadosCoord();
     } else {
@@ -3769,8 +3802,11 @@ async function criarVoluntario() {
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
 }
 
+// ════════════════════════════════════════════════════════════════
+// NAVEGACIÓN Y FILTROS
+// ════════════════════════════════════════════════════════════════
 function goDrawArea() {
-  navegarCoord('mapas', _navEl('mapas'));
+  navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
   setTimeout(() => {
     setTool('draw');
     toast(CONFIG.UI.TOAST_DESENHAR);
@@ -3778,7 +3814,7 @@ function goDrawArea() {
 }
 
 function goAddPing() {
-  navegarCoord('mapas', _navEl('mapas'));
+  navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
   setTimeout(() => {
     setTool('ping');
     toast(CONFIG.UI.TOAST_PING_MODO);
@@ -3829,836 +3865,209 @@ function toggleOfflineCoord() {
   toast(offlineCoord ? CONFIG.UI.TOAST_OFFLINE_ON : CONFIG.UI.TOAST_OFFLINE_OFF);
 }
 
-// ── NAVEGAÇÃO COORDENADOR ──
 // Helper seguro: obtém elemento nav por id de página (gerado dinamicamente)
 function _navEl(id) {
   return document.getElementById('nav-' + id) || null;
 }
 
-function navegarCoord(pagina, el) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const pg = document.getElementById('page-' + pagina);
-  if (pg) pg.classList.add('active');
-  if (el) el.classList.add('active');
-  ESTADO.paginaAtual = pagina;
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 5 — COORD: Mapas / Áreas / Pings
+     ============================================================ -->
 
-  // Ações ao entrar em cada página
-  if (pagina === 'mapas') {
-    setTimeout(() => mapCoord && mapCoord.invalidateSize(), 60);
-  } else if (pagina === 'monitoreo') {
-    renderizarMonitoramento();
-    iniciarDashboardAutoRefresh();
-  } else if (pagina === 'usuarios') {
-    _popularFiltroRole();
-    _popularSelectRole('nuRole');
-    carregarUsuarios();
-  } else if (pagina === 'exportar') {
-    // Já renderizado em renderizarTextos, nada a fazer
-  } else {
-    pararDashboardAutoRefresh();
-  }
-}
 
+<!-- ============================================================
+     SECCIÓN 6 — COORD: Monitoreo
+     Renderizado total del coordinador, voluntarios, monitoramento,
+     badges, progreso general y dashboard en tiempo real.
+     Posición: sexta — depende de S1, S2, S3, S5.
+     NOTA: renderizarTudoCoord movida AQUÍ desde S5 (auditoría ①)
+     CORRECCIÓN: renderizarDashboardAvancado — strings literales
+                 reemplazados por CONFIG.STATUS_PING.* (tabla de
+                 correcciones pendientes del inventario v2)
+     ============================================================ -->
+<script id="s6-coord-monitoreo">
 
 // ════════════════════════════════════════════════════════════════
-// VOLUNTÁRIO — INICIALIZAÇÃO
+// RENDERIZAÇÃO TOTAL — orquestra todas las vistas del coordinador
+// MOVIDA desde S5 (auditoría ①): depende de renderizarVoluntarios,
+// renderizarMonitoramento, atualizarBadges, atualizarProgressoGeral
+// que viven en esta misma sección S6.
 // ════════════════════════════════════════════════════════════════
-let mapVol = null;
-let newPingMapVol = null;
-let offlineVol = false;
-let viewAtual = 'mapa';
-
-function inicializarVoluntario() {
-  const s = ESTADO.sessao;
-  if (!s) return;
-
-  const nome = s.Nome || s.nome || s.usuario || CONFIG.UI.ROLE_VOL_NOME;
-  const ini  = nome.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
-
-  // Preencher UI
-  _txt('volNameDisplay', nome);
-  _txt('volRoleTag',     CONFIG.UI.VOL_AREA_TAG);
-  _txt('volAreaDisplay', s.Areas_Permitidas || '—');
-  _txt('perfilNome',     nome);
-  _txt('perfilAvatar',   ini);
-  _txt('perfilSub',      CONFIG.UI.ROLE_VOL_NOME + ' · ' + (s.Areas_Permitidas||'—'));
-
-  document.getElementById('perfilTags').innerHTML = [
-    s.Mapas_Permitidos || '—',
-    s.Areas_Permitidas || '—',
-  ].map(t => `<div class="area-tag">${_esc(t)}</div>`).join('');
-
-  inicializarMapaVol();
-  carregarPingsVol();
-  // B-18: Carregar área designada do voluntário no mapa
-  carregarAreaVol();
-  // F-22: Carregar ESTADO.areas para que createNewPing possa resolver idArea/idMapa
-  _carregarAreasParaVoluntario();
+function renderizarTudoCoord() {
+  renderizarListaMapas();
+  renderizarAreas();
+  renderizarPings(ESTADO.pings);
+  renderizarVoluntarios();
+  // renderizarMonitoramento é async (faz fetch) — chamada sem await intencional
+  // para não bloquear a renderização síncrona; a UI se atualiza quando o fetch conclui
+  renderizarMonitoramento().catch(() => {});
+  atualizarBadges();
+  atualizarProgressoGeral();
+  carregarMarcadoresPings();
+  preencherSelectsCoord();
 }
 
-// F-22: Carregar áreas para voluntário — necessário para createNewPing resolver idArea/idMapa
-async function _carregarAreasParaVoluntario() {
-  try {
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
-    if (r.sucesso && Array.isArray(r.dados)) {
-      ESTADO.areas = r.dados;
-    }
-  } catch(e) { /* falha silenciosa — ESTADO.areas permanece vazio */ }
-}
-
-function inicializarMapaVol() {
-  const M = CONFIG.MAPA;
-  mapVol = L.map('map-vol', {
-    center: [M.LAT_PADRAO, M.LNG_PADRAO],
-    zoom:   M.ZOOM_PADRAO,
-    zoomControl: true,
-  });
-  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(mapVol);
-
-  mapVol.on('mousemove', e => {
-    _txt('mapCoordsVol',
-      e.latlng.lat.toFixed(4) + '°, ' + e.latlng.lng.toFixed(4) + '°'
-    );
-  });
-
-  // GPS próprio
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PADRAO);
-      L.circleMarker([lat, lng], { radius:8, color:'#3B82F6', fillColor:'#3B82F6', fillOpacity:0.8 })
-        .addTo(mapVol).bindPopup(CONFIG.UI.GPS_VOCE_AQUI);
-    });
-  }
-}
-
-function initNewPingMap() {
-  if (newPingMapVol) { newPingMapVol.invalidateSize(); return; }
-  const M = CONFIG.MAPA;
-  const lat = parseFloat(document.getElementById('npLat').value) || M.LAT_PADRAO;
-  const lng = parseFloat(document.getElementById('npLng').value) || M.LNG_PADRAO;
-  newPingMapVol = L.map('new-ping-map', {
-    center: [lat, lng], zoom: M.ZOOM_NOVO,
-  });
-  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(newPingMapVol);
-}
-
-// B-18: Carregar polígono da área designada ao voluntário no mapa
-async function carregarAreaVol() {
-  const s = ESTADO.sessao;
-  if (!s || !mapVol) return;
-  const areaNome = s.Areas_Permitidas;
-  if (!areaNome || areaNome === '—') return;
-
-  try {
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
-    if (!r.sucesso || !Array.isArray(r.dados)) return;
-
-    // Encontrar área(s) que correspondem ao voluntário
-    const areas = r.dados.filter(a =>
-      a.Nome && a.Nome.toString().trim() === areaNome.toString().trim()
-    );
-
-    let encontrou = false;
-    areas.forEach(area => {
-      if (!area.Pontos_Poligono) return;
-      try {
-        const pts = JSON.parse(area.Pontos_Poligono);
-        if (!pts || pts.length < CONFIG.FORM_LIMITES.MIN_POLIGONO_PTS) return;
-
-        // Desenhar polígono da área no mapa do voluntário
-        const poly = L.polygon(pts, {
-          color: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
-          fillColor: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
-          fillOpacity: 0.12,
-          weight: 2,
-          dashArray: '5,5',
-        }).addTo(mapVol);
-
-        poly.bindPopup(`
-          <strong style="font-family:'Rajdhani',sans-serif;font-size:13px">${area.Nome}</strong><br>
-          <span style="font-size:11px;color:#888">${CONFIG.UI.AREA_LABEL}</span>
-        `);
-
-        // Centralizar mapa na área designada
-        mapVol.fitBounds(poly.getBounds(), { padding: [20, 20] });
-        encontrou = true;
-
-        // Guardar cache da área
-        try { sessionStorage.setItem(CONFIG.STORAGE.AREA_CACHE, JSON.stringify(area)); } catch(e){}
-      } catch(e) {}
-    });
-
-    if (encontrou) toast(CONFIG.UI.TOAST_AREA_CARREGADA);
-  } catch(e) {
-    // Modo offline: não exibir erro — o mapa já tem GPS ativo
-  }
-}
-
-async function carregarPingsVol() {
-  const s = ESTADO.sessao;
-  if (!s) return;
-
-  // Mostrar estado de carregamento
-  const listEl = document.getElementById('pingListVol');
-  if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_PINGS_CARREGANDO}</div>`;
-
-  try {
-    // B-11: Buscar todos os pings e filtrar pelo voluntário logado no frontend
-    // (o backend filtra por idArea/idMapa, mas não por voluntario diretamente)
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
-    if (r.sucesso && Array.isArray(r.dados)) {
-      const nomeVol = s.Nome || s.nome || s.usuario || '';
-      // Filtrar pings atribuídos a este voluntário (campo Voluntario_Responsavel)
-      ESTADO.pingsVol = r.dados.filter(p =>
-        p.Voluntario_Responsavel &&
-        p.Voluntario_Responsavel.toString().trim() === nomeVol.trim()
-      );
-      // Guardar cache local para uso offline
-      try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e){}
-    }
-  } catch(e) {
-    // Modo offline: tentar recuperar do cache
-    try {
-      const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
-      if (cached) ESTADO.pingsVol = JSON.parse(cached);
-    } catch(ce) {}
-    ESTADO.pingsVol = ESTADO.pingsVol || [];
-  }
-  renderizarPingsVol();
-}
-
-function renderizarPingsVol() {
-  const lista = ESTADO.pingsVol;
-  const total   = lista.length;
-  const feitos  = lista.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-  const pct     = total>0 ? Math.round(feitos/total*100) : 0;
-
-  _txt('volProgNum', feitos+'/'+total);
-  document.getElementById('volProgFill').style.width = pct+'%';
-  _txt('pingCountVol', total + ' ' + CONFIG.UI.PINGS_ATRIBUIDOS);
-
-  // Badge pendentes
-  const pend = lista.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE||p.Status===CONFIG.STATUS_PING.CRITICO).length;
-  const badge = document.getElementById('pendBadge');
-  if (badge) { badge.textContent = pend; badge.style.display = pend>0?'block':'none'; }
-
-  // HTML das cards de ping
-  const pingsHTML = total === 0
-    ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
-    : lista.map((p,i) => {
-        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
-        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
-        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-        return `
-        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
-          <div class="ping-card-inner">
-            <div class="ping-status-bar" style="background:${cor}"></div>
-            <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+_esc(p.ID_Ping)}</div>
-              <div class="ping-meta">
-                <span>${_esc(p.ID_Area)||'—'}</span>
-                <span>${_esc(p.Tipo_Unidade)||'—'}</span>
-              </div>
-            </div>
-            <div class="ping-right">
-              <span class="status-tag ${css}">${lbl}</span>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-
-  // Lista mapa view e pontos view (ambos usam o mesmo HTML)
-  const pingListEl = document.getElementById('pingListVol');
-  const pontosListEl = document.getElementById('pontosList');
-  if (pingListEl)  pingListEl.innerHTML  = pingsHTML;
-  if (pontosListEl) pontosListEl.innerHTML = pingsHTML;
-
-  // Sync info
-  _txt('syncStatusTxt', feitos > 0 ? CONFIG.UI.SYNC_OK : CONFIG.UI.SYNC_PENDENTE);
-  _txt('syncSubTxt',    CONFIG.UI.SYNC_ULTIMA + (new Date().toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA)));
-  _txt('syncEnviados',  feitos);
-  _txt('syncPendentes', pend);
-
-  // Marcadores no mapa
-  lista.forEach(p => {
-    if (!p.Latitude || !p.Longitude) return;
-    const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-    const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
-    L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
-      icon: L.divIcon({
-        className:'',
-        html:`<div style="width:14px;height:14px;border-radius:50%;background:${cor};border:2px solid white;box-shadow:0 0 8px ${cor}"></div>`,
-        iconSize:[14,14], iconAnchor:[7,7],
-      })
-    }).addTo(mapVol)
-      .bindPopup(`<strong>${_esc(p.Endereco)||'Ponto'}</strong><br><span style="color:${cor};font-size:11px">${lbl}</span>`)
-      .on('click', () => abrirFormulario(p.ID_Ping, p.Endereco));
-  });
-}
-
-// ── VIEWS DO VOLUNTÁRIO ──
-// Usa CONFIG.VIEWS_VOL — sem hardcode de nomes de views aqui
-function switchView(v) {
-  if (v === 'novo') { abrirNovoPoint(); return; }
-
-  viewAtual = v;
-
-  // Ocultar todas as views
-  CONFIG.VIEWS_VOL.forEach(view => {
-    const el  = document.getElementById(view.id + 'View');
-    const btn = document.getElementById('nav-' + view.id);
-    if (el)  { el.style.display = 'none'; }
-    if (btn) btn.classList.remove('active');
-  });
-
-  // Mostrar view ativa
-  const activeEl  = document.getElementById(v + 'View');
-  const activeBtn = document.getElementById('nav-' + v);
-  if (activeEl) {
-    // mapa usa block, o resto usa flex
-    activeEl.style.display = (v === 'mapa') ? 'block' : 'flex';
-    if (v === 'mapa') setTimeout(() => mapVol && mapVol.invalidateSize(), 100);
-  }
-  if (activeBtn) activeBtn.classList.add('active');
-}
-
-function filtrarPingsView(el, tipo) {
-  document.querySelectorAll('#pontosFilterEl .filter-chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on');
-  const lista = tipo === 'all' ? ESTADO.pingsVol
-    : ESTADO.pingsVol.filter(p => p.Status === tipo);
-  // Re-render só a pontosView
-  document.getElementById('pontosList').innerHTML = lista.length === 0
-    ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
-    : lista.map((p,i) => {
-        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
-        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
-        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-        return `
-        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
-          <div class="ping-card-inner">
-            <div class="ping-status-bar" style="background:${cor}"></div>
-            <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto'}</div>
-              <div class="ping-meta"><span>${_esc(p.ID_Area)||'—'}</span></div>
-            </div>
-            <div class="ping-right"><span class="status-tag ${css}">${lbl}</span></div>
-          </div>
-        </div>`;
-      }).join('');
-}
-
-// Preencher chips filtro pontos
-function renderizarFiltrosPontos() {
-  const filtros = [
-    { tipo:'all',      label:'Todos' },
-    { tipo:CONFIG.STATUS_PING.PENDENTE,  label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.PENDENTE] },
-    { tipo:CONFIG.STATUS_PING.CRITICO,   label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.CRITICO] },
-    { tipo:CONFIG.STATUS_PING.CONCLUIDO, label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.CONCLUIDO] },
-  ];
-  document.getElementById('pontosFilterEl').innerHTML = filtros.map((f,i) =>
-    `<div class="filter-chip${i===0?' on':''}" onclick="filtrarPingsView(this,'${f.tipo}')">${f.label}</div>`
-  ).join('');
-}
-
-// ── OFFLINE VOLUNTÁRIO ──
-function toggleOfflineVol() {
-  offlineVol = !offlineVol;
-  ESTADO.offline = offlineVol;
-  const tag    = document.getElementById('modeTagVol');
-  const banner = document.getElementById('offlineBannerVol');
-  const pill   = document.getElementById('gpsPill');
-  if (offlineVol) {
-    tag.textContent  = '📶 OFFLINE';
-    tag.className    = 'map-tag offline';
-    banner.style.display = 'flex';
-    if (pill) pill.style.borderColor = 'var(--yellow)';
-  } else {
-    tag.textContent  = '🌐 ONLINE';
-    tag.className    = 'map-tag online';
-    banner.style.display = 'none';
-    if (pill) pill.style.borderColor = '';
-  }
-  toast(offlineVol ? CONFIG.UI.TOAST_OFFLINE_ON : CONFIG.UI.TOAST_OFFLINE_OFF);
-}
-
-// ── FORMULÁRIO ──
-let pingAtualForm = null;
-let pingAtualDados = null; // dados completos do ping atual
-
-function abrirFormulario(idPing, nomeEndereco) {
-  pingAtualForm = idPing;
-  // Guardar dados do ping para usar no submit (idArea, idMapa)
-  pingAtualDados = ESTADO.pingsVol.find(p => p.ID_Ping === idPing) || null;
-
-  _txt('formTitle', nomeEndereco || 'Formulário');
-
-  // Pré-preencher endereço se disponível
-  if (pingAtualDados) {
-    const endEl = document.getElementById('fEndereco');
-    if (endEl && !endEl.value) endEl.value = pingAtualDados.Endereco || '';
-    const latEl = document.getElementById('fLat');
-    const lngEl = document.getElementById('fLng');
-    if (latEl && !latEl.value && pingAtualDados.Latitude) latEl.value = pingAtualDados.Latitude;
-    if (lngEl && !lngEl.value && pingAtualDados.Longitude) lngEl.value = pingAtualDados.Longitude;
-  }
-
-  document.getElementById('formOverlay').classList.add('open');
-  document.getElementById('formScroll').scrollTop = 0;
-  goStep(1);
-
-  // Marcar ping como Em Curso ao abrir (se ainda Pendente)
-  if (pingAtualDados && pingAtualDados.Status === CONFIG.STATUS_PING.PENDENTE) {
-    chamarBackend({
-      acao:   CONFIG.ACOES.ATUALIZAR_PING,
-      id:     idPing,
-      Status: CONFIG.STATUS_PING.EM_CURSO,
-    }).catch(() => {});
-  }
-}
-
-function closeForm() {
-  document.getElementById('formOverlay').classList.remove('open');
-  pingAtualForm  = null;
-  pingAtualDados = null;
-  // Limpar fotos pendentes da sessão atual
-  _fotosBase64 = [];
-}
-
-function goStep(n) {
-  const total = CONFIG.FORM_NUM_PASSOS;
-  for (let i = 1; i <= total; i++) {
-    const s = document.getElementById('step'+i);
-    if (!s) continue;
-    s.classList.remove('active','done');
-    if (i < n)  s.classList.add('done');
-    if (i === n) s.classList.add('active');
-  }
-}
-
-function captureGPS() {
-  toast(CONFIG.UI.TOAST_GPS_CAPTURA);
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        document.getElementById('fLat').value = pos.coords.latitude.toFixed(6);
-        document.getElementById('fLng').value = pos.coords.longitude.toFixed(6);
-        toast(CONFIG.UI.TOAST_GPS_OK);
-      },
-      () => {
-        document.getElementById('fLat').value = (CONFIG.MAPA.LAT_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        document.getElementById('fLng').value = (CONFIG.MAPA.LNG_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        toast(CONFIG.UI.TOAST_GPS_SIMULADO);
-      }
-    );
-  }
-}
-
-function saveDraft() {
-  // Coleta os dados principais para rascunho
-  const FC = CONFIG.FORM_CAMPOS;
-  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const draft = {
-    idPing:    pingAtualForm,
-    idArea:    pingAtualDados ? (pingAtualDados.ID_Area || '') : '',
-    idMapa:    pingAtualDados ? (pingAtualDados.ID_Mapa || '') : '',
-    lat:       val(FC.latitude),
-    lng:       val(FC.longitude),
-    endereco:  val(FC.endereco),
-    timestamp: Date.now(),
-  };
-  try { sessionStorage.setItem(CONFIG.SESSAO.CHAVE_DRAFT, JSON.stringify(draft)); } catch(e){}
-  toast(CONFIG.UI.TOAST_RASCUNHO);
-}
-
-// Coleta os chips selecionados de um container (classe .on ou .selected)
-function coletarChipsSelecionados(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return '';
-  // Suporta tanto .on (padrão do projeto) quanto .selected
-  return Array.from(el.querySelectorAll('.chip.on, .chip.selected'))
-    .map(c => c.dataset.val || c.textContent.trim())
-    .join(', ');
-}
-
-// Coleta todos os residentes do formulário
-function coletarResidentes() {
-  const cards = document.querySelectorAll('#residentList .resident-card');
-  const res = [];
-  cards.forEach(card => {
-    const inputs = card.querySelectorAll('input, select, textarea');
-    const r = {
-      nome:                  inputs[0]?.value || '',
-      idade:                 inputs[1]?.value || '',
-      cpf:                   inputs[2]?.value || '',
-      condicao:              inputs[3]?.value || '',
-      vulnerabilidade:       inputs[4]?.value || '',
-      necessidadesEspecificas: inputs[5]?.value || '',
-    };
-    if (r.nome || r.idade) res.push(r); // só adicionar se tem dados
-  });
-  return res;
-}
-
-async function submitForm() {
-  const s = ESTADO.sessao;
-
-  // Validação obrigatória: endereço ou coordenadas
-  const lat = document.getElementById('fLat').value;
-  const lng = document.getElementById('fLng').value;
-  const end = document.getElementById('fEndereco').value.trim();
-  if (!end && (!lat || !lng)) {
-    toast(CONFIG.UI.FORM_CAMPO_OBRIG);
-    goStep(1);
+// ════════════════════════════════════════════════════════════════
+// VOLUNTÁRIOS — card grid
+// ════════════════════════════════════════════════════════════════
+function renderizarVoluntarios() {
+  const el = document.getElementById('volsGrid');
+  if (!ESTADO.voluntarios.length) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:12px">${CONFIG.UI.SEM_DADOS}</div>`;
     return;
   }
-
-  // F-23: validar campos críticos de dano (coração do levantamento)
-  const grauDanoVal  = document.getElementById('fGrauDano')?.value;
-  const tipoDanoVal  = document.getElementById('fTipoDano')?.value;
-  const habitavelVal = document.getElementById('fHabitavel')?.value;
-  if (!grauDanoVal || !tipoDanoVal || !habitavelVal) {
-    toast(CONFIG.UI.FORM_DANO_OBRIG);
-    goStep(3);
-    return;
-  }
-
-  // Usar CONFIG.FORM_CAMPOS para coletar dados do form sem hardcode
-  const FC = CONFIG.FORM_CAMPOS;
-  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-
-  // Montar payload conforme backend espera
-  const dados = {
-    acao:             CONFIG.ACOES.SALVAR_FORMULARIO,
-    idPing:           pingAtualForm,
-    idArea:           pingAtualDados ? (pingAtualDados.ID_Area || '') : '',
-    idMapa:           pingAtualDados ? (pingAtualDados.ID_Mapa || '') : '',
-    // Seção 7.1 Unidade
-    tipoUnidade:      val(FC.tipoUnidade),
-    tipoConstrucao:   val(FC.tipoConstrucao),
-    endereco:         val(FC.endereco),
-    complemento:      val(FC.complemento),
-    referencia:       val(FC.referencia),
-    latitude:         val(FC.latitude),
-    longitude:        val(FC.longitude),
-    // Seção 7.2 Residentes
-    numPessoas:       val(FC.numPessoas)         || '0',
-    numFeridos:       val(FC.numFeridos)         || '0',
-    numDesaparecidos: val(FC.numDesaparecidos)   || '0',
-    numObitos:        val(FC.numObitos)          || '0',
-    animaisDomesticos: val(FC.animaisDomesticos),
-    necessidadesGerais: coletarChipsSelecionados('chipsNecessidades') || val(FC.necessidadesGerais),
-    // Seção 7.3 Danos
-    tipoDano:         val(FC.tipoDano),
-    grauDano:         val(FC.grauDano),
-    servicosAfetados: coletarChipsSelecionados('chipsServicos') || val(FC.servicosAfetados),
-    riscosImediatos:  val(FC.riscosImediatos),
-    unidadeHabitavel: val(FC.unidadeHabitavel),
-    necessitaEvacuacao: val(FC.necessitaEvacuacao),
-    observacoes:      val(FC.observacoes),
-    // Metadados
-    voluntario:       s ? (s.Nome || s.nome || s.usuario) : '',
-    quantidadeFotos:  document.querySelectorAll('#photoGrid .photo-thumb').length,
-  };
-
-  // Detectar situação crítica para feedback imediato
-  const ehCritico = dados.grauDano === CONFIG.GRAUS_DANO[3]  // 'Total'
-                 || dados.grauDano === CONFIG.GRAUS_DANO[2]   // 'Grave'
-                 || dados.riscosImediatos !== CONFIG.RISCOS[0]; // ≠ 'Nenhum'
-
-  try {
-    let result;
-    if (offlineVol) {
-      guardarFilaOffline(dados);
-      result = { sucesso: true };
-    } else {
-      result = await chamarBackend(dados);
-    }
-
-    if (result.sucesso) {
-      // Salvar residentes em paralelo (não bloqueia o fluxo principal)
-      const residentes = coletarResidentes();
-      if (residentes.length > 0 && !offlineVol) {
-        const idUnidade = result.dados ? result.dados.id : null;
-        chamarBackend({
-          acao:       CONFIG.ACOES.SALVAR_RESIDENTES,
-          idPing:     pingAtualForm,
-          idUnidade:  idUnidade || '',
-          residentes: residentes,
-        }).catch(() => {}); // silencioso — formulário principal já foi salvo
-      } else if (residentes.length > 0 && offlineVol) {
-        // Guardar residentes também na fila offline
-        guardarFilaOffline({
-          acao:       CONFIG.ACOES.SALVAR_RESIDENTES,
-          idPing:     pingAtualForm,
-          idUnidade:  '',
-          residentes: residentes,
-        });
-      }
-
-      // B-20: Enviar fotos após salvar o formulário principal
-      const idUnidade = result.dados ? result.dados.id : pingAtualForm;
-      const volNome   = ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.nome || ESTADO.sessao.usuario) : '';
-      if (_fotosBase64.length > 0) {
-        await enviarFotosBackend(pingAtualForm, volNome);
-      }
-
-      // B-21: Enviar alerta ao coordenador se situação crítica
-      if (ehCritico && CONFIG.S5.EMAIL_COORD) {
-        await enviarAlertaCritico(pingAtualDados, dados);
-      }
-
-      if (ehCritico) toast(CONFIG.UI.FORM_CRITICO_ALERTA);
-      else toast(offlineVol ? CONFIG.UI.FORM_OFFLINE_OK : CONFIG.UI.FORM_ENVIADO_OK);
-
-      setTimeout(closeForm, 1500);
-      await carregarPingsVol();
-    } else {
-      toast('⚠️ ' + (result.mensagem || 'Erro ao enviar'));
-    }
-  } catch(e) {
-    // Falhou → guardar offline
-    guardarFilaOffline(dados);
-    toast(CONFIG.UI.FORM_OFFLINE_OK + ' (sem conexão)');
-    setTimeout(closeForm, 1500);
-  }
-}
-
-// ── RESIDENTES ──
-function toggleResident(header) {
-  const body = header.nextElementSibling;
-  const tog  = header.querySelector('.resident-toggle');
-  body.classList.toggle('open');
-  if (tog) tog.textContent = body.classList.contains('open') ? '▾' : '▸';
-}
-
-function addResident() {
-  ESTADO.residentCount++;
-  const n = ESTADO.residentCount;
-  const list = document.getElementById('residentList');
-  const div  = document.createElement('div');
-  div.className = 'resident-card';
-  div.innerHTML = `
-    <div class="resident-header" onclick="toggleResident(this)">
-      <span class="resident-name">Residente ${n}</span>
-      <span class="resident-toggle">▾</span>
-    </div>
-    <div class="resident-body open">
-      <div class="field-row" style="margin-bottom:8px">
-        <div class="field"><label>Nome</label>
-          <input type="text" placeholder="Nome completo"
-            oninput="this.closest('.resident-card').querySelector('.resident-name').textContent=this.value||'Residente ${n}'">
-        </div>
-        <div class="field"><label>Idade</label><input type="number" placeholder="0" min="0"></div>
-      </div>
-      <div class="field-row" style="margin-bottom:8px">
-        <div class="field"><label>CPF (opcional)</label><input type="text" placeholder="000.000.000-00"></div>
-        <div class="field"><label>Condição</label>
-          <select>${CONFIG.CONDICOES.map(c=>`<option>${c}</option>`).join('')}</select>
+  const statusLabel = CONFIG.STATUS_VOL_LABEL;
+  const statusTag   = CONFIG.STATUS_VOL_CSS;
+  el.innerHTML = ESTADO.voluntarios.map(v => {
+    const ini = (v.Nome||'?').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
+    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
+    const nomeVNorm = (v.Nome || '').trim().toLowerCase();
+    const pingsFeitosVol = ESTADO.pings.filter(p =>
+      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+    const pingsTotalVol  = ESTADO.pings.filter(p =>
+      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm).length;
+    const pingsCrit      = ESTADO.pings.filter(p =>
+      (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CRITICO).length;
+    return `
+    <div class="vol-card">
+      <div class="vc-top">
+        <div class="vc-ava ${pingsFeitosVol>0?'av':''}">${ini}</div>
+        <div>
+          <div class="vc-name">${_esc(v.Nome)||'—'}</div>
+          <div class="vc-area">${_esc(v.Areas_Permitidas)||'—'}</div>
+          <span class="tag tag-done" style="margin-top:3px">${CONFIG.VOL_STATUS_ATIVO_LABEL}</span>
         </div>
       </div>
-      <div class="field"><label>Vulnerabilidade</label>
-        <select>${CONFIG.VULNERABILIDADES.map(v=>`<option>${v}</option>`).join('')}</select>
+      <div class="vc-stats">
+        <div class="vcs"><div class="vcs-v">${pingsTotalVol}</div><div class="vcs-l">Total</div></div>
+        <div class="vcs"><div class="vcs-v" style="color:var(--green)">${pingsFeitosVol}</div><div class="vcs-l">Feitos</div></div>
+        <div class="vcs"><div class="vcs-v" style="color:${pingsCrit>0?'var(--red)':'var(--muted)'}">${pingsCrit}</div><div class="vcs-l">Críticos</div></div>
       </div>
-      <div class="field" style="margin-top:8px"><label>Necessidades Específicas</label>
-        <textarea placeholder="Medicação, mobilidade reduzida..." style="min-height:56px"></textarea>
+      <div class="vc-acts">
+        <button class="btn btn-ghost" onclick="openModal('modalDesignar')">📐 Redesignar</button>
       </div>
     </div>`;
-  list.appendChild(div);
-  div.scrollIntoView({ behavior:'smooth' });
+  }).join('');
 }
 
-// ── NOVO PING VOLUNTÁRIO ──
-function abrirNovoPoint() {
-  document.getElementById('newPingOverlay').classList.add('open');
-  setTimeout(initNewPingMap, 100);
-  setTimeout(() => newPingMapVol && newPingMapVol.invalidateSize(), 200);
-}
-
-function closeNewPing() {
-  document.getElementById('newPingOverlay').classList.remove('open');
-}
-
-function captureNewPingGPS() {
-  toast(CONFIG.UI.TOAST_GPS_CAPTURA);
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const lat = pos.coords.latitude.toFixed(6);
-        const lng = pos.coords.longitude.toFixed(6);
-        document.getElementById('npLat').value = lat;
-        document.getElementById('npLng').value = lng;
-        if (newPingMapVol) newPingMapVol.setView([parseFloat(lat), parseFloat(lng)], 17);
-        toast(CONFIG.UI.TOAST_GPS_OK);
-        checkDuplicate(document.getElementById('npComplemento').value);
-      },
-      () => {
-        const lat = (CONFIG.MAPA.LAT_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        const lng = (CONFIG.MAPA.LNG_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        document.getElementById('npLat').value = lat;
-        document.getElementById('npLng').value = lng;
-        if (newPingMapVol) newPingMapVol.setView([parseFloat(lat), parseFloat(lng)], 17);
-        toast(CONFIG.UI.TOAST_GPS_SIMULADO);
-        checkDuplicate(document.getElementById('npComplemento').value);
-      }
-    );
+// ════════════════════════════════════════════════════════════════
+// MONITORAMENTO — progreso por área y voluntario
+// ════════════════════════════════════════════════════════════════
+async function renderizarMonitoramento() {
+  // Carregar formulários do backend se ainda não carregados
+  if (!ESTADO.formularios || ESTADO.formularios.length === 0) {
+    try {
+      const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_FORMULARIOS });
+      if (r.sucesso && r.dados) ESTADO.formularios = r.dados;
+    } catch(e) { /* silencioso — pings continuam funcionando */ }
   }
-}
 
-function checkDuplicate(comp) {
-  const warn = document.getElementById('dupWarning');
-  const lat  = parseFloat(document.getElementById('npLat').value);
-  const lng  = parseFloat(document.getElementById('npLng').value);
-  // BUG-08: verificar lat E lng combinados — evita falsos positivos em ruas paralelas
-  if (isNaN(lat) || isNaN(lng)) { warn.style.display='none'; return; }
-  const proximos = ESTADO.pingsVol.filter(p =>
-    p.Latitude && p.Longitude &&
-    Math.abs(parseFloat(p.Latitude)  - lat) < 0.0003 &&
-    Math.abs(parseFloat(p.Longitude) - lng) < 0.0003
-  );
-  if (proximos.length > 0 && !comp) {
-    document.getElementById('dupLista').innerHTML = proximos.map(p => `
-      <div class="dup-item">
-        <span>📍 ${_esc(p.Endereco)||'—'}</span>
-        <span class="status-tag ${CONFIG.STATUS_CSS[p.Status]||'s-pending'}">${CONFIG.STATUS_LABEL[p.Status]||p.Status}</span>
-      </div>`).join('');
-    warn.style.display = 'block';
-  } else {
-    warn.style.display = 'none';
-  }
-}
+  // Stats cards
+  const total    = ESTADO.pings.length;
+  const concluidos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+  const emCurso  = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.EM_CURSO).length;
+  const criticos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
+  const pendentes= ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE).length;
 
-async function createNewPing() {
-  const lat  = document.getElementById('npLat').value;
-  const lng  = document.getElementById('npLng').value;
-  const addr = document.getElementById('npEndereco').value;
-  const comp = document.getElementById('npComplemento').value;
-  if (!lat || !lng) { toast('⚠️ Capture as coordenadas GPS primeiro'); return; }
-  const s = ESTADO.sessao;
-  // Determinar área do voluntário a partir da sessão
-  const areaVol = s ? (s.Areas_Permitidas || '') : '';
-  const areaObj = ESTADO.areas.find(a => a.Nome === areaVol) || null;
+  const SL = CONFIG.STATS_LABELS;
+  document.getElementById('statsGrid').innerHTML = [
+    { lbl:SL.TOTAL,      val:total,      cor:'sc-orange', ico:'📍' },
+    { lbl:SL.CONCLUIDOS, val:concluidos, cor:'sc-green',  ico:'✅', style:'color:var(--green)' },
+    { lbl:SL.EM_CURSO,   val:emCurso,    cor:'sc-yellow', ico:'🔄', style:'color:var(--yellow)' },
+    { lbl:SL.CRITICOS,   val:criticos,   cor:'sc-red',    ico:'🚨', style:'color:var(--red)' },
+    { lbl:SL.PENDENTES,  val:pendentes,  cor:'sc-blue',   ico:'⏳', style:'color:var(--blue)' },
+  ].map(c => `
+    <div class="stat-card ${c.cor}">
+      <div class="stat-ico">${c.ico}</div>
+      <div class="stat-lbl">${c.lbl}</div>
+      <div class="stat-val" ${c.style?'style="'+c.style+'"':''}>${c.val}</div>
+    </div>`).join('');
 
-  const dados = {
-    acao:        CONFIG.ACOES.SALVAR_PING,
-    endereco:    addr + (comp ? ' – ' + comp : ''),
-    latitude:    lat,
-    longitude:   lng,
-    idArea:      areaObj ? areaObj.ID_Area : '',
-    idMapa:      areaObj ? areaObj.ID_Mapa : '',
-    nomeArea:    areaVol,
-    nomeMapa:    ESTADO.mapaAtual ? ESTADO.mapaAtual.Nome : '',
-    voluntarioResponsavel: s ? (s.Nome || s.nome || s.usuario) : '',
-    criadoPor:   s ? (s.Nome || s.nome || s.usuario) : '',
-  };
-  try {
-    let r;
-    if (offlineVol) {
-      guardarFilaOffline({ ...dados, acao: CONFIG.ACOES.SALVAR_PING });
-      r = { sucesso:true };
-    } else {
-      r = await chamarBackend(dados);
-    }
-    if (r.sucesso) {
-      toast(CONFIG.UI.TOAST_PING_CRIADO);
-      if (offlineVol) {
-        // BUG-07: em modo offline r.dados é undefined — não abrir formulário
-        // com idPing=null. O formulário será acessível após sincronização.
-        setTimeout(() => closeNewPing(), 800);
-      } else {
-        setTimeout(() => {
-          closeNewPing();
-          abrirFormulario(r.dados ? r.dados.id : null, addr||'Novo Ponto');
-        }, 800);
-      }
-      await carregarPingsVol();
-    } else {
-      toast('⚠️ ' + r.mensagem);
-    }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
+  // Progresso por área
+  let areaProg = ESTADO.areas.map(a => {
+    const pa   = ESTADO.pings.filter(p=>p.ID_Area===a.ID_Area);
+    const feitos = pa.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+    const pct  = pa.length>0 ? Math.round(feitos/pa.length*100) : 0;
+    return `<div class="pli">
+      <div class="pli-name">${a.Nome}</div>
+      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
+      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${pct}%</div>
+    </div>`;
+  }).join('');
 
-// ════════════════════════════════════════════════════════════════
-// SHARED HELPERS
-// ════════════════════════════════════════════════════════════════
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
+  // Progresso por voluntário
+  let volProg = ESTADO.voluntarios.map(v => {
+    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
+    const nomeVNorm = (v.Nome || '').trim().toLowerCase();
+    const pv   = ESTADO.pings.filter(p=>(p.Voluntario_Responsavel||'').trim().toLowerCase()===nomeVNorm);
+    const feitos = pv.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+    const pct  = pv.length>0 ? Math.round(feitos/pv.length*100) : 0;
+    return `<div class="pli">
+      <div class="pli-name">${_esc(v.Nome)}</div>
+      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
+      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${feitos}/${pv.length}</div>
+    </div>`;
+  }).join('');
 
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
+  document.getElementById('monitorGrid').innerHTML = `
+    <div class="card">
+      <div class="card-hdr"><div class="card-hdr-title">📐 Progresso por Área</div></div>
+      ${areaProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-hdr-title">👥 Progresso por Voluntário</div></div>
+      ${volProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
+    </div>`;
 
-// BUG-19: toast com fila — evita que mensagens simultâneas se sobrescrevam
-let _toastQueue   = [];
-let _toastRunning = false;
+  // Alertas críticos
+  const critList = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO);
+  _txt('alertasBadge', `${critList.length} alertas`);
+  document.getElementById('alertasList').innerHTML = critList.map(p => `
+    <div class="alert-item">
+      <div style="font-size:16px">🔴</div>
+      <div class="alert-body">
+        <div class="alert-title">${p.Endereco||'—'} — ${p.ID_Area||'—'}</div>
+        <div class="alert-sub">${p.Voluntario_Responsavel||'—'}</div>
+      </div>
+      <span class="tag tag-critical">CRÍTICO</span>
+    </div>`).join('') || `<div style="padding:14px;color:var(--muted);font-size:11px">Nenhuma situação crítica.</div>`;
 
-function toast(msg) {
-  _toastQueue.push(msg);
-  if (!_toastRunning) _processToastQueue();
-}
-
-function _processToastQueue() {
-  if (!_toastQueue.length) { _toastRunning = false; return; }
-  _toastRunning = true;
-  const el  = document.getElementById('toast');
-  const msg = _toastQueue.shift();
-  el.textContent   = msg;
-  el.style.display = 'block';
-  clearTimeout(window._toast);
-  window._toast = setTimeout(() => {
-    el.style.display = 'none';
-    setTimeout(_processToastQueue, 200); // pausa de 200ms entre mensagens
-  }, CONFIG.TOAST_DURACAO);
-}
-
-function formatarData(valor) {
-  if (!valor) return '—';
-  try {
-    const d = new Date(valor);
-    return d.toLocaleDateString(CONFIG.APP.LOCALE, CONFIG.FMT_DATA);
-  } catch(e) { return valor; }
+  // B-23: Renderizar dashboard avançado
+  await renderizarDashboardAvancado();
 }
 
 // ════════════════════════════════════════════════════════════════
-// SPRINT 5 — POLIMENTO FINAL
-// B-21 Alertas | B-23 Dashboard | B-24 Gestão Users | B-25 CSV | B-26 Looker
+// BADGES Y PROGRESO GENERAL
 // ════════════════════════════════════════════════════════════════
-
-// ── B-21: Alertas críticos ────────────────────────────────────────
-async function enviarAlertaCritico(dadosPing, dadosForm) {
-  const s    = ESTADO.sessao;
-  const vol  = s ? (s.Nome || s.nome || s.usuario) : '—';
-  const end  = dadosPing ? (dadosPing.Endereco || dadosPing.endereco || '—') : '—';
-  const grau = dadosForm  ? (dadosForm.fGrauDano || '—') : '—';
-  const risco= dadosForm  ? (dadosForm.fRiscos   || '—') : '—';
-
-  const payload = {
-    acao:         CONFIG.ACOES.ENVIAR_ALERTA,
-    tipo:         CONFIG.UI_S5.ALERTA_TITULO,
-    voluntario:   vol,
-    endereco:     end,
-    grauDano:     grau,
-    riscos:       risco,
-    emailDestino: CONFIG.S5.EMAIL_COORD,
-    timestamp:    new Date().toISOString(),
-  };
-
-  try {
-    await chamarBackend(payload);
-    toast(CONFIG.UI_S5.ALERTA_ENVIADO);
-  } catch(e) {
-    // Falhou — guardar para sincronizar
-    await guardarFilaOffline(payload);
-    toast(CONFIG.UI_S5.ALERTA_ERR);
-  }
+function atualizarBadges() {
+  _txt('nb-mapas', ESTADO.mapas.length);
+  _txt('nb-areas', ESTADO.areas.length);
+  _txt('nb-pings', ESTADO.pings.length);
+  _txt('nb-vols',  ESTADO.voluntarios.length);
+  _txt('nb-mon',   ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length);
+  _txt('nb-users', ESTADO_USERS.lista.length || '');
+  const notifN = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
+  _txt('notifBadgeNum', notifN);
 }
 
-// ── B-23: Dashboard em tempo real (auto-refresh) ─────────────────
-let _dashTimer = null;
+function atualizarProgressoGeral() {
+  const total = ESTADO.pings.length;
+  const feitos= ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+  const pct   = total>0 ? Math.round(feitos/total*100) : 0;
+  _txt('progPct', pct+'%');
+  document.getElementById('progFill').style.width = pct+'%';
+  _txt('progSub', feitos + CONFIG.UI.DE + total + CONFIG.UI.PONTOS_CONCLUIDOS);
+}
 
+async function atualizarDados() {
+  toast(CONFIG.UI.TOAST_ATUALIZAR);
+  await carregarDadosCoord();
+}
+
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD AUTO-REFRESH — B-23
+// ════════════════════════════════════════════════════════════════
 function iniciarDashboardAutoRefresh() {
   pararDashboardAutoRefresh();
   _dashTimer = setInterval(async () => {
@@ -4672,27 +4081,37 @@ function pararDashboardAutoRefresh() {
   if (_dashTimer) { clearInterval(_dashTimer); _dashTimer = null; }
 }
 
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD AVANÇADO — B-23
+// CORRECCIÓN aplicada: strings literales reemplazados por CONFIG.STATUS_PING.*
+// 'Pendente'  → CONFIG.STATUS_PING.PENDENTE
+// 'Em Curso'  → CONFIG.STATUS_PING.EM_CURSO
+// 'Concluido' → CONFIG.STATUS_PING.CONCLUIDO
+// 'Critico'   → CONFIG.STATUS_PING.CRITICO
+// 'Inativo'   → CONFIG.STATUS_VOL_LABEL.inactive
+// ════════════════════════════════════════════════════════════════
 async function renderizarDashboardAvancado() {
   const pings  = ESTADO.pings  || [];
   const vols   = ESTADO.voluntarios || [];
 
-  // Calcular métricas
+  // Calcular métricas — CORRECCIÓN: usando CONFIG.STATUS_PING.* en lugar de strings
   const total     = pings.length;
-  const pendentes = pings.filter(p => p.Status === 'Pendente').length;
-  const emCurso   = pings.filter(p => p.Status === 'Em Curso').length;
-  const concluidos= pings.filter(p => p.Status === 'Concluido').length;
-  const criticos  = pings.filter(p => p.Status === 'Critico').length;
+  const pendentes = pings.filter(p => p.Status === CONFIG.STATUS_PING.PENDENTE).length;
+  const emCurso   = pings.filter(p => p.Status === CONFIG.STATUS_PING.EM_CURSO).length;
+  const concluidos= pings.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+  const criticos  = pings.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
   const pct       = total > 0 ? Math.round((concluidos / total) * 100) : 0;
-  const volsAtivos= vols.filter(v => v.Status !== 'Inativo').length;
+  // CORRECCIÓN: usando CONFIG.STATUS_VOL_LABEL.inactive en lugar de 'Inativo'
+  const volsAtivos= vols.filter(v => v.Status !== CONFIG.STATUS_VOL_LABEL.inactive).length;
 
   // Cards de estatísticas expandidos
   const statsEl = document.getElementById('statsGrid');
   if (statsEl) {
     statsEl.innerHTML = [
-      { num: total,      label: CONFIG.STATS_LABELS.TOTAL,      delta: '',                            ico: '📍', cor: 'var(--text)' },
-      { num: pendentes,  label: CONFIG.STATS_LABELS.PENDENTES,  delta: '',                            ico: '⏳', cor: 'var(--yellow)' },
-      { num: emCurso,    label: CONFIG.STATS_LABELS.EM_CURSO,   delta: '',                            ico: '🔄', cor: 'var(--orange)' },
-      { num: concluidos, label: CONFIG.STATS_LABELS.CONCLUIDOS, delta: pct + '% do total',            ico: '✅', cor: 'var(--green)' },
+      { num: total,      label: CONFIG.STATS_LABELS.TOTAL,      delta: '',                                ico: '📍', cor: 'var(--text)' },
+      { num: pendentes,  label: CONFIG.STATS_LABELS.PENDENTES,  delta: '',                                ico: '⏳', cor: 'var(--yellow)' },
+      { num: emCurso,    label: CONFIG.STATS_LABELS.EM_CURSO,   delta: '',                                ico: '🔄', cor: 'var(--orange)' },
+      { num: concluidos, label: CONFIG.STATS_LABELS.CONCLUIDOS, delta: pct + '% do total',               ico: '✅', cor: 'var(--green)' },
       { num: criticos,   label: CONFIG.STATS_LABELS.CRITICOS,   delta: criticos > 0 ? '⚠️ Atenção' : '', ico: '🚨', cor: criticos > 0 ? 'var(--red)' : 'var(--muted)' },
     ].map(s => `
       <div class="stat-card-big">
@@ -4719,26 +4138,27 @@ async function renderizarDashboardAvancado() {
       </div>`;
   }
 
-  // Alertas críticos
+  // Alertas críticos — F-15: usar p.Grau_Dano (snake_case, nome real da coluna)
   const alertasEl = document.getElementById('alertasList');
   if (alertasEl) {
-  // F-15: usar p.Grau_Dano (snake_case, nome real da coluna retornada pelo backend)
-  const criticosList = pings.filter(p =>
-    p.Status === 'Critico' || p.Grau_Dano === 'Total' || p.Grau_Dano === 'Grave'
-  );
-  if (criticosList.length === 0) {
-    alertasEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">✅ Nenhuma situação crítica ativa.</div>`;
-  } else {
-    alertasEl.innerHTML = criticosList.slice(0, 5).map(p => `
-      <div class="alerta-item">
-        <div class="alerta-item-ico">🚨</div>
-        <div class="alerta-item-body">
-          <div class="alerta-item-titulo">${_esc(p.Endereco) || '—'}</div>
-          <div class="alerta-item-desc">Grau: ${_esc(p.Grau_Dano) || '—'} · Voluntário: ${_esc(p.Voluntario_Responsavel) || '—'}</div>
-          <div class="alerta-item-ts">${p.Atualizado ? formatarData(p.Atualizado) : '—'}</div>
-        </div>
-      </div>`).join('');
-  }
+    const criticosList = pings.filter(p =>
+      p.Status === CONFIG.STATUS_PING.CRITICO ||
+      p.Grau_Dano === CONFIG.GRAUS_DANO[3] ||   // 'Total'
+      p.Grau_Dano === CONFIG.GRAUS_DANO[2]       // 'Grave'
+    );
+    if (criticosList.length === 0) {
+      alertasEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">✅ Nenhuma situação crítica ativa.</div>`;
+    } else {
+      alertasEl.innerHTML = criticosList.slice(0, 5).map(p => `
+        <div class="alerta-item">
+          <div class="alerta-item-ico">🚨</div>
+          <div class="alerta-item-body">
+            <div class="alerta-item-titulo">${_esc(p.Endereco) || '—'}</div>
+            <div class="alerta-item-desc">Grau: ${_esc(p.Grau_Dano) || '—'} · Voluntário: ${_esc(p.Voluntario_Responsavel) || '—'}</div>
+            <div class="alerta-item-ts">${p.Atualizado ? formatarData(p.Atualizado) : '—'}</div>
+          </div>
+        </div>`).join('');
+    }
     const badge = document.getElementById('alertasBadge');
     if (badge) badge.textContent = criticosList.length > 0 ? criticosList.length : '';
   }
@@ -4750,9 +4170,57 @@ async function renderizarDashboardAvancado() {
   }
 }
 
-// ── B-24: Gestão de Usuários ─────────────────────────────────────
-let ESTADO_USERS = { lista: [] };
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 6 — COORD: Monitoreo
+     ============================================================ -->
 
+
+<!-- ============================================================
+     SECCIÓN 7 — COORD: Admin
+     Navegación del coordinador, gestión de usuarios, exportar
+     CSV/PDF, configurar alertas y links externos.
+     Posición: séptima — depende de S1, S2, S3, S6.
+     NOTA: navegarCoord movida AQUÍ desde S5 (auditoría ②)
+     CORRECCIÓN: criarNovoUsuario usaba CONFIG.ACOES.CRIAR_VOLUNTARIO
+                 (no existe en backend) → corregido a CONFIG.ACOES.CRIAR_USUARIO
+     ============================================================ -->
+<script id="s7-coord-admin">
+
+// ════════════════════════════════════════════════════════════════
+// NAVEGAÇÃO COORDENADOR
+// MOVIDA desde S5 (auditoría ②): depende de renderizarMonitoramento [S6],
+// iniciarDashboardAutoRefresh [S6], pararDashboardAutoRefresh [S6],
+// _popularFiltroRole [S7], _popularSelectRole [S7], carregarUsuarios [S7]
+// ════════════════════════════════════════════════════════════════
+function navegarCoord(pagina, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('page-' + pagina);
+  if (pg) pg.classList.add('active');
+  if (el) el.classList.add('active');
+  ESTADO.paginaAtual = pagina;
+
+  // Ações ao entrar em cada página
+  if (pagina === 'mapas') {
+    setTimeout(() => mapCoord && mapCoord.invalidateSize(), 60);
+  } else if (pagina === 'monitoreo') {
+    renderizarMonitoramento();        // S6 — runtime call ✅
+    iniciarDashboardAutoRefresh();    // S6 — runtime call ✅
+  } else if (pagina === 'usuarios') {
+    _popularFiltroRole();             // S7 — misma sección ✅
+    _popularSelectRole('nuRole');     // S7 — misma sección ✅
+    carregarUsuarios();               // S7 — misma sección ✅
+  } else if (pagina === 'exportar') {
+    // Já renderizado em renderizarTextos, nada a fazer
+  } else {
+    pararDashboardAutoRefresh();      // S6 — runtime call ✅
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// GESTÃO DE USUÁRIOS — B-24
+// ════════════════════════════════════════════════════════════════
 async function carregarUsuarios() {
   try {
     // BUG-02: LISTAR_VOLUNTARIOS não existe no CONFIG — chave correta é LISTAR_USUARIOS
@@ -4863,7 +4331,9 @@ async function criarNovoUsuario() {
 
   try {
     const r = await chamarBackend({
-      acao:            CONFIG.ACOES.CRIAR_VOLUNTARIO,
+      // CORRECCIÓN: era CONFIG.ACOES.CRIAR_VOLUNTARIO (no existe en backend)
+      // corregido a CONFIG.ACOES.CRIAR_USUARIO — verificado contra backend V3
+      acao:            CONFIG.ACOES.CRIAR_USUARIO,
       nome:            nome,
       usuario:         usuario,
       senha:           senha,
@@ -4931,7 +4401,9 @@ function _popularFiltroRole() {
       .join('');
 }
 
-// ── B-25: Exportar CSV ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// EXPORTAR CSV — B-25
+// ════════════════════════════════════════════════════════════════
 function exportarCSV(tipo) {
   const SEP  = CONFIG.S5.CSV_SEPARADOR;
   const NOME = CONFIG.S5.CSV_NOME_ARQUIVO;
@@ -5000,7 +4472,9 @@ function _csvEsc(val) {
   return s.includes(CONFIG.S5.CSV_SEPARADOR) || s.includes('"') || s.includes('\n') ? '"' + s + '"' : s;
 }
 
-// ── PDF: gerado no frontend sem depender do Drive ─────────────────
+// ════════════════════════════════════════════════════════════════
+// EXPORTAR PDF — frontend sin depender del Drive
+// ════════════════════════════════════════════════════════════════
 function exportarPDF() {
   const S5U   = CONFIG.UI_S5;
   const pings = ESTADO.pings || [];
@@ -5008,19 +4482,16 @@ function exportarPDF() {
 
   toast(CONFIG.UI.TOAST_PDF);
 
-  // ── Monta o HTML do relatório ─────────────────────────────────
   const agora    = new Date();
   const dataStr  = agora.toLocaleDateString(CONFIG.APP.LOCALE, CONFIG.FMT_DATA);
   const horaStr  = agora.toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA);
   const mapaAtual = ESTADO.mapaAtual ? ESTADO.mapaAtual.Nome || '' : '';
 
-  // Resumo de estatísticas
-  const total     = pings.length;
+  const total      = pings.length;
   const concluidos = pings.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
   const criticos   = pings.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
   const pendentes  = pings.filter(p => p.Status === CONFIG.STATUS_PING.PENDENTE).length;
 
-  // Linhas da tabela
   const linhasTabela = pings.map(p => `
     <tr>
       <td>${p.ID_Ping || ''}</td>
@@ -5076,19 +4547,17 @@ function exportarPDF() {
     <div class="rodape">${S5U.PDF_RODAPE}</div>
   </body></html>`;
 
-  // ── Abre em nova aba e dispara impressão/save como PDF ────────
   const janela = window.open('', '_blank');
   if (!janela) { toast('⚠️ Permita popups para gerar o PDF.'); return; }
   janela.document.write(html);
   janela.document.close();
-  janela.onload = () => {
-    janela.focus();
-    janela.print();
-  };
+  janela.onload = () => { janela.focus(); janela.print(); };
   toast(S5U.PDF_GERADO);
 }
 
-// ── B-21: Configurar alertas — BUG-13: substituído window.prompt() por modal nativo ─────────────────
+// ════════════════════════════════════════════════════════════════
+// ALERTAS EMAIL — B-21 (BUG-13: modal nativo en lugar de window.prompt)
+// ════════════════════════════════════════════════════════════════
 function configurarAlertas() {
   const input = document.getElementById('alertaEmailInput');
   if (input) input.value = CONFIG.S5.EMAIL_COORD || '';
@@ -5102,23 +4571,70 @@ function salvarConfAlerta() {
   toast(email ? CONFIG.UI_S5.ALERTA_OK + email : CONFIG.UI_S5.ALERTA_OFF);
 }
 
-// ── B-25: Exportar via backend (Sheets/Drive) ─────────────────────
+// ════════════════════════════════════════════════════════════════
+// LINKS EXTERNOS — Sheets / Drive / Looker
+// ════════════════════════════════════════════════════════════════
 function abrirLink(tipo) {
-  const L  = CONFIG.LINKS;
+  const L   = CONFIG.LINKS;
   const S5U = CONFIG.UI_S5;
-  const urls = { sheets: L.SHEETS, drive: L.DRIVE, looker: L.LOOKER };
+  const urls   = { sheets: L.SHEETS, drive: L.DRIVE, looker: L.LOOKER };
   const avisos = { sheets: S5U.SHEETS_SEM_URL, drive: S5U.DRIVE_SEM_URL, looker: S5U.LOOKER_SEM_URL };
   const url = urls[tipo];
   if (!url) { toast(avisos[tipo] || '⚠️ URL não configurada'); return; }
   window.open(url, '_blank');
 }
 
-// ════════════════════════════════════════════════════════════════
-// SPRINT 4 — OFFLINE + PWA
-// B-15 IndexedDB | B-16 Service Worker | B-19 Auto-sync | B-20 Fotos | B-22 Manifest
-// ════════════════════════════════════════════════════════════════
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 7 — COORD: Admin
+     ============================================================ -->
 
-// ── B-22: Manifest PWA dinâmico ──────────────────────────────────
+
+<!-- ============================================================
+     SECCIÓN 8 — COORD: Sistema
+     PWA (manifest + service worker), IndexedDB, fila offline,
+     sincronización automática, alertas críticas e instalación PWA.
+     Posición: octava — depende de S1, S2, S3, S7.
+     NOTA: enviarAlertaCritico movida AQUÍ desde S7 (auditoría ③)
+           depende de guardarFilaOffline que vive en esta sección.
+     ============================================================ -->
+<script id="s8-coord-sistema">
+
+// ════════════════════════════════════════════════════════════════
+// ALERTAS CRÍTICOS — B-21
+// MOVIDA desde S7 (auditoría ③): depende de guardarFilaOffline [S8]
+// ════════════════════════════════════════════════════════════════
+async function enviarAlertaCritico(dadosPing, dadosForm) {
+  const s    = ESTADO.sessao;
+  const vol  = s ? (s.Nome || s.nome || s.usuario) : '—';
+  const end  = dadosPing ? (dadosPing.Endereco || dadosPing.endereco || '—') : '—';
+  const grau = dadosForm  ? (dadosForm.fGrauDano || '—') : '—';
+  const risco= dadosForm  ? (dadosForm.fRiscos   || '—') : '—';
+
+  const payload = {
+    acao:         CONFIG.ACOES.ENVIAR_ALERTA,
+    tipo:         CONFIG.UI_S5.ALERTA_TITULO,
+    voluntario:   vol,
+    endereco:     end,
+    grauDano:     grau,
+    riscos:       risco,
+    emailDestino: CONFIG.S5.EMAIL_COORD,
+    timestamp:    new Date().toISOString(),
+  };
+
+  try {
+    await chamarBackend(payload);
+    toast(CONFIG.UI_S5.ALERTA_ENVIADO);
+  } catch(e) {
+    // Falhou — guardar para sincronizar
+    await guardarFilaOffline(payload);
+    toast(CONFIG.UI_S5.ALERTA_ERR);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PWA MANIFEST — B-22
+// ════════════════════════════════════════════════════════════════
 function injetarManifest() {
   const P = CONFIG.PWA;
   const manifest = {
@@ -5140,7 +4656,11 @@ function injetarManifest() {
   document.getElementById('pwa-manifest').href = url;
 }
 
-// ── B-16: Service Worker como Blob ───────────────────────────────
+// ════════════════════════════════════════════════════════════════
+// SERVICE WORKER — B-16
+// BUG-26: Safari não suporta blob: URLs para Service Worker.
+// Para Safari: extrair SW para /sw.js no servidor e definir CONFIG.SW.PATH = "/sw.js"
+// ════════════════════════════════════════════════════════════════
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   const CN = CONFIG.SW.CACHE_NOME;
@@ -5183,7 +4703,6 @@ self.addEventListener('fetch', e => {
 });
 `;
   try {
-    // BUG-26: Safari não suporta blob: URLs para Service Worker.
     if (CONFIG.SW.PATH) {
       navigator.serviceWorker.register(CONFIG.SW.PATH, { scope: './' })
         .then(() => toast(CONFIG.UI_S4.PWA_PRONTO))
@@ -5198,9 +4717,9 @@ self.addEventListener('fetch', e => {
   } catch(e) {}
 }
 
-// ── B-15: IndexedDB ──────────────────────────────────────────────
-let _idb = null;
-
+// ════════════════════════════════════════════════════════════════
+// INDEXEDDB — B-15
+// ════════════════════════════════════════════════════════════════
 function abrirIDB() {
   return new Promise((resolve, reject) => {
     if (_idb) { resolve(_idb); return; }
@@ -5272,7 +4791,9 @@ async function idbGet(store, chave) {
   });
 }
 
-// ── B-15: Fila offline via IndexedDB (substitui sessionStorage) ──
+// ════════════════════════════════════════════════════════════════
+// FILA OFFLINE — B-15 (substitui sessionStorage)
+// ════════════════════════════════════════════════════════════════
 async function guardarFilaOffline(dados) {
   try {
     await idbAdd(CONFIG.IDB.STORE_FILA, { ...dados, _ts: Date.now() });
@@ -5293,14 +4814,16 @@ async function guardarFilaOffline(dados) {
   }
 }
 
-// ── B-19: Sincronização automática ao reconectar ─────────────────
+// ════════════════════════════════════════════════════════════════
+// SINCRONIZAÇÃO — B-19
+// ════════════════════════════════════════════════════════════════
 async function sincronizarAgora() {
   toast(CONFIG.UI.TOAST_SYNC_NOW);
   const resultado = await _sincronizarFila();
   const total = resultado.enviados + resultado.fotosEnviadas;
   if (total > 0) {
     toast('✅ ' + total + ' item(s) sincronizado(s)');
-    await carregarPingsVol();
+    await carregarPingsVol(); // S9 — runtime call ✅
   } else {
     toast('✅ Nada para sincronizar.');
   }
@@ -5373,26 +4896,740 @@ async function _sincronizarFila() {
 }
 
 // Listener de reconexão — B-19
+// carregarPingsVol definida en S9 — runtime call ✅
 window.addEventListener('online', async () => {
   toast(CONFIG.UI_S4.SYNC_AUTO);
   const res = await _sincronizarFila();
   if (res.enviados + res.fotosEnviadas > 0) {
     toast(CONFIG.UI_S4.SYNC_DONE);
-    await carregarPingsVol();
+    await carregarPingsVol(); // S9 — runtime call ✅
   }
 });
 
-// ── B-20: Upload de fotos — captura real base64 ───────────────────
-let _fotosBase64 = []; // array de { nome, tipo, base64, descricao }
+// ════════════════════════════════════════════════════════════════
+// INSTALACIÓN PWA — Banner
+// ════════════════════════════════════════════════════════════════
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  const banner = document.getElementById('installBanner');
+  if (banner) banner.style.display = 'flex';
+});
 
+function instalarPWA() {
+  if (!_deferredInstall) return;
+  _deferredInstall.prompt();
+  _deferredInstall.userChoice.then(() => {
+    _deferredInstall = null;
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.style.display = 'none';
+  });
+}
+
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 8 — COORD: Sistema
+     ============================================================ -->
+
+
+<!-- ============================================================
+     SECCIÓN 9 — VOLUNTARIO
+     Todo el flujo del voluntario: inicialización, mapa, pings,
+     vistas, formulario, residentes, nuevo ping, fotos y proxy.
+     Posición: novena (última) — depende de S1, S2, S3, S4, S8.
+     ============================================================ -->
+<script id="s9-voluntario">
+
+// ════════════════════════════════════════════════════════════════
+// INICIALIZACIÓN DEL VOLUNTARIO
+// ════════════════════════════════════════════════════════════════
+function inicializarVoluntario() {
+  const s = ESTADO.sessao;
+  if (!s) return;
+
+  const nome = s.Nome || s.nome || s.usuario || CONFIG.UI.ROLE_VOL_NOME;
+  const ini  = nome.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
+
+  // Preencher UI
+  _txt('volNameDisplay', nome);
+  _txt('volRoleTag',     CONFIG.UI.VOL_AREA_TAG);
+  _txt('volAreaDisplay', s.Areas_Permitidas || '—');
+  _txt('perfilNome',     nome);
+  _txt('perfilAvatar',   ini);
+  _txt('perfilSub',      CONFIG.UI.ROLE_VOL_NOME + ' · ' + (s.Areas_Permitidas||'—'));
+
+  document.getElementById('perfilTags').innerHTML = [
+    s.Mapas_Permitidos || '—',
+    s.Areas_Permitidas || '—',
+  ].map(t => `<div class="area-tag">${_esc(t)}</div>`).join('');
+
+  inicializarMapaVol();
+  carregarPingsVol();
+  // B-18: Carregar área designada do voluntário no mapa
+  carregarAreaVol();
+  // F-22: Carregar ESTADO.areas para que createNewPing possa resolver idArea/idMapa
+  _carregarAreasParaVoluntario();
+}
+
+// F-22: Carregar áreas para voluntário — necessário para createNewPing resolver idArea/idMapa
+async function _carregarAreasParaVoluntario() {
+  try {
+    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
+    if (r.sucesso && Array.isArray(r.dados)) {
+      ESTADO.areas = r.dados;
+    }
+  } catch(e) { /* falha silenciosa — ESTADO.areas permanece vazio */ }
+}
+
+function inicializarMapaVol() {
+  const M = CONFIG.MAPA;
+  mapVol = L.map('map-vol', {
+    center: [M.LAT_PADRAO, M.LNG_PADRAO],
+    zoom:   M.ZOOM_PADRAO,
+    zoomControl: true,
+  });
+  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(mapVol);
+
+  mapVol.on('mousemove', e => {
+    _txt('mapCoordsVol',
+      e.latlng.lat.toFixed(4) + '°, ' + e.latlng.lng.toFixed(4) + '°'
+    );
+  });
+
+  // GPS próprio
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PADRAO);
+      L.circleMarker([lat, lng], { radius:8, color:'#3B82F6', fillColor:'#3B82F6', fillOpacity:0.8 })
+        .addTo(mapVol).bindPopup(CONFIG.UI.GPS_VOCE_AQUI);
+    });
+  }
+}
+
+function initNewPingMap() {
+  if (newPingMapVol) { newPingMapVol.invalidateSize(); return; }
+  const M = CONFIG.MAPA;
+  const lat = parseFloat(document.getElementById('npLat').value) || M.LAT_PADRAO;
+  const lng = parseFloat(document.getElementById('npLng').value) || M.LNG_PADRAO;
+  newPingMapVol = L.map('new-ping-map', {
+    center: [lat, lng], zoom: M.ZOOM_NOVO,
+  });
+  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(newPingMapVol);
+}
+
+// B-18: Carregar polígono da área designada ao voluntário no mapa
+async function carregarAreaVol() {
+  const s = ESTADO.sessao;
+  if (!s || !mapVol) return;
+  const areaNome = s.Areas_Permitidas;
+  if (!areaNome || areaNome === '—') return;
+
+  try {
+    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
+    if (!r.sucesso || !Array.isArray(r.dados)) return;
+
+    const areas = r.dados.filter(a =>
+      a.Nome && a.Nome.toString().trim() === areaNome.toString().trim()
+    );
+
+    let encontrou = false;
+    areas.forEach(area => {
+      if (!area.Pontos_Poligono) return;
+      try {
+        const pts = JSON.parse(area.Pontos_Poligono);
+        if (!pts || pts.length < CONFIG.FORM_LIMITES.MIN_POLIGONO_PTS) return;
+
+        const poly = L.polygon(pts, {
+          color: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
+          fillColor: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
+          fillOpacity: 0.12,
+          weight: 2,
+          dashArray: '5,5',
+        }).addTo(mapVol);
+
+        poly.bindPopup(`
+          <strong style="font-family:'Rajdhani',sans-serif;font-size:13px">${area.Nome}</strong><br>
+          <span style="font-size:11px;color:#888">${CONFIG.UI.AREA_LABEL}</span>
+        `);
+
+        mapVol.fitBounds(poly.getBounds(), { padding: [20, 20] });
+        encontrou = true;
+
+        try { sessionStorage.setItem(CONFIG.STORAGE.AREA_CACHE, JSON.stringify(area)); } catch(e){}
+      } catch(e) {}
+    });
+
+    if (encontrou) toast(CONFIG.UI.TOAST_AREA_CARREGADA);
+  } catch(e) {
+    // Modo offline: não exibir erro — o mapa já tem GPS ativo
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PINGS DEL VOLUNTARIO
+// ════════════════════════════════════════════════════════════════
+async function carregarPingsVol() {
+  const s = ESTADO.sessao;
+  if (!s) return;
+
+  const listEl = document.getElementById('pingListVol');
+  if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_PINGS_CARREGANDO}</div>`;
+
+  try {
+    // B-11: Buscar todos os pings e filtrar pelo voluntário logado no frontend
+    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
+    if (r.sucesso && Array.isArray(r.dados)) {
+      const nomeVol = s.Nome || s.nome || s.usuario || '';
+      ESTADO.pingsVol = r.dados.filter(p =>
+        p.Voluntario_Responsavel &&
+        p.Voluntario_Responsavel.toString().trim() === nomeVol.trim()
+      );
+      try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e){}
+    }
+  } catch(e) {
+    try {
+      const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
+      if (cached) ESTADO.pingsVol = JSON.parse(cached);
+    } catch(ce) {}
+    ESTADO.pingsVol = ESTADO.pingsVol || [];
+  }
+  renderizarPingsVol();
+}
+
+function renderizarPingsVol() {
+  const lista = ESTADO.pingsVol;
+  const total   = lista.length;
+  const feitos  = lista.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+  const pct     = total>0 ? Math.round(feitos/total*100) : 0;
+
+  _txt('volProgNum', feitos+'/'+total);
+  document.getElementById('volProgFill').style.width = pct+'%';
+  _txt('pingCountVol', total + ' ' + CONFIG.UI.PINGS_ATRIBUIDOS);
+
+  const pend = lista.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE||p.Status===CONFIG.STATUS_PING.CRITICO).length;
+  const badge = document.getElementById('pendBadge');
+  if (badge) { badge.textContent = pend; badge.style.display = pend>0?'block':'none'; }
+
+  const pingsHTML = total === 0
+    ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
+    : lista.map((p,i) => {
+        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
+        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
+        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+        return `
+        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
+          <div class="ping-card-inner">
+            <div class="ping-status-bar" style="background:${cor}"></div>
+            <div class="ping-info">
+              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+_esc(p.ID_Ping)}</div>
+              <div class="ping-meta">
+                <span>${_esc(p.ID_Area)||'—'}</span>
+                <span>${_esc(p.Tipo_Unidade)||'—'}</span>
+              </div>
+            </div>
+            <div class="ping-right">
+              <span class="status-tag ${css}">${lbl}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+  const pingListEl   = document.getElementById('pingListVol');
+  const pontosListEl = document.getElementById('pontosList');
+  if (pingListEl)   pingListEl.innerHTML   = pingsHTML;
+  if (pontosListEl) pontosListEl.innerHTML = pingsHTML;
+
+  _txt('syncStatusTxt', feitos > 0 ? CONFIG.UI.SYNC_OK : CONFIG.UI.SYNC_PENDENTE);
+  _txt('syncSubTxt',    CONFIG.UI.SYNC_ULTIMA + (new Date().toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA)));
+  _txt('syncEnviados',  feitos);
+  _txt('syncPendentes', pend);
+
+  lista.forEach(p => {
+    if (!p.Latitude || !p.Longitude) return;
+    const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+    const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
+    L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
+      icon: L.divIcon({
+        className:'',
+        html:`<div style="width:14px;height:14px;border-radius:50%;background:${cor};border:2px solid white;box-shadow:0 0 8px ${cor}"></div>`,
+        iconSize:[14,14], iconAnchor:[7,7],
+      })
+    }).addTo(mapVol)
+      .bindPopup(`<strong>${_esc(p.Endereco)||'Ponto'}</strong><br><span style="color:${cor};font-size:11px">${lbl}</span>`)
+      .on('click', () => abrirFormulario(p.ID_Ping, p.Endereco));
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// VISTAS DEL VOLUNTARIO
+// ════════════════════════════════════════════════════════════════
+// Usa CONFIG.VIEWS_VOL — sem hardcode de nomes de views aqui
+function switchView(v) {
+  if (v === 'novo') { abrirNovoPoint(); return; }
+
+  viewAtual = v;
+
+  CONFIG.VIEWS_VOL.forEach(view => {
+    const el  = document.getElementById(view.id + 'View');
+    const btn = document.getElementById('nav-' + view.id);
+    if (el)  { el.style.display = 'none'; }
+    if (btn) btn.classList.remove('active');
+  });
+
+  const activeEl  = document.getElementById(v + 'View');
+  const activeBtn = document.getElementById('nav-' + v);
+  if (activeEl) {
+    activeEl.style.display = (v === 'mapa') ? 'block' : 'flex';
+    if (v === 'mapa') setTimeout(() => mapVol && mapVol.invalidateSize(), 100);
+  }
+  if (activeBtn) activeBtn.classList.add('active');
+}
+
+function filtrarPingsView(el, tipo) {
+  document.querySelectorAll('#pontosFilterEl .filter-chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  const lista = tipo === 'all' ? ESTADO.pingsVol
+    : ESTADO.pingsVol.filter(p => p.Status === tipo);
+  document.getElementById('pontosList').innerHTML = lista.length === 0
+    ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
+    : lista.map((p,i) => {
+        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
+        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
+        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+        return `
+        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
+          <div class="ping-card-inner">
+            <div class="ping-status-bar" style="background:${cor}"></div>
+            <div class="ping-info">
+              <div class="ping-name">${_esc(p.Endereco)||'Ponto'}</div>
+              <div class="ping-meta"><span>${_esc(p.ID_Area)||'—'}</span></div>
+            </div>
+            <div class="ping-right"><span class="status-tag ${css}">${lbl}</span></div>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+// Preencher chips filtro pontos
+function renderizarFiltrosPontos() {
+  const filtros = [
+    { tipo:'all',      label:'Todos' },
+    { tipo:CONFIG.STATUS_PING.PENDENTE,  label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.PENDENTE] },
+    { tipo:CONFIG.STATUS_PING.CRITICO,   label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.CRITICO] },
+    { tipo:CONFIG.STATUS_PING.CONCLUIDO, label:CONFIG.STATUS_LABEL[CONFIG.STATUS_PING.CONCLUIDO] },
+  ];
+  document.getElementById('pontosFilterEl').innerHTML = filtros.map((f,i) =>
+    `<div class="filter-chip${i===0?' on':''}" onclick="filtrarPingsView(this,'${f.tipo}')">${f.label}</div>`
+  ).join('');
+}
+
+function toggleOfflineVol() {
+  offlineVol = !offlineVol;
+  ESTADO.offline = offlineVol;
+  const tag    = document.getElementById('modeTagVol');
+  const banner = document.getElementById('offlineBannerVol');
+  const pill   = document.getElementById('gpsPill');
+  if (offlineVol) {
+    tag.textContent  = '📶 OFFLINE';
+    tag.className    = 'map-tag offline';
+    banner.style.display = 'flex';
+    if (pill) pill.style.borderColor = 'var(--yellow)';
+  } else {
+    tag.textContent  = '🌐 ONLINE';
+    tag.className    = 'map-tag online';
+    banner.style.display = 'none';
+    if (pill) pill.style.borderColor = '';
+  }
+  toast(offlineVol ? CONFIG.UI.TOAST_OFFLINE_ON : CONFIG.UI.TOAST_OFFLINE_OFF);
+}
+
+// ════════════════════════════════════════════════════════════════
+// FORMULARIO
+// ════════════════════════════════════════════════════════════════
+function abrirFormulario(idPing, nomeEndereco) {
+  pingAtualForm = idPing;
+  pingAtualDados = ESTADO.pingsVol.find(p => p.ID_Ping === idPing) || null;
+
+  _txt('formTitle', nomeEndereco || 'Formulário');
+
+  if (pingAtualDados) {
+    const endEl = document.getElementById('fEndereco');
+    if (endEl && !endEl.value) endEl.value = pingAtualDados.Endereco || '';
+    const latEl = document.getElementById('fLat');
+    const lngEl = document.getElementById('fLng');
+    if (latEl && !latEl.value && pingAtualDados.Latitude) latEl.value = pingAtualDados.Latitude;
+    if (lngEl && !lngEl.value && pingAtualDados.Longitude) lngEl.value = pingAtualDados.Longitude;
+  }
+
+  document.getElementById('formOverlay').classList.add('open');
+  document.getElementById('formScroll').scrollTop = 0;
+  goStep(1);
+
+  // Marcar ping como Em Curso ao abrir (se ainda Pendente)
+  if (pingAtualDados && pingAtualDados.Status === CONFIG.STATUS_PING.PENDENTE) {
+    chamarBackend({
+      acao:   CONFIG.ACOES.ATUALIZAR_PING,
+      id:     idPing,
+      Status: CONFIG.STATUS_PING.EM_CURSO,
+    }).catch(() => {});
+  }
+}
+
+function closeForm() {
+  document.getElementById('formOverlay').classList.remove('open');
+  pingAtualForm  = null;
+  pingAtualDados = null;
+  _fotosBase64 = [];
+}
+
+function goStep(n) {
+  const total = CONFIG.FORM_NUM_PASSOS;
+  for (let i = 1; i <= total; i++) {
+    const s = document.getElementById('step'+i);
+    if (!s) continue;
+    s.classList.remove('active','done');
+    if (i < n)  s.classList.add('done');
+    if (i === n) s.classList.add('active');
+  }
+}
+
+function captureGPS() {
+  toast(CONFIG.UI.TOAST_GPS_CAPTURA);
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        document.getElementById('fLat').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('fLng').value = pos.coords.longitude.toFixed(6);
+        toast(CONFIG.UI.TOAST_GPS_OK);
+      },
+      () => {
+        document.getElementById('fLat').value = (CONFIG.MAPA.LAT_PADRAO + (Math.random()-.5)*.005).toFixed(6);
+        document.getElementById('fLng').value = (CONFIG.MAPA.LNG_PADRAO + (Math.random()-.5)*.005).toFixed(6);
+        toast(CONFIG.UI.TOAST_GPS_SIMULADO);
+      }
+    );
+  }
+}
+
+function saveDraft() {
+  const FC = CONFIG.FORM_CAMPOS;
+  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const draft = {
+    idPing:    pingAtualForm,
+    idArea:    pingAtualDados ? (pingAtualDados.ID_Area || '') : '',
+    idMapa:    pingAtualDados ? (pingAtualDados.ID_Mapa || '') : '',
+    lat:       val(FC.latitude),
+    lng:       val(FC.longitude),
+    endereco:  val(FC.endereco),
+    timestamp: Date.now(),
+  };
+  try { sessionStorage.setItem(CONFIG.SESSAO.CHAVE_DRAFT, JSON.stringify(draft)); } catch(e){}
+  toast(CONFIG.UI.TOAST_RASCUNHO);
+}
+
+function coletarChipsSelecionados(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return '';
+  return Array.from(el.querySelectorAll('.chip.on, .chip.selected'))
+    .map(c => c.dataset.val || c.textContent.trim())
+    .join(', ');
+}
+
+function coletarResidentes() {
+  const cards = document.querySelectorAll('#residentList .resident-card');
+  const res = [];
+  cards.forEach(card => {
+    const inputs = card.querySelectorAll('input, select, textarea');
+    const r = {
+      nome:                  inputs[0]?.value || '',
+      idade:                 inputs[1]?.value || '',
+      cpf:                   inputs[2]?.value || '',
+      condicao:              inputs[3]?.value || '',
+      vulnerabilidade:       inputs[4]?.value || '',
+      necessidadesEspecificas: inputs[5]?.value || '',
+    };
+    if (r.nome || r.idade) res.push(r);
+  });
+  return res;
+}
+
+async function submitForm() {
+  const s = ESTADO.sessao;
+
+  const lat = document.getElementById('fLat').value;
+  const lng = document.getElementById('fLng').value;
+  const end = document.getElementById('fEndereco').value.trim();
+  if (!end && (!lat || !lng)) {
+    toast(CONFIG.UI.FORM_CAMPO_OBRIG);
+    goStep(1);
+    return;
+  }
+
+  // F-23: validar campos críticos de dano
+  const grauDanoVal  = document.getElementById('fGrauDano')?.value;
+  const tipoDanoVal  = document.getElementById('fTipoDano')?.value;
+  const habitavelVal = document.getElementById('fHabitavel')?.value;
+  if (!grauDanoVal || !tipoDanoVal || !habitavelVal) {
+    toast(CONFIG.UI.FORM_DANO_OBRIG);
+    goStep(3);
+    return;
+  }
+
+  const FC = CONFIG.FORM_CAMPOS;
+  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+  const dados = {
+    acao:             CONFIG.ACOES.SALVAR_FORMULARIO,
+    idPing:           pingAtualForm,
+    idArea:           pingAtualDados ? (pingAtualDados.ID_Area || '') : '',
+    idMapa:           pingAtualDados ? (pingAtualDados.ID_Mapa || '') : '',
+    tipoUnidade:      val(FC.tipoUnidade),
+    tipoConstrucao:   val(FC.tipoConstrucao),
+    endereco:         val(FC.endereco),
+    complemento:      val(FC.complemento),
+    referencia:       val(FC.referencia),
+    latitude:         val(FC.latitude),
+    longitude:        val(FC.longitude),
+    numPessoas:       val(FC.numPessoas)         || '0',
+    numFeridos:       val(FC.numFeridos)         || '0',
+    numDesaparecidos: val(FC.numDesaparecidos)   || '0',
+    numObitos:        val(FC.numObitos)          || '0',
+    animaisDomesticos: val(FC.animaisDomesticos),
+    necessidadesGerais: coletarChipsSelecionados('chipsNecessidades') || val(FC.necessidadesGerais),
+    tipoDano:         val(FC.tipoDano),
+    grauDano:         val(FC.grauDano),
+    servicosAfetados: coletarChipsSelecionados('chipsServicos') || val(FC.servicosAfetados),
+    riscosImediatos:  val(FC.riscosImediatos),
+    unidadeHabitavel: val(FC.unidadeHabitavel),
+    necessitaEvacuacao: val(FC.necessitaEvacuacao),
+    observacoes:      val(FC.observacoes),
+    voluntario:       s ? (s.Nome || s.nome || s.usuario) : '',
+    quantidadeFotos:  document.querySelectorAll('#photoGrid .photo-thumb').length,
+  };
+
+  const ehCritico = dados.grauDano === CONFIG.GRAUS_DANO[3]  // 'Total'
+                 || dados.grauDano === CONFIG.GRAUS_DANO[2]   // 'Grave'
+                 || dados.riscosImediatos !== CONFIG.RISCOS[0]; // ≠ 'Nenhum'
+
+  try {
+    let result;
+    if (offlineVol) {
+      guardarFilaOffline(dados);
+      result = { sucesso: true };
+    } else {
+      result = await chamarBackend(dados);
+    }
+
+    if (result.sucesso) {
+      const residentes = coletarResidentes();
+      if (residentes.length > 0 && !offlineVol) {
+        const idUnidade = result.dados ? result.dados.id : null;
+        chamarBackend({
+          acao:       CONFIG.ACOES.SALVAR_RESIDENTES,
+          idPing:     pingAtualForm,
+          idUnidade:  idUnidade || '',
+          residentes: residentes,
+        }).catch(() => {});
+      } else if (residentes.length > 0 && offlineVol) {
+        guardarFilaOffline({
+          acao:       CONFIG.ACOES.SALVAR_RESIDENTES,
+          idPing:     pingAtualForm,
+          idUnidade:  '',
+          residentes: residentes,
+        });
+      }
+
+      const volNome = ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.nome || ESTADO.sessao.usuario) : '';
+      if (_fotosBase64.length > 0) {
+        await enviarFotosBackend(pingAtualForm, volNome);
+      }
+
+      if (ehCritico && CONFIG.S5.EMAIL_COORD) {
+        await enviarAlertaCritico(pingAtualDados, dados); // S8 — runtime call ✅
+      }
+
+      if (ehCritico) toast(CONFIG.UI.FORM_CRITICO_ALERTA);
+      else toast(offlineVol ? CONFIG.UI.FORM_OFFLINE_OK : CONFIG.UI.FORM_ENVIADO_OK);
+
+      setTimeout(closeForm, 1500);
+      await carregarPingsVol();
+    } else {
+      toast('⚠️ ' + (result.mensagem || 'Erro ao enviar'));
+    }
+  } catch(e) {
+    guardarFilaOffline(dados);
+    toast(CONFIG.UI.FORM_OFFLINE_OK + ' (sem conexão)');
+    setTimeout(closeForm, 1500);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// RESIDENTES
+// ════════════════════════════════════════════════════════════════
+function toggleResident(header) {
+  const body = header.nextElementSibling;
+  const tog  = header.querySelector('.resident-toggle');
+  body.classList.toggle('open');
+  if (tog) tog.textContent = body.classList.contains('open') ? '▾' : '▸';
+}
+
+function addResident() {
+  ESTADO.residentCount++;
+  const n = ESTADO.residentCount;
+  const list = document.getElementById('residentList');
+  const div  = document.createElement('div');
+  div.className = 'resident-card';
+  div.innerHTML = `
+    <div class="resident-header" onclick="toggleResident(this)">
+      <span class="resident-name">Residente ${n}</span>
+      <span class="resident-toggle">▾</span>
+    </div>
+    <div class="resident-body open">
+      <div class="field-row" style="margin-bottom:8px">
+        <div class="field"><label>Nome</label>
+          <input type="text" placeholder="Nome completo"
+            oninput="this.closest('.resident-card').querySelector('.resident-name').textContent=this.value||'Residente ${n}'">
+        </div>
+        <div class="field"><label>Idade</label><input type="number" placeholder="0" min="0"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:8px">
+        <div class="field"><label>CPF (opcional)</label><input type="text" placeholder="000.000.000-00"></div>
+        <div class="field"><label>Condição</label>
+          <select>${CONFIG.CONDICOES.map(c=>`<option>${c}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field"><label>Vulnerabilidade</label>
+        <select>${CONFIG.VULNERABILIDADES.map(v=>`<option>${v}</option>`).join('')}</select>
+      </div>
+      <div class="field" style="margin-top:8px"><label>Necessidades Específicas</label>
+        <textarea placeholder="Medicação, mobilidade reduzida..." style="min-height:56px"></textarea>
+      </div>
+    </div>`;
+  list.appendChild(div);
+  div.scrollIntoView({ behavior:'smooth' });
+}
+
+// ════════════════════════════════════════════════════════════════
+// NUEVO PING DEL VOLUNTARIO
+// ════════════════════════════════════════════════════════════════
+function abrirNovoPoint() {
+  document.getElementById('newPingOverlay').classList.add('open');
+  setTimeout(initNewPingMap, 100);
+  setTimeout(() => newPingMapVol && newPingMapVol.invalidateSize(), 200);
+}
+
+function closeNewPing() {
+  document.getElementById('newPingOverlay').classList.remove('open');
+}
+
+function captureNewPingGPS() {
+  toast(CONFIG.UI.TOAST_GPS_CAPTURA);
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        document.getElementById('npLat').value = lat;
+        document.getElementById('npLng').value = lng;
+        if (newPingMapVol) newPingMapVol.setView([parseFloat(lat), parseFloat(lng)], 17);
+        toast(CONFIG.UI.TOAST_GPS_OK);
+        checkDuplicate(document.getElementById('npComplemento').value);
+      },
+      () => {
+        const lat = (CONFIG.MAPA.LAT_PADRAO + (Math.random()-.5)*.005).toFixed(6);
+        const lng = (CONFIG.MAPA.LNG_PADRAO + (Math.random()-.5)*.005).toFixed(6);
+        document.getElementById('npLat').value = lat;
+        document.getElementById('npLng').value = lng;
+        if (newPingMapVol) newPingMapVol.setView([parseFloat(lat), parseFloat(lng)], 17);
+        toast(CONFIG.UI.TOAST_GPS_SIMULADO);
+        checkDuplicate(document.getElementById('npComplemento').value);
+      }
+    );
+  }
+}
+
+function checkDuplicate(comp) {
+  const warn = document.getElementById('dupWarning');
+  const lat  = parseFloat(document.getElementById('npLat').value);
+  const lng  = parseFloat(document.getElementById('npLng').value);
+  // BUG-08: verificar lat E lng combinados — evita falsos positivos em ruas paralelas
+  if (isNaN(lat) || isNaN(lng)) { warn.style.display='none'; return; }
+  const proximos = ESTADO.pingsVol.filter(p =>
+    p.Latitude && p.Longitude &&
+    Math.abs(parseFloat(p.Latitude)  - lat) < 0.0003 &&
+    Math.abs(parseFloat(p.Longitude) - lng) < 0.0003
+  );
+  if (proximos.length > 0 && !comp) {
+    document.getElementById('dupLista').innerHTML = proximos.map(p => `
+      <div class="dup-item">
+        <span>📍 ${_esc(p.Endereco)||'—'}</span>
+        <span class="status-tag ${CONFIG.STATUS_CSS[p.Status]||'s-pending'}">${CONFIG.STATUS_LABEL[p.Status]||p.Status}</span>
+      </div>`).join('');
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+}
+
+async function createNewPing() {
+  const lat  = document.getElementById('npLat').value;
+  const lng  = document.getElementById('npLng').value;
+  const addr = document.getElementById('npEndereco').value;
+  const comp = document.getElementById('npComplemento').value;
+  if (!lat || !lng) { toast('⚠️ Capture as coordenadas GPS primeiro'); return; }
+  const s = ESTADO.sessao;
+  const areaVol = s ? (s.Areas_Permitidas || '') : '';
+  const areaObj = ESTADO.areas.find(a => a.Nome === areaVol) || null;
+
+  const dados = {
+    acao:        CONFIG.ACOES.SALVAR_PING,
+    endereco:    addr + (comp ? ' – ' + comp : ''),
+    latitude:    lat,
+    longitude:   lng,
+    idArea:      areaObj ? areaObj.ID_Area : '',
+    idMapa:      areaObj ? areaObj.ID_Mapa : '',
+    nomeArea:    areaVol,
+    nomeMapa:    ESTADO.mapaAtual ? ESTADO.mapaAtual.Nome : '',
+    voluntarioResponsavel: s ? (s.Nome || s.nome || s.usuario) : '',
+    criadoPor:   s ? (s.Nome || s.nome || s.usuario) : '',
+  };
+  try {
+    let r;
+    if (offlineVol) {
+      guardarFilaOffline({ ...dados, acao: CONFIG.ACOES.SALVAR_PING });
+      r = { sucesso:true };
+    } else {
+      r = await chamarBackend(dados);
+    }
+    if (r.sucesso) {
+      toast(CONFIG.UI.TOAST_PING_CRIADO);
+      if (offlineVol) {
+        // BUG-07: em modo offline r.dados é undefined — não abrir formulário
+        setTimeout(() => closeNewPing(), 800);
+      } else {
+        setTimeout(() => {
+          closeNewPing();
+          abrirFormulario(r.dados ? r.dados.id : null, addr||'Novo Ponto');
+        }, 800);
+      }
+      await carregarPingsVol();
+    } else {
+      toast('⚠️ ' + r.mensagem);
+    }
+  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// UPLOAD DE FOTOS — B-20
+// ════════════════════════════════════════════════════════════════
 function inicializarUploadFotos() {
-  // Criar input file oculto reutilizável
   let inp = document.getElementById('_fotoInput');
   if (!inp) {
     inp = document.createElement('input');
-    inp.type    = 'file';
-    inp.id      = '_fotoInput';
-    inp.accept  = CONFIG.FOTOS.EXTENSOES;
+    inp.type     = 'file';
+    inp.id       = '_fotoInput';
+    inp.accept   = CONFIG.FOTOS.EXTENSOES;
     inp.multiple = false;
     inp.style.display = 'none';
     inp.addEventListener('change', _onFotoSelecionada);
@@ -5407,7 +5644,6 @@ function addPhoto() {
     toast(CONFIG.UI_S4.FOTO_MAX);
     return;
   }
-  // Garantir que o input existe (inicializarUploadFotos pode não ter rodado ainda)
   inicializarUploadFotos();
   const inp = document.getElementById('_fotoInput');
   if (inp) inp.click();
@@ -5416,14 +5652,12 @@ function addPhoto() {
 async function _onFotoSelecionada(e) {
   const file = e.target.files[0];
   if (!file) return;
-  e.target.value = ''; // resetar para permitir mesma foto
+  e.target.value = '';
 
-  // Validar tipo
   if (!CONFIG.FOTOS.TIPOS_ACEITOS.includes(file.type)) {
     toast(CONFIG.UI_S4.FOTO_TIPO);
     return;
   }
-  // Validar tamanho
   if (file.size > CONFIG.FOTOS.MAX_TAMANHO_MB * 1024 * 1024) {
     toast(CONFIG.UI_S4.FOTO_GRANDE);
     return;
@@ -5432,10 +5666,10 @@ async function _onFotoSelecionada(e) {
   try {
     const base64 = await _comprimirFoto(file);
     const fotoObj = {
-      nome:      file.name,
-      tipo:      file.type,
-      base64:    base64,
-      descricao: '',
+      nome:       file.name,
+      tipo:       file.type,
+      base64:     base64,
+      descricao:  '',
       _local_url: URL.createObjectURL(file),
       _uid: Date.now().toString(36) + Math.random().toString(36).slice(2), // BUG-21
     };
@@ -5460,7 +5694,6 @@ function _comprimirFoto(file) {
         canvas.width  = width;
         canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        // Remover prefixo data:image/...;base64,
         const dataUrl = canvas.toDataURL('image/jpeg', CONFIG.FOTOS.QUALIDADE_JPEG);
         resolve(dataUrl.split(',')[1]);
       };
@@ -5493,12 +5726,10 @@ function removePhoto(btn) {
   if (uid) {
     _fotosBase64 = _fotosBase64.filter(f => f._uid !== uid);
   } else {
-    // Fallback para índice se _uid ausente
     const idx = parseInt(thumb.dataset.idx);
     if (!isNaN(idx)) _fotosBase64.splice(idx, 1);
   }
   thumb.remove();
-  // Re-indexar
   document.querySelectorAll('#photoGrid .photo-thumb').forEach((t,i) => t.dataset.idx = i);
   toast(CONFIG.UI.TOAST_FOTO_DEL);
 }
@@ -5506,10 +5737,10 @@ function removePhoto(btn) {
 async function enviarFotosBackend(idPing, voluntario) {
   if (!_fotosBase64.length) return { sucesso:true, quantidade:0 };
   const payload = {
-    acao:      CONFIG.ACOES.SALVAR_FOTOS,
-    idPing:    idPing,
+    acao:       CONFIG.ACOES.SALVAR_FOTOS,
+    idPing:     idPing,
     voluntario: voluntario,
-    fotos:     _fotosBase64.map(f => ({
+    fotos:      _fotosBase64.map(f => ({
       nome:      f.nome,
       tipo:      f.tipo,
       base64:    f.base64,
@@ -5531,8 +5762,7 @@ async function enviarFotosBackend(idPing, voluntario) {
   return { sucesso:true, quantidade: payload.fotos.length, offline:true };
 }
 
-// ── Proxy de fotos: carrega imagem do servidor sem expor Drive ────
-// Uso: carregarFotoProxy(idArquivo, elementoImg)
+// Proxy de fotos: carrega imagem do servidor sem expor Drive
 // O AppScript serve a imagem como base64 puro via doGet?acao=getFoto
 async function carregarFotoProxy(idArquivo, imgEl) {
   if (!idArquivo || !imgEl) return;
@@ -5550,77 +5780,11 @@ async function carregarFotoProxy(idArquivo, imgEl) {
   }
 }
 
-// ── Banner de instalação PWA ──────────────────────────────────────
-let _deferredInstall = null;
-
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _deferredInstall = e;
-  const banner = document.getElementById('installBanner');
-  if (banner) banner.style.display = 'flex';
-});
-
-function instalarPWA() {
-  if (!_deferredInstall) return;
-  _deferredInstall.prompt();
-  _deferredInstall.userChoice.then(() => {
-    _deferredInstall = null;
-    const banner = document.getElementById('installBanner');
-    if (banner) banner.style.display = 'none';
-  });
-}
-
-// ════════════════════════════════════════════════════════════════
-// INICIALIZAÇÃO GERAL
-// ════════════════════════════════════════════════════════════════
-window.addEventListener('load', () => {
-  // 1. PWA: manifest dinâmico + service worker
-  injetarManifest();
-  registrarServiceWorker();
-
-  // 2. Renderizar todos os textos a partir do CONFIG
-  renderizarTextos();
-  renderizarFiltrosPontos();
-
-  // 3. Inicializar upload de fotos (input oculto)
-  inicializarUploadFotos();
-
-  // 4. Fechar modais ao clicar fora
-  document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); });
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
-    if (e.key==='Enter' && document.getElementById('tela-login').style.display !== 'none') doLogin();
-  });
-
-  // 5. Verificar sessão ativa
-  // IMPORTANTE: renderizarTextos() já foi chamado acima (passo 2)
-  // então os elementos dinâmicos (pendBadge, nav-mapas, etc.) já existem
-  const sessao = carregarSessao();
-  if (sessao) {
-    ESTADO.sessao = sessao;
-    // Restaurar sessão: ir direto para a tela correta sem animação de redirect
-    const destino = CONFIG.DESTINO_ROLE[sessao.tipo.toLowerCase()];
-mostrarTela(destino || CONFIG.TELAS.LOGIN);
-if (destino) {
-  if (sessao.tipo.toLowerCase() === CONFIG.ROLES.COORD) {
-        inicializarCoordenador();
-      } else {
-        inicializarVoluntario();
-      }
-    }
-  } else {
-    mostrarTela(CONFIG.TELAS.LOGIN);
-  }
-
-  // 6. IDB: abrir base antecipado para uso offline imediato
-  abrirIDB().catch(() => {});
-});
 </script>
 <!-- ============================================================
-     FIM SEÇÃO 2: LÓGICA
+     FIM SECCIÓN 9 — VOLUNTARIO
      ============================================================ -->
+
 
 </body>
 </html>
