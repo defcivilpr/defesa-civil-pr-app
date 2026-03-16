@@ -746,6 +746,8 @@ const CONFIG = {
     BTN_NOVO_PIN:      "＋ Novo ponto",
     BTN_FECHAR:        "✕ Fechar",
     BTN_CANCELAR_NAV:  "✕ Cancelar navegação",
+    BTN_TOGGLE_MAPAS:     "🗺 Mapas",
+    MAPAS_SIDEBAR_TITULO: "🗺 Mapas Salvos",
   },
 
   // ── [F0] OSRM — endpoint para cálculo de rotas online ────────
@@ -1247,13 +1249,19 @@ textarea{resize:vertical;min-height:65px;}
 /* Maps-layout: o mapa preenche o espaço total */
 .maps-layout{position:absolute;inset:0;display:block;}
 
-/* Maps-sidebar: painel flutuante sobre o mapa */
+/* Maps-sidebar: painel colapsável — oculto por default, abre sobre o mapa */
+/* Posicionado após o nav sidebar (left:var(--sidebar-w)) — nunca se superpõe */
 .maps-sidebar{
-  position:absolute;left:0;top:0;bottom:0;width:260px;
+  position:absolute;left:var(--sidebar-w);top:0;bottom:0;width:260px;
   z-index:200;background:rgba(20,32,56,.96);
   backdrop-filter:blur(8px);border-right:1px solid var(--border);
   box-shadow:4px 0 16px rgba(0,0,0,.4);
   display:flex;flex-direction:column;overflow:hidden;
+  transform:translateX(-100%);
+  transition:transform .28s cubic-bezier(.32,1,.55,1);
+}
+.maps-sidebar.aberta{
+  transform:translateX(0);
 }
 
 /* Map canvas: preenche tudo (toolbar + barra busca + mapa) */
@@ -2317,8 +2325,11 @@ textarea{resize:vertical;min-height:65px;}
         <div class="maps-layout">
           <div class="maps-sidebar">
             <div class="maps-sidebar-hdr">
-              <div class="maps-sidebar-hdr-title">🗺 Mapas Salvos</div>
-              <button class="btn btn-primary" style="padding:4px 9px;font-size:10px" onclick="openModal('modalSaveMap')">+ Novo</button>
+              <div class="maps-sidebar-hdr-title" id="mapsSidebarTitulo"></div>
+              <div style="display:flex;gap:5px;align-items:center">
+                <button class="btn btn-primary" style="padding:4px 9px;font-size:10px" onclick="openModal('modalSaveMap')">+ Novo</button>
+                <div class="aip-close" onclick="_toggleMapasSidebar()" title="Fechar painel">✕</div>
+              </div>
             </div>
             <div class="maps-list" id="mapsList"></div>
           </div>
