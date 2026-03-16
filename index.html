@@ -1237,11 +1237,12 @@ textarea{resize:vertical;min-height:65px;}
 }
 
 /* Main: camada base — ocupa toda a app-body */
-.main{position:absolute;inset:0;flex:none;}
+.main{position:absolute;top:0;bottom:0;left:var(--sidebar-w);right:0;flex:none;}
 
 /* Página do mapa: SEMPRE visível como fundo — nunca ocultada */
 #page-mapas{
-  position:absolute!important;inset:0!important;
+  position:absolute!important;
+  top:0!important;bottom:0!important;left:0!important;right:0!important;
   display:flex!important;flex-direction:column;
   z-index:1;overflow:hidden;
 }
@@ -1252,7 +1253,7 @@ textarea{resize:vertical;min-height:65px;}
 /* Maps-sidebar: painel colapsável — oculto por default, abre sobre o mapa */
 /* Posicionado após o nav sidebar (left:var(--sidebar-w)) — nunca se superpõe */
 .maps-sidebar{
-  position:absolute;left:var(--sidebar-w);top:0;bottom:0;width:260px;
+  position:absolute;left:0;top:0;bottom:0;width:260px;
   z-index:200;background:rgba(20,32,56,.96);
   backdrop-filter:blur(8px);border-right:1px solid var(--border);
   box-shadow:4px 0 16px rgba(0,0,0,.4);
