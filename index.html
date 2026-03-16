@@ -104,6 +104,8 @@ const CONFIG = {
     ENVIAR_ALERTA:      "enviarAlerta",
     REATIVAR_USUARIO:   "reativarUsuario",
     LISTAR_FORMULARIOS: "listarFormularios",
+    // [F0] Fase 7 — editar usuario sin perder registros
+    EDITAR_USUARIO:     "editarUsuario",
   },
 
   // ── Status de ping (valores que chegam do backend) ───────────
@@ -656,6 +658,15 @@ const CONFIG = {
     TH_USER_STATUS:    "Status",
     TH_USER_ACOES:     "Ações",
 
+    // [F7] Editar usuário
+    EDITAR_USUARIO_TITULO: "✏️ Editar Usuário",
+    EDITAR_BTN:            "✏️ Editar",
+    EDITAR_SALVAR_BTN:     "💾 Salvar Alterações",
+    EDITAR_SENHA_HINT:     "Senha (deixe em branco para não alterar)",
+    EDITAR_OK:             "✅ Usuário atualizado com sucesso.",
+    EDITAR_ERR_CAMPOS:     "⚠️ Nome e usuário são obrigatórios.",
+    EDITAR_ERR_SENHA:      "⚠️ Nova senha deve ter ao menos 4 caracteres.",
+
     // B-25 CSV
     CSV_GERADO:        "⬇️ CSV gerado e baixado.",
     CSV_VAZIO:         "⚠️ Nenhum dado para exportar.",
@@ -710,6 +721,96 @@ const CONFIG = {
   // ── Formato de data/hora ─────────────────────────────────────
   FMT_DATA: { day:"2-digit", month:"2-digit", year:"numeric" },
   FMT_HORA: { hour:"2-digit", minute:"2-digit" },
+
+  // ════════════════════════════════════════════════════════════════
+  // [FASE 0] — VALORES NOVOS: referenciados pelas Fases 1-10
+  // Nenhum destes valores deve aparecer hardcodeado fora deste bloco.
+  // ════════════════════════════════════════════════════════════════
+
+  // ── [F0] Cores dos pines por estado (marcadores no mapa) ─────
+  // Separado de COR_STATUS para não quebrar uso existente.
+  // Referenciado por: pingIcon · carregarMarcadoresPings · renderizarLeyendaMapa
+  COR_PINES: {
+    Pendente:  "#F59E0B",   // 🟡 Amarelo
+    "Em Curso":"#F97316",   // 🟠 Laranja
+    Concluido: "#22C55E",   // 🟢 Verde
+    Critico:   "#EF4444",   // 🔴 Vermelho
+    DEFAULT:   "#94A3B8",   // ⚪ Cinza (sem status definido)
+  },
+
+  // ── [F0] Textos UI — botões de ação (Fases 2 e 8) ────────────
+  UI_ACOES: {
+    BTN_GUARDAR_MAPA:  "💾 Guardar este mapa",
+    BTN_IR_PIN:        "🧭 Ir a este ponto",
+    BTN_INICIAR_REL:   "▶ Iniciar Relevamento",
+    BTN_NOVO_PIN:      "＋ Novo ponto",
+    BTN_FECHAR:        "✕ Fechar",
+    BTN_CANCELAR_NAV:  "✕ Cancelar navegação",
+  },
+
+  // ── [F0] OSRM — endpoint para cálculo de rotas online ────────
+  // Referenciado por: navegarAlPin() — Fase 8
+  // Com sinal  → OSRM calcula rota em tempo real
+  // Sem sinal  → rota pré-calculada cacheada no IndexedDB
+  OSRM_URL: "https://router.project-osrm.org/route/v1/foot/{lat1},{lng1};{lat2},{lng2}?overview=full&geometries=geojson",
+
+  // ── [F0] Formato do código legível de ping (M01-A02-P003) ─────
+  // Referenciado por: generarCodigoPing() — Fase 4
+  CODIGO_PING: {
+    PREFIXO_MAPA:  "M",
+    PREFIXO_AREA:  "A",
+    PREFIXO_PING:  "P",
+    DIGITOS_MAPA:  2,
+    DIGITOS_AREA:  2,
+    DIGITOS_PING:  3,
+    SEPARADOR:     "-",
+  },
+
+  // ── [F0] Labels da legenda do mapa ────────────────────────────
+  // Referenciado por: renderizarLeyendaMapa() — Fase 5
+  LEYENDA_MAPA: [
+    { status: "Pendente",  label: "Pendente",  cor: "#F59E0B" },
+    { status: "Em Curso",  label: "Em Curso",  cor: "#F97316" },
+    { status: "Concluido", label: "Concluído", cor: "#22C55E" },
+    { status: "Critico",   label: "Crítico",   cor: "#EF4444" },
+  ],
+
+  // ── [F0] Ação nova no backend — editar usuário (Fase 7) ───────
+  // Já inserido em CONFIG.ACOES acima. Referenciado por: confirmarEditarUsuario() — Fase 7
+  // CONFIG.ACOES.EDITAR_USUARIO = "editarUsuario"  ← ver bloco ACOES acima
+
+  // ── [F0] Textos UI — bottom sheet do voluntário (Fase 8) ─────
+  UI_BOTTOM_SHEET: {
+    TITULO_PIN:       "Ponto de Relevamento",
+    LABEL_CODIGO:     "Código:",
+    LABEL_ENDERECO:   "Endereço:",
+    LABEL_STATUS:     "Status:",
+    SEM_ENDERECO:     "Endereço não informado",
+    DIST_APROX:       "Distância aprox.: ",
+    DIST_M:           " m",
+    DIST_KM:          " km",
+    NAV_CALCULANDO:   "⏳ Calculando rota...",
+    NAV_OFFLINE:      "📶 Rota offline (pré-calculada)",
+    NAV_ONLINE:       "🌐 Rota calculada",
+    NAV_SEM_ROTA:     "⚠️ Rota não disponível offline.",
+    NAV_GPS_ERR:      "⚠️ GPS necessário para navegar.",
+  },
+
+  // ── [F0] Textos UI — tela Sync do voluntário (Fase 9) ────────
+  UI_SYNC: {
+    TITULO:            "☁️ Sincronização",
+    SEM_PENDENTES:     "✅ Tudo sincronizado",
+    PENDENTES_LABEL:   " formulários pendentes de envio",
+    PENDENTE_1:        "1 formulário pendente de envio",
+    ITEM_PIN_LABEL:    "Pin: ",
+    ITEM_SEM_PIN:      "Pin não identificado",
+    ITEM_DATA:         "Salvo em: ",
+    SINCRONIZANDO:     "⏳ Sincronizando...",
+    ITEM_OK:           "✅ Enviado",
+    ITEM_ERR:          "⚠️ Erro ao enviar",
+    NOTIF_SYNC_OK:     "✅ Sincronização completa",
+    NOTIF_SYNC_PARCIAL:"⚠️ Sincronização parcial — verifique conexão",
+  },
 
 };
 
@@ -1115,6 +1216,63 @@ textarea{resize:vertical;min-height:65px;}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
 .page{display:none;flex:1;overflow:hidden;flex-direction:column;}
 .page.active{display:flex;}
+
+/* ════════════════════════════════════════════════════════
+   [FASE 1] COORD — MAPA SEMPRE VISÍVEL
+   Mapa é a camada base. Sidebar e páginas = overlays.
+   Nenhum valor hardcodeado — tudo referencia variáveis CSS.
+════════════════════════════════════════════════════════ */
+
+/* app-body: contexto de posicionamento para filhos absolutos */
+.app-body{position:relative;}
+
+/* Sidebar: painel flutuante sobre o mapa (esquerda) */
+.sidebar{
+  position:absolute;left:0;top:0;bottom:0;
+  z-index:500;flex-shrink:0;
+  box-shadow:4px 0 24px rgba(0,0,0,.4);
+  backdrop-filter:blur(4px);
+}
+
+/* Main: camada base — ocupa toda a app-body */
+.main{position:absolute;inset:0;flex:none;}
+
+/* Página do mapa: SEMPRE visível como fundo — nunca ocultada */
+#page-mapas{
+  position:absolute!important;inset:0!important;
+  display:flex!important;flex-direction:column;
+  z-index:1;overflow:hidden;
+}
+
+/* Maps-layout: o mapa preenche o espaço total */
+.maps-layout{position:absolute;inset:0;display:block;}
+
+/* Maps-sidebar: painel flutuante sobre o mapa */
+.maps-sidebar{
+  position:absolute;left:0;top:0;bottom:0;width:260px;
+  z-index:200;background:rgba(20,32,56,.96);
+  backdrop-filter:blur(8px);border-right:1px solid var(--border);
+  box-shadow:4px 0 16px rgba(0,0,0,.4);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* Map canvas: preenche tudo (toolbar + barra busca + mapa) */
+.map-canvas-wrap{
+  position:absolute!important;inset:0!important;
+  display:flex!important;flex-direction:column;overflow:hidden;
+}
+
+/* Páginas não-mapa: painéis overlay à direita da sidebar */
+.page:not(#page-mapas){
+  position:absolute;top:0;left:var(--sidebar-w);right:0;bottom:0;
+  z-index:400;background:var(--navy-mid);
+  border-left:1px solid var(--border);
+  display:none;flex-direction:column;overflow:hidden;flex:none;
+}
+.page:not(#page-mapas).active{display:flex;}
+
+/* ════ FIM [FASE 1] CSS ════ */
+
 .content-area{flex:1;overflow-y:auto;padding:16px;}
 .content-area::-webkit-scrollbar{width:4px;}
 .content-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
@@ -1148,11 +1306,8 @@ textarea{resize:vertical;min-height:65px;}
 .stat-ico{position:absolute;right:12px;top:12px;font-size:20px;opacity:.1;}
 
 /* MAPAS PAGE */
-.maps-layout{display:grid;grid-template-columns:280px 1fr;flex:1;overflow:hidden;}
-.maps-sidebar{
-  background:var(--navy-mid);border-right:1px solid var(--border-soft);
-  display:flex;flex-direction:column;overflow:hidden;
-}
+/* [F1] .maps-layout, .maps-sidebar e .map-canvas-wrap redefinidos no bloco [FASE 1] acima */
+/* As regras abaixo mantêm apenas estilos de filhos que não conflitam */
 .maps-sidebar-hdr{
   padding:10px 12px;border-bottom:1px solid var(--border-soft);
   display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
@@ -1172,7 +1327,7 @@ textarea{resize:vertical;min-height:65px;}
 .mli-meta{font-size:10px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;margin-bottom:2px;}
 .mli-actions{display:flex;gap:5px;margin-top:8px;}
 .mli-actions .btn{padding:4px 9px;font-size:10px;}
-.map-canvas-wrap{position:relative;flex:1;display:flex;flex-direction:column;overflow:hidden;}
+/* [F1] .map-canvas-wrap redefinido com position:absolute no bloco [FASE 1] */
 .map-toolbar{
   background:var(--navy-mid);border-bottom:1px solid var(--border-soft);
   padding:7px 12px;display:flex;align-items:center;gap:7px;
@@ -1248,6 +1403,224 @@ textarea{resize:vertical;min-height:65px;}
   z-index:1000;display:none;box-shadow:0 4px 16px rgba(0,0,0,.4);
   backdrop-filter:blur(8px);white-space:nowrap;
 }
+/* ── [FASE 2] Botão flutuante "Guardar este mapa" ──────────────
+   Aparece sobre o mapa após busca exitosa. Texto via CONFIG.UI_ACOES.
+   position:absolute dentro de .map-canvas-wrap (position:absolute inset:0)
+   ──────────────────────────────────────────────────────────── */
+#btnGuardarMapa{
+  display:none;position:absolute;bottom:48px;left:50%;
+  transform:translateX(-50%);z-index:1010;
+  background:linear-gradient(135deg,var(--orange),var(--orange-dark));
+  color:#fff;border:none;border-radius:24px;
+  padding:10px 22px;font-family:'Rajdhani',sans-serif;
+  font-size:13px;font-weight:700;letter-spacing:.8px;
+  cursor:pointer;box-shadow:0 4px 20px rgba(244,82,30,.5);
+  white-space:nowrap;transition:opacity .2s,transform .2s;
+  animation:fabIn .35s cubic-bezier(.34,1.56,.64,1) both;
+}
+#btnGuardarMapa:hover{
+  opacity:.92;transform:translateX(-50%) scale(1.04);
+}
+/* ── FIM [FASE 2] CSS ── */
+
+/* ── [FASE 5] Leyenda del mapa ────────────────────────────────
+   Panel flotante bottom-right sobre el mapa.
+   Colores y labels vienen de CONFIG.LEYENDA_MAPA — nunca hardcodeados.
+   ─────────────────────────────────────────────────────────── */
+#leyendaMapa{
+  position:absolute;bottom:32px;right:10px;z-index:1005;
+  background:rgba(11,22,40,.92);border:1px solid var(--border);
+  border-radius:9px;padding:8px 12px;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);
+  backdrop-filter:blur(8px);min-width:120px;
+  animation:fadeUp .3s ease both;
+}
+#leyendaMapa .ley-titulo{
+  font-family:'Rajdhani',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:2px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:7px;
+}
+#leyendaMapa .ley-item{
+  display:flex;align-items:center;gap:7px;
+  font-size:11px;color:var(--text);margin-bottom:5px;
+}
+#leyendaMapa .ley-item:last-child{margin-bottom:0;}
+#leyendaMapa .ley-dot{
+  width:10px;height:10px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.35);
+  flex-shrink:0;
+}
+/* ── FIM [FASE 5] CSS ── */
+
+/* ── [FASE 6] Monitoreo mapa-céntrico ─────────────────────────
+   #page-monitoreo es transparente — el mapa base se ve siempre.
+   El panel de stats flota sobre el mapa.
+   ─────────────────────────────────────────────────────────── */
+#page-monitoreo{
+  background:transparent!important;
+  pointer-events:none;
+}
+#page-monitoreo > *{pointer-events:auto;}
+
+/* Header del monitoreo — compacto, sobre el mapa */
+#page-monitoreo .page-header{
+  background:rgba(11,22,40,.88);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--border);
+  padding:8px 14px;
+}
+
+/* Panel flotante de stats — lateral derecho */
+#monitorPanel{
+  position:absolute;right:10px;top:68px;
+  width:300px;z-index:600;
+  background:rgba(11,22,40,.94);
+  border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,.5);
+  backdrop-filter:blur(10px);
+  overflow:hidden;
+  transition:opacity .25s,transform .25s;
+  max-height:calc(100vh - 160px);overflow-y:auto;
+}
+#monitorPanel::-webkit-scrollbar{width:3px;}
+#monitorPanel::-webkit-scrollbar-thumb{background:var(--border);}
+#monitorPanel.oculto{opacity:0;pointer-events:none;transform:translateX(20px);}
+
+/* Toggle mapa/tabla */
+#btnToggleMonitor{
+  font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.8px;padding:5px 11px;border-radius:6px;
+  border:1px solid var(--border-soft);cursor:pointer;
+  background:var(--navy-light);color:var(--muted);
+  text-transform:uppercase;transition:all .15s;
+}
+#btnToggleMonitor.activo{
+  background:var(--orange-glow);color:var(--orange);
+  border-color:var(--border);
+}
+
+/* Tabla de monitoreo — vista alternativa */
+#monitorTabla{
+  display:none;position:absolute;
+  top:68px;left:var(--sidebar-w);right:0;bottom:0;
+  background:var(--navy-mid);z-index:601;
+  overflow-y:auto;padding:12px;
+}
+#monitorTabla.visible{display:block;}
+/* ── FIM [FASE 6] CSS ── */
+
+/* ── [FASE 8] Bottom Sheet + Ruta al pin ──────────────────────
+   Bottom sheet del voluntario — desliza desde abajo sobre el mapa.
+   Textos via CONFIG.UI_BOTTOM_SHEET y CONFIG.UI_ACOES.
+   ─────────────────────────────────────────────────────────── */
+#bottomSheetPin{
+  position:fixed;left:0;right:0;bottom:0;
+  z-index:2000;
+  background:var(--navy-mid);
+  border-top:1px solid var(--border);
+  border-radius:18px 18px 0 0;
+  padding:0 0 24px;
+  box-shadow:0 -8px 40px rgba(0,0,0,.6);
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.32,1,.55,1);
+  pointer-events:none;
+}
+#bottomSheetPin.aberta{
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.bsp-handle{
+  width:40px;height:4px;border-radius:2px;
+  background:var(--border);margin:10px auto 14px;
+}
+.bsp-codigo{
+  font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;
+  color:var(--orange);letter-spacing:1px;
+  padding:0 20px 2px;
+}
+.bsp-endereco{
+  font-size:13px;font-weight:500;color:var(--text);
+  padding:0 20px 4px;
+}
+.bsp-status{
+  font-size:11px;color:var(--muted);
+  padding:0 20px 14px;
+}
+.bsp-dist{
+  font-size:11px;color:var(--muted);
+  padding:0 20px 12px;
+}
+.bsp-btns{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;padding:0 16px;
+}
+.bsp-btn-nav{
+  background:var(--navy-light);border:1px solid var(--border);
+  color:var(--text);border-radius:10px;padding:12px 8px;
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;transition:all .15s;
+  text-align:center;
+}
+.bsp-btn-nav:hover{border-color:var(--orange);color:var(--orange);}
+.bsp-btn-form{
+  background:linear-gradient(135deg,var(--orange),var(--orange-dark));
+  border:none;color:#fff;border-radius:10px;padding:12px 8px;
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.5px;cursor:pointer;transition:opacity .15s;
+  text-align:center;
+}
+.bsp-btn-form:hover{opacity:.9;}
+.bsp-overlay{
+  position:fixed;inset:0;z-index:1999;
+  background:transparent;display:none;
+}
+.bsp-overlay.visivel{display:block;}
+/* ── FIM [FASE 8] CSS ── */
+
+/* ── [FASE 9] Sync — lista detallada de pendientes ────────────
+   Muestra cada formulario pendiente con código de pin y fecha.
+   Textos via CONFIG.UI_SYNC — nunca hardcodeados.
+   ─────────────────────────────────────────────────────────── */
+#syncResumen{
+  margin:0 12px 10px;
+  background:var(--navy-mid);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+}
+#syncResumenIco{font-size:22px;}
+#syncResumenTexto{flex:1;}
+#syncResumenNum{
+  font-family:'Rajdhani',sans-serif;font-size:26px;font-weight:700;
+  line-height:1;
+}
+#syncResumenSub{font-size:11px;color:var(--muted);margin-top:2px;}
+#syncListaTitulo{
+  font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:2px;color:var(--muted);text-transform:uppercase;
+  padding:0 16px 8px;
+}
+#syncListaPendentes{padding:0 12px;}
+.sync-item-pend{
+  background:var(--card);border:1px solid var(--border-soft);
+  border-radius:9px;padding:11px 13px;margin-bottom:7px;
+  display:flex;align-items:center;gap:10px;
+}
+.sync-item-pend.enviado{
+  border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05);
+}
+.sync-item-pend.erro{
+  border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.05);
+}
+.sip-ico{font-size:14px;flex-shrink:0;}
+.sip-body{flex:1;min-width:0;}
+.sip-codigo{
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  color:var(--orange);letter-spacing:.5px;
+}
+.sip-data{font-size:10px;color:var(--muted);margin-top:1px;}
+.sip-estado{font-size:11px;font-weight:500;flex-shrink:0;}
+/* ── FIM [FASE 9] CSS ── */
+
 .area-info-panel{
   position:absolute;right:10px;top:10px;width:210px;z-index:1000;
   background:var(--navy-mid);border:1px solid var(--border);
@@ -1970,6 +2343,8 @@ textarea{resize:vertical;min-height:65px;}
               <button class="btn btn-primary" onclick="searchLocation()">Buscar</button>
             </div>
             <div id="leaflet-map"></div>
+            <!-- [FASE 2] Botão flutuante — aparece após busca exitosa. Texto via CONFIG -->
+            <button id="btnGuardarMapa" onclick="_abrirModalGuardarMapa()"></button>
             <div class="map-hint" id="hintDraw" style="color:var(--orange)"></div>
             <div class="map-hint" id="hintPing" style="color:var(--red)"></div>
             <div class="area-info-panel" id="areaInfoPanel">
@@ -2034,28 +2409,42 @@ textarea{resize:vertical;min-height:65px;}
 
       <!-- PAGE: MONITOREO -->
       <div class="page" id="page-monitoreo">
+        <!-- [F6] Header compacto sobre el mapa -->
         <div class="page-header">
-          <div><div class="page-title">📊 Monitoramento</div><div class="page-sub">Progresso em tempo real do levantamento</div></div>
+          <div><div class="page-title">📊 Monitoramento</div></div>
           <div style="display:flex;gap:8px;align-items:center">
-            <span id="dashAutoRefresh" style="font-size:11px;color:var(--muted)"></span>
-            <button class="btn btn-ghost" onclick="atualizarDados()">🔄 Atualizar</button>
+            <span id="dashAutoRefresh" style="font-size:10px;color:var(--muted)"></span>
+            <button id="btnToggleMonitor" onclick="_toggleMonitorPanel()">📋 Painel</button>
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="atualizarDados()">🔄</button>
           </div>
         </div>
-        <div class="content-area">
-          <!-- Cards de estatísticas grandes — B-23 -->
-          <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)" id="statsGrid"></div>
-          <!-- Barra de progresso geral -->
-          <div class="card" style="margin-top:0" id="progressoGeral"></div>
-          <!-- Progresso por área e voluntário -->
-          <div class="monitor-grid" id="monitorGrid"></div>
-          <!-- Alertas críticos visuais -->
-          <div class="card" id="alertasCard">
-            <div class="card-hdr">
-              <div class="card-hdr-title">🚨 Situações Críticas</div>
-              <span class="tag tag-critical" id="alertasBadge"></span>
-            </div>
-            <div id="alertasList"></div>
+
+        <!-- [F6] Panel flotante de stats — lateral derecho sobre el mapa -->
+        <div id="monitorPanel">
+          <div style="padding:10px 12px;border-bottom:1px solid var(--border-soft)">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;color:var(--orange);letter-spacing:1px">PROGRESSO EM TEMPO REAL</div>
           </div>
+          <div style="padding:10px 12px">
+            <!-- Cards de estatísticas -->
+            <div id="statsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px"></div>
+            <!-- Barra de progresso geral -->
+            <div id="progressoGeral" style="margin-bottom:10px"></div>
+            <!-- Progresso por área e voluntário -->
+            <div id="monitorGrid"></div>
+            <!-- Alertas críticos -->
+            <div id="alertasCard" style="margin-top:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;color:var(--red)">🚨 Situações Críticas</span>
+                <span class="tag tag-critical" id="alertasBadge"></span>
+              </div>
+              <div id="alertasList"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- [F6] Vista tabla alternativa (toggle) -->
+        <div id="monitorTabla">
+          <div class="monitor-grid" id="monitorGridTabla"></div>
         </div>
       </div>
 
@@ -2124,6 +2513,30 @@ textarea{resize:vertical;min-height:65px;}
       <div class="modal-footer">
         <button id="btnCancelarUsuario" class="btn btn-ghost" onclick="closeModal('modalNovoUser')">Cancelar</button>
         <button class="btn btn-primary" onclick="criarNovoUsuario()">Criar Usuário</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR USUÁRIO — [FASE 7] -->
+  <div class="modal-overlay" id="modalEditarUsuario">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title" id="modalEditarUserTitulo"></div>
+        <div class="modal-close" onclick="closeModal('modalEditarUsuario')">✕</div>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="euId">
+        <div class="mgrid">
+          <div class="field"><label>Nome Completo *</label><input type="text" id="euNome" placeholder="Nome do usuário"></div>
+          <div class="field"><label>Usuário (login) *</label><input type="text" id="euUsuario" placeholder="usuario123"></div>
+          <div class="field full"><label id="euSenhaLabel"></label><input type="password" id="euSenha" placeholder=""></div>
+          <div class="field full"><label>Área Designada</label><select id="euArea"></select></div>
+        </div>
+        <div id="euErro" style="color:var(--red);font-size:12px;margin-top:8px;display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
+        <button class="btn btn-primary" id="euBtnSalvar" onclick="confirmarEditarUsuario()"></button>
       </div>
     </div>
   </div>
@@ -2342,14 +2755,31 @@ textarea{resize:vertical;min-height:65px;}
 
     <!-- SYNC VIEW -->
     <div id="syncView" style="display:none;flex-direction:column">
-      <div class="sync-card">
+
+      <!-- [F9] Resumen de pendientes — número grande, estado claro -->
+      <div id="syncResumen">
+        <div id="syncResumenIco">☁️</div>
+        <div id="syncResumenTexto">
+          <div id="syncResumenNum">0</div>
+          <div id="syncResumenSub"></div>
+        </div>
+      </div>
+
+      <!-- [F9] Título de la lista -->
+      <div id="syncListaTitulo"></div>
+
+      <!-- [F9] Lista detallada de formularios pendientes -->
+      <div id="syncListaPendentes"></div>
+
+      <!-- Estadísticas existentes — mantenidas -->
+      <div class="sync-card" style="margin:0 12px 8px">
         <div class="sync-card-title">☁️ Status de Sincronização</div>
         <div class="sync-row"><span>Formulários enviados</span><span id="syncEnviados" style="color:var(--green)">0</span></div>
         <div class="sync-row"><span>Fotos enviadas</span><span id="syncFotos" style="color:var(--green)">0</span></div>
         <div class="sync-row"><span>Pendentes de sync</span><span id="syncPendentes" style="color:var(--yellow)">0</span></div>
         <div class="sync-row"><span>Última sincronização</span><span id="syncUltima" style="color:var(--muted)">—</span></div>
       </div>
-      <div class="sync-card">
+      <div class="sync-card" style="margin:0 12px 8px">
         <div class="sync-card-title">📱 Armazenamento Local</div>
         <div class="sync-row"><span>Rascunhos salvos</span><span id="syncRascunhos" style="color:var(--orange)">0</span></div>
         <div class="sync-row"><span>Fotos em cache</span><span id="syncFotosCache" style="color:var(--muted)">—</span></div>
@@ -2506,6 +2936,22 @@ textarea{resize:vertical;min-height:65px;}
     </div>
   </div>
 
+  <!-- [FASE 8] Overlay transparente — cierra la bottom sheet al tocar fuera -->
+  <div class="bsp-overlay" id="bspOverlay" onclick="_fecharBottomSheet()"></div>
+
+  <!-- [FASE 8] Bottom Sheet del pin — textos asignados en runtime via CONFIG -->
+  <div id="bottomSheetPin">
+    <div class="bsp-handle"></div>
+    <div class="bsp-codigo"  id="bspCodigo"></div>
+    <div class="bsp-endereco" id="bspEndereco"></div>
+    <div class="bsp-status"  id="bspStatus"></div>
+    <div class="bsp-dist"    id="bspDist"></div>
+    <div class="bsp-btns">
+      <button class="bsp-btn-nav"  id="bspBtnNav"  onclick="_onBspNav()"></button>
+      <button class="bsp-btn-form" id="bspBtnForm" onclick="_onBspForm()"></button>
+    </div>
+  </div>
+
 </div><!-- /tela-vol -->
 
 <div id="toast"></div>
@@ -2582,11 +3028,18 @@ let drawTempLine   = null;
 let drawTempMarkers = [];
 let offlineCoord   = false;
 let _clockInterval = null; // BUG-10: referência ao timer do relógio para evitar acúmulo
+// [F3] Capa semitransparente de áreas existentes — visible al dibujar, solo referencia visual
+let _capaAreasExistentes = null;
+// [F6] Capa de polígonos coloreados para la vista de monitoreo
+let _monitorPolygons    = null;
 
 // ── Variables globales — Voluntario ─────────────────────────────
 let mapVol       = null;
 let newPingMapVol = null;
 let offlineVol   = false;
+// [F8] Estado de la bottom sheet y navegación
+let _pingBspAtual  = null;    // ping actualmente mostrado en la bottom sheet
+let _rutaLayer     = null;    // L.polyline de la ruta activa en mapVol
 let viewAtual    = 'mapa';
 
 // ── Variables globales — Formulario ─────────────────────────────
@@ -3199,12 +3652,15 @@ function inicializarCoordenador() {
   _txt('coordUserName', nome);
   _txt('coordAvatar',   iniciais);
 
+  // [F1] Mapa inicializado primeiro — é a camada base do layout
   inicializarMapaCoord();
   carregarDadosCoord();
   atualizarRelogio();
   // BUG-10: limpar timer anterior antes de criar novo — evita acúmulo a cada login
   if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
   _clockInterval = setInterval(atualizarRelogio, 1000);
+  // [F1] Garantir tamanho correto do mapa após montagem completa do layout
+  setTimeout(() => mapCoord && mapCoord.invalidateSize(), 200);
 }
 
 function atualizarRelogio() {
@@ -3214,7 +3670,11 @@ function atualizarRelogio() {
 }
 
 function inicializarMapaCoord() {
-  if (mapCoord) return;
+  // [F1] Se já inicializado, garantir tamanho correto no novo layout full-screen
+  if (mapCoord) {
+    setTimeout(() => mapCoord.invalidateSize(), 100);
+    return;
+  }
   const M = CONFIG.MAPA;
   mapCoord = L.map('leaflet-map', {
     center: [M.LAT_PADRAO, M.LNG_PADRAO],
@@ -3226,6 +3686,10 @@ function inicializarMapaCoord() {
   L.control.layers({ 'CARTO Dark': cartoDark, 'OpenStreetMap': osm }).addTo(mapCoord);
   mapCoord.on('click',    onMapClick);
   mapCoord.on('dblclick', onMapDblClick);
+  // [F1] Forçar redimensionamento após montagem do layout full-screen
+  setTimeout(() => mapCoord.invalidateSize(), 150);
+  // [F5] Renderizar leyenda de colores sobre el mapa
+  setTimeout(() => renderizarLeyendaMapa(), 200);
 }
 
 async function carregarDadosCoord() {
@@ -3349,9 +3813,16 @@ function renderizarPings(lista) {
     const css   = CONFIG.STATUS_CSS[p.Status]  || 's-pending';
     const label = CONFIG.STATUS_LABEL[p.Status]|| p.Status;
     const volIni = (_esc(p.Voluntario_Responsavel)||'—').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
+    // [F4] Código legible — usa p.Codigo si existe, fallback al ID corto
+    const codigo = p.Codigo || p.codigo || '';
     return `
     <tr>
-      <td style="color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:10px">${_esc(p.ID_Ping)||'—'}</td>
+      <td style="color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:10px">
+        ${codigo
+          ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);letter-spacing:.5px">${_esc(codigo)}</span>`
+          : `<span style="color:var(--muted)">${_esc(p.ID_Ping)||'—'}</span>`
+        }
+      </td>
       <td><div style="font-weight:500;color:var(--text)">${_esc(p.Endereco)||'—'}</div></td>
       <td style="color:var(--muted);font-size:10px">${_esc(p.ID_Area)||'—'}</td>
       <td><span class="tag ${css==='s-done'?'tag-done':css==='s-critical'?'tag-critical':css==='s-process'?'tag-active':'tag-pending'}">${label}</span></td>
@@ -3389,11 +3860,16 @@ function carregarMarcadoresPings() {
   pingMarkers = [];
   ESTADO.pings.forEach(p => {
     if (!p.Latitude || !p.Longitude) return;
-    const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+    // [F5] Usar CONFIG.COR_PINES para consistencia con la leyenda
+    const cor  = CONFIG.COR_PINES[p.Status] || CONFIG.COR_PINES.DEFAULT;
     const icon = pingIcon(cor);
+    // [F4] Mostrar código legible no popup — fallback para ID se não existir
+    const codigo = p.Codigo || p.codigo || '';
     const m = L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], { icon })
       .addTo(mapCoord)
-      .bindPopup(`<strong style="font-family:'Rajdhani',sans-serif">${_esc(p.Endereco)||'Ping'}</strong><br>
+      .bindPopup(`
+        ${codigo ? `<div style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:13px;letter-spacing:.5px;margin-bottom:4px">${_esc(codigo)}</div>` : ''}
+        <strong style="font-family:'Rajdhani',sans-serif">${_esc(p.Endereco)||'Ping'}</strong><br>
         <span style="color:${cor};font-size:11px">${CONFIG.STATUS_LABEL[p.Status]||p.Status}</span>`);
     pingMarkers.push(m);
   });
@@ -3402,37 +3878,89 @@ function carregarMarcadoresPings() {
 // Carrega polígonos das áreas salvas no backend e os desenha no mapa
 function carregarPoligonosAreas() {
   if (!mapCoord) return;
+
+  // [F3] Limpar capa de áreas existentes antes de recarregar
+  if (_capaAreasExistentes) {
+    _capaAreasExistentes.clearLayers();
+  } else {
+    _capaAreasExistentes = L.layerGroup().addTo(mapCoord);
+  }
+
   // Remover polígonos antigos que vieram do backend (marcados com _fromBackend)
+  // da lista drawnPolygons — a capa visual agora é _capaAreasExistentes
   ESTADO.drawnPolygons = ESTADO.drawnPolygons.filter(p => {
     if (p._fromBackend) { p.remove(); return false; }
     return true;
   });
+
   ESTADO.areas.forEach(area => {
     if (!area.Coordenadas) return;
     try {
       const pts = JSON.parse(area.Coordenadas);
       if (!pts || pts.length < 3) return;
+      // [F3] Polígono vai para _capaAreasExistentes — fixo, semitransparente, só visual
       const poly = L.polygon(pts, {
-        color: '#F4521E', fillColor: '#F4521E', fillOpacity: 0.08, weight: 2,
-      }).addTo(mapCoord);
+        color:       '#F4521E',
+        fillColor:   '#F4521E',
+        fillOpacity: 0.08,
+        weight:      2,
+        opacity:     0.6,
+      });
       poly._areaName    = area.Nome;
       poly._fromBackend = true;
       poly.bindTooltip(_esc(area.Nome), {
         permanent: true, direction: 'center', className: 'area-tooltip',
       });
       poly.on('click', () => mostrarInfoArea(area.Nome));
+      _capaAreasExistentes.addLayer(poly);
+      // Manter referência em drawnPolygons para compatibilidade com clearLastDraw
       ESTADO.drawnPolygons.push(poly);
     } catch(e) {}
   });
 }
 
-function pingIcon(cor) {
+// [F5] pingIcon: aceita cor direta (string hex) ou status (string de CONFIG.STATUS_PING)
+// Compatível com todas as chamadas existentes que passam cor direta.
+function pingIcon(corOuStatus) {
+  // Se for um status conhecido → derivar cor de CONFIG.COR_PINES
+  const cor = CONFIG.COR_PINES[corOuStatus]
+    ? CONFIG.COR_PINES[corOuStatus]
+    : (corOuStatus || CONFIG.COR_PINES.DEFAULT);
   return L.divIcon({
     className:'',
     html: `<div style="width:12px;height:12px;border-radius:50%;background:${cor};border:2px solid white;box-shadow:0 0 6px ${cor}"></div>`,
     iconSize:[12,12], iconAnchor:[6,6],
   });
 }
+
+// ── [FASE 5] renderizarLeyendaMapa ───────────────────────────
+// Cria e injeta o painel de leyenda sobre o mapa.
+// Lê exclusivamente CONFIG.LEYENDA_MAPA — cores e labels nunca hardcodeados.
+// Chamada uma vez desde inicializarMapaCoord().
+function renderizarLeyendaMapa() {
+  // Remover leyenda anterior se existir (evita duplicados em re-init)
+  const anterior = document.getElementById('leyendaMapa');
+  if (anterior) anterior.remove();
+
+  const wrap = document.getElementById('leaflet-map');
+  if (!wrap) return;
+
+  const items = CONFIG.LEYENDA_MAPA.map(item =>
+    `<div class="ley-item">
+      <div class="ley-dot" style="background:${item.cor}"></div>
+      <span>${_esc(item.label)}</span>
+    </div>`
+  ).join('');
+
+  const el = document.createElement('div');
+  el.id = 'leyendaMapa';
+  el.innerHTML = `<div class="ley-titulo">Legenda</div>${items}`;
+
+  // Insertar dentro del map-canvas-wrap (padre de leaflet-map) para position:absolute
+  const canvas = wrap.parentElement || wrap;
+  canvas.appendChild(el);
+}
+// ── FIM [FASE 5] renderizarLeyendaMapa ───────────────────────
 
 function focarPingMapa(lat, lng) {
   navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
@@ -3512,7 +4040,7 @@ function finalizarPoligono() {
 async function salvarArea() {
   const nome = document.getElementById('areaNomeInput').value.trim();
   if (!nome) { toast(CONFIG.UI.TOAST_AREA_NOME); return; }
-  const vol  = document.getElementById('areaVolInput').value;
+  const vol  = document.getElementById('areaVolInput')?.value;
   const desc = document.getElementById('areaDescInput').value;
   const pts  = ESTADO.pendingPolyPoints;
 
@@ -3526,7 +4054,7 @@ async function salvarArea() {
   poly.on('click', () => mostrarInfoArea(nome));
   ESTADO.drawnPolygons.push(poly);
 
-  // Limpar pontos temporários
+  // Limpar pontos temporários da capa de dibujo ativa
   ESTADO.drawPoints = [];
   drawTempMarkers.forEach(m => m.remove());
   drawTempMarkers = [];
@@ -3541,12 +4069,13 @@ async function salvarArea() {
       idMapa:      ESTADO.mapaAtual.ID_Mapa,
       nome:        nome,
       descricao:   desc,
-      voluntario:  vol !== CONFIG.UI.SEM_DESIGNACAO ? vol : '',
+      voluntario:  vol && vol !== CONFIG.UI.SEM_DESIGNACAO ? vol : '',
       coordenadas: JSON.stringify(pts),
       criadoPor:   ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
     });
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_AREA_CRIADA);
+      // [F3] Recarregar datos y polígonos — nueva área pasa a _capaAreasExistentes
       await carregarDadosCoord();
     } else {
       toast('⚠️ ' + (r.mensagem || 'Erro ao salvar área'));
@@ -3557,12 +4086,13 @@ async function salvarArea() {
 }
 
 function cancelarArea() {
-  // Descartar polígono pendente
+  // Descartar polígono pendente — só a capa de dibujo ativa
   ESTADO.drawPoints = [];
   ESTADO.pendingPolyPoints = [];
   drawTempMarkers.forEach(m => m.remove());
   drawTempMarkers = [];
   if (drawTempLine) { drawTempLine.remove(); drawTempLine = null; }
+  // [F3] As áreas existentes (_capaAreasExistentes) permanecem — não são tocadas ao cancelar
   setTool('nav');
   closeModal('modalSalvarArea');
 }
@@ -3618,6 +4148,9 @@ async function searchLocation() {
   const q   = document.getElementById('mapSearchInput').value.trim();
   const res = document.getElementById('searchResults');
   if (!q) return;
+  // [F2] Ocultar botão enquanto busca — reaparece em irPara() se exitosa
+  const btn = document.getElementById('btnGuardarMapa');
+  if (btn) btn.style.display = 'none';
   try {
     const r   = await fetch(`${CONFIG.MAPA.NOMINATIM}?q=${encodeURIComponent(q)}&format=json&limit=5`, { headers:{'Accept-Language':'pt-BR,pt'} });
     const data= await r.json();
@@ -3633,6 +4166,12 @@ function irPara(lat, lon, nome) {
   mapCoord.setView([lat, lon], 14);
   document.getElementById('searchResults').style.display = 'none';
   document.getElementById('mapSearchInput').value = nome;
+  // [F2] Mostrar botão flutuante após navegar ao resultado de busca
+  const btn = document.getElementById('btnGuardarMapa');
+  if (btn) {
+    btn.textContent = CONFIG.UI_ACOES.BTN_GUARDAR_MAPA;
+    btn.style.display = 'block';
+  }
 }
 
 async function salvarMapa() {
@@ -3662,11 +4201,29 @@ async function salvarMapa() {
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_MAPA_SALVO);
       closeModal('modalSaveMap');
+      // [F2] Ocultar botão flutuante após salvar com sucesso
+      const btn = document.getElementById('btnGuardarMapa');
+      if (btn) btn.style.display = 'none';
       await carregarDadosCoord();
     } else {
       toast('⚠️ ' + r.mensagem);
     }
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+}
+
+// [F2] Abre o modal de salvar mapa pré-preenchendo lat/lng/zoom da vista atual
+function _abrirModalGuardarMapa() {
+  if (mapCoord) {
+    const c = mapCoord.getCenter();
+    const z = mapCoord.getZoom();
+    const latEl  = document.getElementById('mapLat');
+    const lngEl  = document.getElementById('mapLng');
+    const zoomEl = document.getElementById('mapZoom');
+    if (latEl)  latEl.value  = c.lat.toFixed(6);
+    if (lngEl)  lngEl.value  = c.lng.toFixed(6);
+    if (zoomEl) zoomEl.value = z;
+  }
+  openModal('modalSaveMap');
 }
 
 async function deletarMapa(id) {
@@ -3682,6 +4239,36 @@ async function deletarMapa(id) {
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
 }
 
+// ── [FASE 4] generarCodigoPing ────────────────────────────────
+// Genera el código legible M01-A02-P003 usando CONFIG.CODIGO_PING.
+// mapaId  → busca índice (1-based) en ESTADO.mapas
+// areaId  → busca índice (1-based) en áreas del mapa
+// numPing → número secuencial del ping dentro del área (1-based)
+function generarCodigoPing(mapaId, areaId, numPing) {
+  const C  = CONFIG.CODIGO_PING;
+  const sep = C.SEPARADOR;
+
+  // Índice del mapa (1-based)
+  const idxMapa = ESTADO.mapas.findIndex(m => m.ID_Mapa === mapaId);
+  const nMapa   = idxMapa >= 0 ? idxMapa + 1 : 1;
+
+  // Índice del área dentro del mapa (1-based)
+  const areasDelMapa = ESTADO.areas.filter(a => a.ID_Mapa === mapaId);
+  const idxArea = areasDelMapa.findIndex(a => a.ID_Area === areaId);
+  const nArea   = idxArea >= 0 ? idxArea + 1 : 1;
+
+  // Número del ping (1-based, recibido como argumento)
+  const nPing = numPing && numPing > 0 ? numPing : 1;
+
+  // Formatear con ceros según CONFIG
+  const pad = (n, d) => String(n).padStart(d, '0');
+
+  return C.PREFIXO_MAPA + pad(nMapa, C.DIGITOS_MAPA)
+    + sep + C.PREFIXO_AREA + pad(nArea, C.DIGITOS_AREA)
+    + sep + C.PREFIXO_PING + pad(nPing, C.DIGITOS_PING);
+}
+// ── FIM [FASE 4] generarCodigoPing ───────────────────────────
+
 async function confirmarPing() {
   const lat  = parseFloat(document.getElementById('pingLat').value);
   const lng  = parseFloat(document.getElementById('pingLng').value);
@@ -3691,14 +4278,23 @@ async function confirmarPing() {
   // Detectar automaticamente qual área contém este ponto
   const areaDetectada = detectarAreaPorPonto(lat, lng);
 
+  // [F4] Calcular número secuencial del ping dentro del área y generar código legible
+  const idMapa = ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '';
+  const idArea = areaDetectada ? areaDetectada.ID_Area : '';
+  const pingsEnArea = idArea
+    ? ESTADO.pings.filter(p => p.ID_Area === idArea).length + 1
+    : ESTADO.pings.filter(p => p.ID_Mapa === idMapa).length + 1;
+  const codigoPing = generarCodigoPing(idMapa, idArea, pingsEnArea);
+
   try {
     const r = await chamarBackend({
       acao:         CONFIG.ACOES.SALVAR_PING,
       endereco:     addr,
       latitude:     lat,
       longitude:    lng,
-      idMapa:       ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '',
-      idArea:       areaDetectada ? areaDetectada.ID_Area : '',
+      idMapa:       idMapa,
+      idArea:       idArea,
+      codigo:       codigoPing,   // [F4] código legible M01-A02-P003
       tipoUnidade:  document.getElementById('pingTipoUnidade').value,
       voluntario:   document.getElementById('pingDesignarVol').value !== CONFIG.UI.SEM_DESIGNACAO
                     ? document.getElementById('pingDesignarVol').value : '',
@@ -3808,6 +4404,13 @@ async function criarVoluntario() {
 function goDrawArea() {
   navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
   setTimeout(() => {
+    // [F3] Asegurar que las áreas existentes son visibles antes de dibujar
+    // El coordinador ve qué zonas ya están cubiertas y no las pisa
+    if (_capaAreasExistentes && mapCoord) {
+      if (!mapCoord.hasLayer(_capaAreasExistentes)) {
+        _capaAreasExistentes.addTo(mapCoord);
+      }
+    }
     setTool('draw');
     toast(CONFIG.UI.TOAST_DESENHAR);
   }, 100);
@@ -3963,77 +4566,10 @@ async function renderizarMonitoramento() {
     } catch(e) { /* silencioso — pings continuam funcionando */ }
   }
 
-  // Stats cards
-  const total    = ESTADO.pings.length;
-  const concluidos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-  const emCurso  = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.EM_CURSO).length;
-  const criticos = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
-  const pendentes= ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE).length;
+  // [F6] Colorear polígonos del mapa por avance — vista principal
+  colorearAreasPorAvance();
 
-  const SL = CONFIG.STATS_LABELS;
-  document.getElementById('statsGrid').innerHTML = [
-    { lbl:SL.TOTAL,      val:total,      cor:'sc-orange', ico:'📍' },
-    { lbl:SL.CONCLUIDOS, val:concluidos, cor:'sc-green',  ico:'✅', style:'color:var(--green)' },
-    { lbl:SL.EM_CURSO,   val:emCurso,    cor:'sc-yellow', ico:'🔄', style:'color:var(--yellow)' },
-    { lbl:SL.CRITICOS,   val:criticos,   cor:'sc-red',    ico:'🚨', style:'color:var(--red)' },
-    { lbl:SL.PENDENTES,  val:pendentes,  cor:'sc-blue',   ico:'⏳', style:'color:var(--blue)' },
-  ].map(c => `
-    <div class="stat-card ${c.cor}">
-      <div class="stat-ico">${c.ico}</div>
-      <div class="stat-lbl">${c.lbl}</div>
-      <div class="stat-val" ${c.style?'style="'+c.style+'"':''}>${c.val}</div>
-    </div>`).join('');
-
-  // Progresso por área
-  let areaProg = ESTADO.areas.map(a => {
-    const pa   = ESTADO.pings.filter(p=>p.ID_Area===a.ID_Area);
-    const feitos = pa.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-    const pct  = pa.length>0 ? Math.round(feitos/pa.length*100) : 0;
-    return `<div class="pli">
-      <div class="pli-name">${a.Nome}</div>
-      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
-      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${pct}%</div>
-    </div>`;
-  }).join('');
-
-  // Progresso por voluntário
-  let volProg = ESTADO.voluntarios.map(v => {
-    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
-    const nomeVNorm = (v.Nome || '').trim().toLowerCase();
-    const pv   = ESTADO.pings.filter(p=>(p.Voluntario_Responsavel||'').trim().toLowerCase()===nomeVNorm);
-    const feitos = pv.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
-    const pct  = pv.length>0 ? Math.round(feitos/pv.length*100) : 0;
-    return `<div class="pli">
-      <div class="pli-name">${_esc(v.Nome)}</div>
-      <div class="pli-bar"><div class="pli-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
-      <div class="pli-pct" style="color:${pct===100?'var(--green)':'var(--yellow)'}">${feitos}/${pv.length}</div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('monitorGrid').innerHTML = `
-    <div class="card">
-      <div class="card-hdr"><div class="card-hdr-title">📐 Progresso por Área</div></div>
-      ${areaProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
-    </div>
-    <div class="card">
-      <div class="card-hdr"><div class="card-hdr-title">👥 Progresso por Voluntário</div></div>
-      ${volProg || `<div style="padding:14px;color:var(--muted);font-size:11px">${CONFIG.UI.SEM_DADOS}</div>`}
-    </div>`;
-
-  // Alertas críticos
-  const critList = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO);
-  _txt('alertasBadge', `${critList.length} alertas`);
-  document.getElementById('alertasList').innerHTML = critList.map(p => `
-    <div class="alert-item">
-      <div style="font-size:16px">🔴</div>
-      <div class="alert-body">
-        <div class="alert-title">${p.Endereco||'—'} — ${p.ID_Area||'—'}</div>
-        <div class="alert-sub">${p.Voluntario_Responsavel||'—'}</div>
-      </div>
-      <span class="tag tag-critical">CRÍTICO</span>
-    </div>`).join('') || `<div style="padding:14px;color:var(--muted);font-size:11px">Nenhuma situação crítica.</div>`;
-
-  // B-23: Renderizar dashboard avançado
+  // B-23: Renderizar dashboard avançado (stats en panel flotante)
   await renderizarDashboardAvancado();
 }
 
@@ -4072,6 +4608,7 @@ function iniciarDashboardAutoRefresh() {
   pararDashboardAutoRefresh();
   _dashTimer = setInterval(async () => {
     if (ESTADO.paginaAtual === 'monitoreo') {
+      // [F6] Actualiza mapa coloreado y stats en cada ciclo de refresh
       await renderizarMonitoramento();
     }
   }, CONFIG.S5.DASHBOARD_REFRESH);
@@ -4138,6 +4675,45 @@ async function renderizarDashboardAvancado() {
       </div>`;
   }
 
+  // [F6] Progresso por área e voluntário — dentro do panel flotante #monitorGrid
+  const monitorEl = document.getElementById('monitorGrid');
+  if (monitorEl) {
+    const areaProg = ESTADO.areas.map(a => {
+      const pa     = pings.filter(p => p.ID_Area === a.ID_Area);
+      const feitos = pa.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+      const pctA   = pa.length > 0 ? Math.round(feitos / pa.length * 100) : 0;
+      const corA   = pctA === 100 ? 'var(--green)' : pctA > 0 ? 'var(--yellow)' : 'var(--muted)';
+      return `<div class="pli">
+        <div class="pli-name" style="font-size:10px">${_esc(a.Nome)}</div>
+        <div class="pli-bar"><div class="pli-fill" style="width:${pctA}%;background:${corA}"></div></div>
+        <div class="pli-pct" style="color:${corA};font-size:10px">${pctA}%</div>
+      </div>`;
+    }).join('');
+
+    const volProg = ESTADO.voluntarios.map(v => {
+      const nNorm  = (v.Nome || '').trim().toLowerCase();
+      const pv     = pings.filter(p => (p.Voluntario_Responsavel || '').trim().toLowerCase() === nNorm);
+      const feitos = pv.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+      const pctV   = pv.length > 0 ? Math.round(feitos / pv.length * 100) : 0;
+      const corV   = pctV === 100 ? 'var(--green)' : pctV > 0 ? 'var(--yellow)' : 'var(--muted)';
+      return `<div class="pli">
+        <div class="pli-name" style="font-size:10px">${_esc(v.Nome)}</div>
+        <div class="pli-bar"><div class="pli-fill" style="width:${pctV}%;background:${corV}"></div></div>
+        <div class="pli-pct" style="color:${corV};font-size:10px">${feitos}/${pv.length}</div>
+      </div>`;
+    }).join('');
+
+    monitorEl.innerHTML = `
+      <div style="margin-bottom:10px">
+        <div style="font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">📐 Por Área</div>
+        ${areaProg || `<div style="font-size:11px;color:var(--muted)">${CONFIG.UI.SEM_DADOS}</div>`}
+      </div>
+      <div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">👥 Por Voluntário</div>
+        ${volProg || `<div style="font-size:11px;color:var(--muted)">${CONFIG.UI.SEM_DADOS}</div>`}
+      </div>`;
+  }
+
   // Alertas críticos — F-15: usar p.Grau_Dano (snake_case, nome real da coluna)
   const alertasEl = document.getElementById('alertasList');
   if (alertasEl) {
@@ -4170,6 +4746,68 @@ async function renderizarDashboardAvancado() {
   }
 }
 
+// ── [FASE 6] colorearAreasPorAvance ──────────────────────────
+// Colorea los polígonos del mapa según ratio completado/total de pings.
+// Colores derivados de CONFIG.COR_PINES — nunca hardcodeados.
+// Verde(100%) · Amarillo(>0%) · Rojo(0%/crítico)
+function colorearAreasPorAvance() {
+  if (!mapCoord) return;
+
+  // Limpiar capa anterior de monitoreo
+  if (_monitorPolygons) {
+    _monitorPolygons.clearLayers();
+  } else {
+    _monitorPolygons = L.layerGroup().addTo(mapCoord);
+  }
+
+  ESTADO.areas.forEach(area => {
+    if (!area.Coordenadas) return;
+    try {
+      const pts = JSON.parse(area.Coordenadas);
+      if (!pts || pts.length < 3) return;
+
+      const pingsArea   = ESTADO.pings.filter(p => p.ID_Area === area.ID_Area);
+      const total       = pingsArea.length;
+      const concluidos  = pingsArea.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+      const criticos    = pingsArea.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
+      const pct         = total > 0 ? concluidos / total : 0;
+
+      // Derivar cor de CONFIG.COR_PINES según estado dominante
+      let cor;
+      if (criticos > 0)       cor = CONFIG.COR_PINES.Critico;
+      else if (pct >= 1)      cor = CONFIG.COR_PINES.Concluido;
+      else if (concluidos > 0)cor = CONFIG.COR_PINES['Em Curso'];
+      else                    cor = CONFIG.COR_PINES.Pendente;
+
+      const opacity = total > 0 ? 0.28 : 0.1;
+
+      const poly = L.polygon(pts, {
+        color:       cor,
+        fillColor:   cor,
+        fillOpacity: opacity,
+        weight:      2,
+        opacity:     0.8,
+      });
+      const pctLabel = total > 0 ? Math.round(pct * 100) + '%' : '—';
+      poly.bindTooltip(
+        `<strong>${_esc(area.Nome)}</strong><br>${pctLabel} · ${concluidos}/${total}`,
+        { direction:'center', className:'area-tooltip' }
+      );
+      _monitorPolygons.addLayer(poly);
+    } catch(e) {}
+  });
+}
+// ── FIM [FASE 6] colorearAreasPorAvance ──────────────────────
+
+// [F6] Toggle entre panel de stats y tabla detallada
+function _toggleMonitorPanel() {
+  const panel = document.getElementById('monitorPanel');
+  const btn   = document.getElementById('btnToggleMonitor');
+  if (!panel) return;
+  const oculto = panel.classList.toggle('oculto');
+  if (btn) btn.classList.toggle('activo', !oculto);
+}
+
 </script>
 <!-- ============================================================
      FIM SECCIÓN 6 — COORD: Monitoreo
@@ -4194,25 +4832,30 @@ async function renderizarDashboardAvancado() {
 // _popularFiltroRole [S7], _popularSelectRole [S7], carregarUsuarios [S7]
 // ════════════════════════════════════════════════════════════════
 function navegarCoord(pagina, el) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  // [F1] Remover active de páginas não-mapa — #page-mapas NUNCA é ocultado
+  // O mapa permanece visível como camada base em qualquer navegação
+  document.querySelectorAll('.page:not(#page-mapas)').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const pg = document.getElementById('page-' + pagina);
-  if (pg) pg.classList.add('active');
+
+  // Ativar página solicitada como overlay (exceto "mapas" — já visível como base)
+  if (pagina !== 'mapas') {
+    const pg = document.getElementById('page-' + pagina);
+    if (pg) pg.classList.add('active');
+  }
   if (el) el.classList.add('active');
   ESTADO.paginaAtual = pagina;
 
+  // [F1] Mapa sempre presente — invalidar tamanho em toda navegação
+  setTimeout(() => mapCoord && mapCoord.invalidateSize(), 60);
+
   // Ações ao entrar em cada página
-  if (pagina === 'mapas') {
-    setTimeout(() => mapCoord && mapCoord.invalidateSize(), 60);
-  } else if (pagina === 'monitoreo') {
+  if (pagina === 'monitoreo') {
     renderizarMonitoramento();        // S6 — runtime call ✅
     iniciarDashboardAutoRefresh();    // S6 — runtime call ✅
   } else if (pagina === 'usuarios') {
     _popularFiltroRole();             // S7 — misma sección ✅
     _popularSelectRole('nuRole');     // S7 — misma sección ✅
     carregarUsuarios();               // S7 — misma sección ✅
-  } else if (pagina === 'exportar') {
-    // Já renderizado em renderizarTextos, nada a fazer
   } else {
     pararDashboardAutoRefresh();      // S6 — runtime call ✅
   }
@@ -4295,10 +4938,17 @@ function renderizarUsuarios() {
         <span class="tag ${isAtivo ? 'tag-done' : 'tag-pending'}">${_esc(status)}</span>
       </td>
       <td style="padding:10px 12px">
-        <button class="user-action-btn ${isAtivo ? 'danger' : ''}"
-          onclick="${isAtivo ? `confirmarDesativarUser('${_esc(userId)}','${_esc(nome)}')` : `confirmarReativarUser('${_esc(userId)}','${_esc(nome)}')`}">
-          ${isAtivo ? '🔒 Desativar' : '🔓 Reativar'}
-        </button>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <!-- [F7] Botón Editar — abre modal con datos pre-cargados -->
+          <button class="user-action-btn"
+            onclick="abrirModalEditarUsuario('${_esc(userId)}')">
+            ${CONFIG.UI_S5.EDITAR_BTN}
+          </button>
+          <button class="user-action-btn ${isAtivo ? 'danger' : ''}"
+            onclick="${isAtivo ? `confirmarDesativarUser('${_esc(userId)}','${_esc(nome)}')` : `confirmarReativarUser('${_esc(userId)}','${_esc(nome)}')`}">
+            ${isAtivo ? '🔒 Desativar' : '🔓 Reativar'}
+          </button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -4583,6 +5233,89 @@ function abrirLink(tipo) {
   if (!url) { toast(avisos[tipo] || '⚠️ URL não configurada'); return; }
   window.open(url, '_blank');
 }
+// ── [FASE 7] abrirModalEditarUsuario ─────────────────────────
+// Busca o usuário por ID, pré-carrega dados no modal e abre.
+// Historial de registros intacto — só edita a fila do usuário.
+function abrirModalEditarUsuario(userId) {
+  const u = ESTADO_USERS.lista.find(x => (x.ID || x.id || '') === userId);
+  if (!u) { toast(CONFIG.UI.TOAST_BACKEND_ERR); return; }
+
+  const S5U = CONFIG.UI_S5;
+  _txt('modalEditarUserTitulo', S5U.EDITAR_USUARIO_TITULO);
+
+  // Pre-cargar datos actuales
+  document.getElementById('euId').value      = userId;
+  document.getElementById('euNome').value    = u.Nome    || u.nome    || '';
+  document.getElementById('euUsuario').value = u.Usuario || u.usuario || '';
+  document.getElementById('euSenha').value   = '';
+
+  // Label de senha y placeholder via CONFIG
+  const lblSenha = document.getElementById('euSenhaLabel');
+  const inpSenha = document.getElementById('euSenha');
+  if (lblSenha) lblSenha.textContent = S5U.EDITAR_SENHA_HINT;
+  if (inpSenha) inpSenha.placeholder = S5U.EDITAR_SENHA_HINT;
+
+  // Botón salvar via CONFIG
+  const btnSalvar = document.getElementById('euBtnSalvar');
+  if (btnSalvar) btnSalvar.textContent = S5U.EDITAR_SALVAR_BTN;
+
+  // Ocultar error previo
+  const erroEl = document.getElementById('euErro');
+  if (erroEl) erroEl.style.display = 'none';
+
+  // Popular select de área con la actual pre-seleccionada
+  _popularSelectArea('euArea', true);
+  const euArea = document.getElementById('euArea');
+  if (euArea) euArea.value = u.Areas_Permitidas || u.area || '';
+
+  openModal('modalEditarUsuario');
+}
+
+// ── [FASE 7] confirmarEditarUsuario ──────────────────────────
+// Valida, construye payload y llama CONFIG.ACOES.EDITAR_USUARIO.
+// No toca formularios ni pings — solo la fila del usuario en el Sheet.
+async function confirmarEditarUsuario() {
+  const S5U    = CONFIG.UI_S5;
+  const id     = document.getElementById('euId')?.value?.trim();
+  const nome   = document.getElementById('euNome')?.value?.trim();
+  const usuario= document.getElementById('euUsuario')?.value?.trim();
+  const senha  = document.getElementById('euSenha')?.value?.trim();
+  const area   = document.getElementById('euArea')?.value || '';
+  const erroEl = document.getElementById('euErro');
+
+  // Validaciones via CONFIG
+  if (!nome || !usuario) {
+    if (erroEl) { erroEl.textContent = S5U.EDITAR_ERR_CAMPOS; erroEl.style.display = 'block'; }
+    return;
+  }
+  if (senha && senha.length < CONFIG.S5.SENHA_MINIMA_LEN) {
+    if (erroEl) { erroEl.textContent = S5U.EDITAR_ERR_SENHA; erroEl.style.display = 'block'; }
+    return;
+  }
+  if (erroEl) erroEl.style.display = 'none';
+
+  // Construir payload — senha solo si fue modificada
+  const payload = {
+    acao:    CONFIG.ACOES.EDITAR_USUARIO,
+    id:      id,
+    Nome:    nome,
+    Usuario: usuario,
+    Areas_Permitidas: area,
+  };
+  if (senha) payload.Senha = senha;
+
+  try {
+    const r = await chamarBackend(payload);
+    if (r.sucesso) {
+      toast(S5U.EDITAR_OK);
+      closeModal('modalEditarUsuario');
+      await carregarUsuarios();   // S7 — recargar lista actualizada
+    } else {
+      if (erroEl) { erroEl.textContent = '⚠️ ' + (r.mensagem || S5U.EDITAR_ERR_CAMPOS); erroEl.style.display = 'block'; }
+    }
+  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+}
+// ── FIM [FASE 7] ─────────────────────────────────────────────
 
 </script>
 <!-- ============================================================
@@ -4819,14 +5552,19 @@ async function guardarFilaOffline(dados) {
 // ════════════════════════════════════════════════════════════════
 async function sincronizarAgora() {
   toast(CONFIG.UI.TOAST_SYNC_NOW);
+  // [F9] Actualizar panel antes de sincronizar — mostrar estado inicial
+  if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(true);
+
   const resultado = await _sincronizarFila();
   const total = resultado.enviados + resultado.fotosEnviadas;
   if (total > 0) {
-    toast('✅ ' + total + ' item(s) sincronizado(s)');
+    toast(CONFIG.UI_SYNC.NOTIF_SYNC_OK);
     await carregarPingsVol(); // S9 — runtime call ✅
   } else {
     toast('✅ Nada para sincronizar.');
   }
+  // [F9] Refrescar panel tras completar
+  if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(false);
 }
 
 async function _sincronizarFila() {
@@ -4843,6 +5581,8 @@ async function _sincronizarFila() {
         if (r.sucesso) {
           await idbDelete(CONFIG.IDB.STORE_FILA, _id);
           enviados++;
+          // [F9] Notificar progreso ítem por ítem
+          if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(true);
         }
       } catch(e) { /* manter na fila */ }
     }
@@ -4859,8 +5599,11 @@ async function _sincronizarFila() {
     for (const item of filaSession) {
       try {
         const r = await chamarBackend(item);
-        if (r.sucesso) enviados++;
-        else restante.push(item);
+        if (r.sucesso) {
+          enviados++;
+          // [F9] Notificar progreso
+          if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(true);
+        } else restante.push(item);
       } catch(e) { restante.push(item); }
     }
     sessionStorage.setItem(CONFIG.STORAGE.FILA_OFFLINE, JSON.stringify(restante));
@@ -5086,6 +5829,8 @@ async function carregarPingsVol() {
         p.Voluntario_Responsavel.toString().trim() === nomeVol.trim()
       );
       try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e){}
+      // [F8] Pre-calcular rotas quando há sinal — guarda no IndexedDB para uso offline
+      if (!offlineVol) precalcularRutas();
     }
   } catch(e) {
     try {
@@ -5157,7 +5902,8 @@ function renderizarPingsVol() {
       })
     }).addTo(mapVol)
       .bindPopup(`<strong>${_esc(p.Endereco)||'Ponto'}</strong><br><span style="color:${cor};font-size:11px">${lbl}</span>`)
-      .on('click', () => abrirFormulario(p.ID_Ping, p.Endereco));
+      // [F8] Click abre bottom sheet en lugar de formulario directamente
+      .on('click', () => { setTimeout(() => abrirBottomSheetPin(p), 80); });
   });
 }
 
@@ -5184,6 +5930,9 @@ function switchView(v) {
     if (v === 'mapa') setTimeout(() => mapVol && mapVol.invalidateSize(), 100);
   }
   if (activeBtn) activeBtn.classList.add('active');
+
+  // [F9] Al entrar a la vista Sync → renderizar estado detallado de la cola
+  if (v === 'sync') renderizarEstadoSync(false);
 }
 
 function filtrarPingsView(el, tipo) {
@@ -5247,8 +5996,18 @@ function toggleOfflineVol() {
 // ════════════════════════════════════════════════════════════════
 // FORMULARIO
 // ════════════════════════════════════════════════════════════════
-function abrirFormulario(idPing, nomeEndereco) {
-  pingAtualForm = idPing;
+// [F8] abrirFormulario acepta idPing (string) O ping completo (objeto)
+// — llamado desde botón "▶ Iniciar Relevamento" de la bottom sheet
+// — mantiene compatibilidad con llamadas existentes que pasan idPing + nomeEndereco
+function abrirFormulario(idPingOuObj, nomeEndereco) {
+  // [F8] Si recibe objeto ping desde bottom sheet, extraer campos
+  let idPing = idPingOuObj;
+  if (idPingOuObj && typeof idPingOuObj === 'object') {
+    idPing      = idPingOuObj.ID_Ping;
+    nomeEndereco= idPingOuObj.Endereco || nomeEndereco;
+  }
+
+  pingAtualForm  = idPing;
   pingAtualDados = ESTADO.pingsVol.find(p => p.ID_Ping === idPing) || null;
 
   _txt('formTitle', nomeEndereco || 'Formulário');
@@ -5258,9 +6017,12 @@ function abrirFormulario(idPing, nomeEndereco) {
     if (endEl && !endEl.value) endEl.value = pingAtualDados.Endereco || '';
     const latEl = document.getElementById('fLat');
     const lngEl = document.getElementById('fLng');
-    if (latEl && !latEl.value && pingAtualDados.Latitude) latEl.value = pingAtualDados.Latitude;
+    if (latEl && !latEl.value && pingAtualDados.Latitude)  latEl.value = pingAtualDados.Latitude;
     if (lngEl && !lngEl.value && pingAtualDados.Longitude) lngEl.value = pingAtualDados.Longitude;
   }
+
+  // [F8] Cerrar bottom sheet si estaba abierta
+  _fecharBottomSheet();
 
   document.getElementById('formOverlay').classList.add('open');
   document.getElementById('formScroll').scrollTop = 0;
@@ -5779,6 +6541,289 @@ async function carregarFotoProxy(idArquivo, imgEl) {
     imgEl.style.opacity = '0.4';
   }
 }
+// ════════════════════════════════════════════════════════════════
+// [FASE 8] BOTTOM SHEET + NAVEGAÇÃO AO PIN
+// ════════════════════════════════════════════════════════════════
+
+// ── abrirBottomSheetPin ──────────────────────────────────────
+// Muestra dirección, código M01-A02-P003 y los dos botones.
+// Todos los textos vienen de CONFIG.UI_BOTTOM_SHEET y CONFIG.UI_ACOES.
+function abrirBottomSheetPin(ping) {
+  if (!ping) return;
+  _pingBspAtual = ping;
+
+  const BS  = CONFIG.UI_BOTTOM_SHEET;
+  const cor = CONFIG.COR_PINES[ping.Status] || CONFIG.COR_PINES.DEFAULT;
+
+  // Código legible — fallback a ID
+  const codigo   = ping.Codigo || ping.codigo || ping.ID_Ping || '—';
+  const endereco = ping.Endereco || BS.SEM_ENDERECO;
+  const status   = CONFIG.STATUS_LABEL[ping.Status] || ping.Status || '—';
+
+  _txt('bspCodigo',   codigo);
+  _txt('bspEndereco', endereco);
+  _txt('bspStatus',   BS.LABEL_STATUS + ' ' + status);
+  _txt('bspDist',     '');   // se actualiza en navegarAlPin
+
+  // Textos de botones via CONFIG
+  const btnNav  = document.getElementById('bspBtnNav');
+  const btnForm = document.getElementById('bspBtnForm');
+  if (btnNav)  btnNav.textContent  = CONFIG.UI_ACOES.BTN_IR_PIN;
+  if (btnForm) btnForm.textContent = CONFIG.UI_ACOES.BTN_INICIAR_REL;
+
+  // Aplicar color del status al código
+  const codigoEl = document.getElementById('bspCodigo');
+  if (codigoEl) codigoEl.style.color = cor;
+
+  // Abrir
+  document.getElementById('bottomSheetPin').classList.add('aberta');
+  document.getElementById('bspOverlay').classList.add('visivel');
+
+  // Navegar al mapa si no está visible
+  if (ping.Latitude && ping.Longitude && mapVol) {
+    switchView('mapa');
+    setTimeout(() => {
+      mapVol.setView(
+        [parseFloat(ping.Latitude), parseFloat(ping.Longitude)],
+        CONFIG.MAPA.ZOOM_PING
+      );
+    }, 120);
+  }
+}
+
+function _fecharBottomSheet() {
+  document.getElementById('bottomSheetPin')?.classList.remove('aberta');
+  document.getElementById('bspOverlay')?.classList.remove('visivel');
+  _pingBspAtual = null;
+}
+
+// Llamado por el botón "🧭 Ir a este ponto" de la bottom sheet
+function _onBspNav() {
+  if (!_pingBspAtual) return;
+  const lat = parseFloat(_pingBspAtual.Latitude);
+  const lng = parseFloat(_pingBspAtual.Longitude);
+  if (!lat || !lng) { toast(CONFIG.UI_BOTTOM_SHEET.NAV_GPS_ERR); return; }
+  navegarAlPin(lat, lng);
+}
+
+// Llamado por el botón "▶ Iniciar Relevamento" de la bottom sheet
+function _onBspForm() {
+  if (!_pingBspAtual) return;
+  abrirFormulario(_pingBspAtual);
+}
+
+// ── navegarAlPin ─────────────────────────────────────────────
+// Con señal  → OSRM calcula la ruta (CONFIG.OSRM_URL)
+// Sin señal  → usa ruta cacheada en IndexedDB
+// GPS activo → voluntario se ve en tiempo real sobre el mapa
+async function navegarAlPin(lat, lng) {
+  const BS = CONFIG.UI_BOTTOM_SHEET;
+  const distEl = document.getElementById('bspDist');
+  if (distEl) distEl.textContent = BS.NAV_CALCULANDO;
+
+  // Limpiar ruta anterior
+  if (_rutaLayer && mapVol) { _rutaLayer.remove(); _rutaLayer = null; }
+
+  // Obtener posición GPS actual del voluntario
+  let posAtual = null;
+  try {
+    posAtual = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(
+        p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => rej(new Error('gps')),
+        { timeout: 5000, maximumAge: 10000 }
+      )
+    );
+  } catch(e) { /* GPS não disponível — continuar sem posição */ }
+
+  // Tentar rota online via OSRM
+  if (!offlineVol && posAtual) {
+    try {
+      const url = CONFIG.OSRM_URL
+        .replace('{lat1}', posAtual.lat).replace('{lng1}', posAtual.lng)
+        .replace('{lat2}', lat).replace('{lng2}', lng);
+      const r    = await fetch(url);
+      const data = await r.json();
+      if (data.code === 'Ok' && data.routes && data.routes[0]) {
+        const coords = data.routes[0].geometry.coordinates
+          .map(c => [c[1], c[0]]);   // OSRM retorna [lng,lat] → Leaflet [lat,lng]
+        const dist   = data.routes[0].distance;
+        _rutaLayer   = L.polyline(coords, {
+          color: CONFIG.COR_PINES['Em Curso'],
+          weight: 4, opacity: 0.85, dashArray: '8,4',
+        }).addTo(mapVol);
+        mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [40, 40] });
+        // Guardar en IndexedDB para uso offline
+        const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
+        try { await idbAdd('rutas', { key, coords, dist, ts: Date.now() }); } catch(e){}
+        const distLabel = dist >= 1000
+          ? (dist / 1000).toFixed(1) + BS.DIST_KM
+          : Math.round(dist) + BS.DIST_M;
+        if (distEl) distEl.textContent = BS.DIST_APROX + distLabel;
+        if (distEl) distEl.textContent += ' · ' + BS.NAV_ONLINE;
+        return;
+      }
+    } catch(e) { /* fallback offline */ }
+  }
+
+  // Fallback: ruta cacheada en IndexedDB
+  try {
+    const key     = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
+    const cached  = await idbGet('rutas', key);
+    if (cached && cached.coords) {
+      _rutaLayer = L.polyline(cached.coords, {
+        color: CONFIG.COR_PINES.Pendente,
+        weight: 4, opacity: 0.7, dashArray: '8,4',
+      }).addTo(mapVol);
+      mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [40, 40] });
+      const distLabel = cached.dist >= 1000
+        ? (cached.dist / 1000).toFixed(1) + BS.DIST_KM
+        : Math.round(cached.dist) + BS.DIST_M;
+      if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_OFFLINE;
+      return;
+    }
+  } catch(e) {}
+
+  // Sin ruta disponible — navegar al punto directamente
+  if (distEl) distEl.textContent = BS.NAV_SEM_ROTA;
+  if (mapVol) mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
+}
+
+// ── precalcularRutas ─────────────────────────────────────────
+// Cuando hay señal, calcula y guarda en IndexedDB las rutas
+// a todos los pines asignados al voluntario.
+// Llamada silenciosamente al cargar los pings con señal.
+async function precalcularRutas() {
+  if (offlineVol || !ESTADO.pingsVol || !ESTADO.pingsVol.length) return;
+
+  // Obtener posición GPS actual
+  let posAtual = null;
+  try {
+    posAtual = await new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(
+        p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => rej(new Error('gps')),
+        { timeout: 8000, maximumAge: 30000 }
+      )
+    );
+  } catch(e) { return; }  // Sin GPS — no pre-calcular
+
+  // Pre-calcular solo pines pendientes/en curso
+  const pendientes = ESTADO.pingsVol.filter(p =>
+    p.Status === CONFIG.STATUS_PING.PENDENTE ||
+    p.Status === CONFIG.STATUS_PING.EM_CURSO ||
+    p.Status === CONFIG.STATUS_PING.CRITICO
+  );
+
+  for (const ping of pendientes) {
+    if (!ping.Latitude || !ping.Longitude) continue;
+    const lat = parseFloat(ping.Latitude);
+    const lng = parseFloat(ping.Longitude);
+    const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
+    try {
+      const url = CONFIG.OSRM_URL
+        .replace('{lat1}', posAtual.lat).replace('{lng1}', posAtual.lng)
+        .replace('{lat2}', lat).replace('{lng2}', lng);
+      const r    = await fetch(url);
+      const data = await r.json();
+      if (data.code === 'Ok' && data.routes && data.routes[0]) {
+        const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        const dist   = data.routes[0].distance;
+        await idbAdd('rutas', { key, coords, dist, ts: Date.now() });
+      }
+    } catch(e) { /* silencioso — continuar con el siguiente */ }
+  }
+}
+// ── FIM [FASE 8] ─────────────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════════
+// [FASE 9] SYNC — ESTADO CLARO DA COLA OFFLINE
+// ════════════════════════════════════════════════════════════════
+
+// ── renderizarEstadoSync ─────────────────────────────────────
+// Muestra lista detallada de formularios pendientes con código de pin.
+// sincronizando=true → muestra indicador de carga activo.
+// Lee TODOS los textos de CONFIG.UI_SYNC — nada hardcodeado.
+async function renderizarEstadoSync(sincronizando) {
+  const SY       = CONFIG.UI_SYNC;
+  const resNum   = document.getElementById('syncResumenNum');
+  const resSub   = document.getElementById('syncResumenSub');
+  const resIco   = document.getElementById('syncResumenIco');
+  const listaTit = document.getElementById('syncListaTitulo');
+  const listaEl  = document.getElementById('syncListaPendentes');
+
+  if (!resNum) return;   // vista no montada aún
+
+  // Obtener fila pendiente del IndexedDB
+  let fila = [];
+  try { fila = await idbGetAll(CONFIG.IDB.STORE_FILA); } catch(e) {}
+
+  // Fallback sessionStorage
+  if (!fila.length) {
+    try {
+      const ss = JSON.parse(sessionStorage.getItem(CONFIG.STORAGE.FILA_OFFLINE) || '[]');
+      fila = ss;
+    } catch(e) {}
+  }
+
+  const total = fila.length;
+
+  // ── Resumen ──────────────────────────────────────────────
+  if (sincronizando) {
+    resIco.textContent  = '⏳';
+    resNum.textContent  = total;
+    resNum.style.color  = 'var(--yellow)';
+    resSub.textContent  = SY.SINCRONIZANDO;
+  } else if (total === 0) {
+    resIco.textContent  = '✅';
+    resNum.textContent  = '0';
+    resNum.style.color  = 'var(--green)';
+    resSub.textContent  = SY.SEM_PENDENTES;
+  } else {
+    resIco.textContent  = '📤';
+    resNum.textContent  = total;
+    resNum.style.color  = 'var(--yellow)';
+    resSub.textContent  = total === 1
+      ? SY.PENDENTE_1
+      : total + SY.PENDENTES_LABEL;
+  }
+
+  // ── Lista detallada ──────────────────────────────────────
+  if (!listaEl) return;
+
+  if (total === 0 && !sincronizando) {
+    if (listaTit) listaTit.textContent = '';
+    listaEl.innerHTML = '';
+    return;
+  }
+
+  if (listaTit) listaTit.textContent = sincronizando ? SY.SINCRONIZANDO : '';
+
+  listaEl.innerHTML = fila.map(item => {
+    // Intentar obtener código de ping y fecha de guardado
+    const idPing  = item.idPing  || item.ID_Ping  || '';
+    const tsPing  = item._ts     || '';
+    const dataStr = tsPing
+      ? SY.ITEM_DATA + new Date(tsPing).toLocaleString(CONFIG.APP.LOCALE)
+      : '';
+
+    // Buscar código legible en pingsVol
+    const pingObj  = (ESTADO.pingsVol || []).find(p => p.ID_Ping === idPing);
+    const codigo   = (pingObj && (pingObj.Codigo || pingObj.codigo))
+      ? (pingObj.Codigo || pingObj.codigo)
+      : (idPing ? SY.ITEM_PIN_LABEL + idPing : SY.ITEM_SEM_PIN);
+
+    return `<div class="sync-item-pend${sincronizando ? '' : ''}">
+      <div class="sip-ico">${sincronizando ? '⏳' : '📋'}</div>
+      <div class="sip-body">
+        <div class="sip-codigo">${_esc(codigo)}</div>
+        ${dataStr ? `<div class="sip-data">${_esc(dataStr)}</div>` : ''}
+      </div>
+      <div class="sip-estado" style="color:var(--yellow)">${sincronizando ? SY.SINCRONIZANDO : '⏳'}</div>
+    </div>`;
+  }).join('');
+}
+// ── FIM [FASE 9] ─────────────────────────────────────────────
 
 </script>
 <!-- ============================================================
