@@ -1170,7 +1170,7 @@ textarea{resize:vertical;min-height:65px;}
 #tela-coord{
   position:fixed;inset:0;display:none;flex-direction:column;
 }
-.app-body{display:flex;flex:1;overflow:hidden;}
+.app-body{position:relative;display:flex;flex:1;overflow:hidden;}
 .sidebar{
   width:var(--sidebar-w);background:var(--navy-mid);
   border-right:1px solid var(--border);
@@ -1224,9 +1224,6 @@ textarea{resize:vertical;min-height:65px;}
    Mapa é a camada base. Sidebar e páginas = overlays.
    Nenhum valor hardcodeado — tudo referencia variáveis CSS.
 ════════════════════════════════════════════════════════ */
-
-/* app-body: contexto de posicionamento para filhos absolutos */
-.app-body{position:relative;}
 
 /* Sidebar: painel flutuante sobre o mapa (esquerda) */
 .sidebar{
