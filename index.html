@@ -2335,6 +2335,8 @@ textarea{resize:vertical;min-height:65px;}
           </div>
           <div class="map-canvas-wrap">
             <div class="map-toolbar">
+              <button class="mtb mtb-nav" id="btnToggleMapas" onclick="_toggleMapasSidebar()"></button>
+              <div class="tb-sep"></div>
               <button class="mtb mtb-nav active" id="toolNav" onclick="setTool('nav')">👆 Navegar</button>
               <button class="mtb mtb-draw" id="toolDraw" onclick="setTool('draw')">📐 Desenhar Área</button>
               <button class="mtb mtb-ping" id="toolPing" onclick="setTool('ping')">📍 Adicionar Ping</button>
@@ -3244,6 +3246,10 @@ function renderizarTextos() {
   // Hints mapa
   _txt('hintDraw', U.HINT_DRAW);
   _txt('hintPing', U.HINT_PING);
+
+  // Sidebar de mapas — texto via CONFIG
+  _txt('mapsSidebarTitulo', CONFIG.UI_ACOES.MAPAS_SIDEBAR_TITULO);
+  _txt('btnToggleMapas',    CONFIG.UI_ACOES.BTN_TOGGLE_MAPAS);
 
   // Sprint 4 — Textos PWA banner instalação
   const S4 = CONFIG.UI_S4;
@@ -4237,6 +4243,23 @@ function _abrirModalGuardarMapa() {
   openModal('modalSaveMap');
 }
 
+// [SIDEBAR] Toggle do painel de mapas salvos
+// Abre/fecha o maps-sidebar. Invalida o mapa para redesenhar corretamente.
+// Texto do botão toggle e título do painel via CONFIG.UI_ACOES.
+function _toggleMapasSidebar() {
+  const sidebar = document.querySelector('.maps-sidebar');
+  const btn     = document.getElementById('btnToggleMapas');
+  if (!sidebar) return;
+
+  const abrindo = !sidebar.classList.contains('aberta');
+  sidebar.classList.toggle('aberta', abrindo);
+
+  if (btn) btn.classList.toggle('active', abrindo);
+
+  // Redesenhar mapa após animación de apertura/cierre
+  setTimeout(() => mapCoord && mapCoord.invalidateSize(), 300);
+}
+     
 async function deletarMapa(id) {
   if (!confirm(CONFIG.UI.CONFIRMAR_MAPA_DEL)) return;
   try {
