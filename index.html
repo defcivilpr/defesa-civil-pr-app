@@ -106,6 +106,15 @@ const CONFIG = {
     LISTAR_FORMULARIOS: "listarFormularios",
     // [F0] Fase 7 — editar usuario sin perder registros
     EDITAR_USUARIO:     "editarUsuario",
+    // [B0] Bloque 0 — acciones nuevas del sistema de ciclo de vida
+    ARQUIVAR_MAPA:       "arquivarMapa",
+    ARQUIVAR_AREA:       "arquivarArea",
+    ARQUIVAR_PING:       "arquivarPing",
+    DELETAR_PING:        "deletarPing",
+    RENOMEAR_MAPA:       "renomearMapa",
+    RENOMEAR_AREA:       "renomearArea",
+    MOVER_PING:          "moverPing",
+    VERIFICAR_OPERATIVO: "verificarOperativo",
   },
 
   // ── Status de ping (valores que chegam do backend) ───────────
@@ -814,6 +823,77 @@ const CONFIG = {
     NOTIF_SYNC_PARCIAL:"⚠️ Sincronização parcial — verifique conexão",
   },
 
+  // ════════════════════════════════════════════════════════════════
+  // [BLOQUE 0] — CONFIG BASE: campo polígono + ciclo de vida + UI
+  // Nenhum destes valores deve aparecer hardcodeado fora deste bloco.
+  // ════════════════════════════════════════════════════════════════
+
+  // ── Campo unificado do polígono ──────────────────────────────
+  // Único nome do campo no Sheet — usado em S5 e S9 sem excepção.
+  // Frontend S5 usava "Coordenadas" (errado) → unificado aqui.
+  CAMPO_POLIGONO: "Pontos_Poligono",
+
+  // ── Textos Ciclo de Vida: Borrador vs Operativo ──────────────
+  // Referenciado por: deletarMapa · deleteArea · eliminarPing (Bloque 6)
+  UI_CICLO: {
+    // Fase Borrador — eliminação real (sem histórico)
+    MAPA_BORRADOR_CONF:  "Eliminar este mapa? Esta ação é permanente.",
+    AREA_BORRADOR_CONF:  "Eliminar esta área? Esta ação é permanente.",
+    PING_BORRADOR_CONF:  "Eliminar este ponto? Esta ação é permanente.",
+    // Fase Operativa — arquivamento com cascata
+    MAPA_OP_CONF:  "Arquivar mapa {nome}?\n{areas} áreas · {pings} pontos · {vols} voluntários afetados.",
+    AREA_OP_CONF:  "Arquivar área {nome}?\n{pings} pontos · {concluidos} concluídos · {pendentes} pendentes.",
+    PING_OP_CONF:  "Arquivar ponto {codigo}?\nTem {forms} formulário(s) enviado(s).",
+    // Botões
+    BTN_ARQUIVAR:  "🗄 Arquivar",
+    BTN_ELIMINAR:  "🗑 Eliminar",
+    BTN_EDITAR:    "✏️ Renomear",
+    ARQUIVADO_LABEL: "Arquivado",
+    // Mover pin (Bloque 5)
+    PING_MOVIDO_OK: "📍 Ponto movido com sucesso.",
+    PING_FORA_AREA: "⚠️ O ponto deve permanecer dentro da sua área.",
+    PING_MOVENDO:   "📍 Movendo ponto...",
+  },
+
+  // ── Ações novas no backend ───────────────────────────────────
+  // Adicionadas dentro de ACOES — referenciadas pelos Bloques 1-6.
+  // NOTA: estas chaves vivem no bloco ACOES acima para consistência;
+  // as linhas abaixo são aliases de documentação — o valor real está
+  // inserido diretamente no bloco ACOES no próximo str_replace.
+
+  // ── Tarjeta flotante de confirmação de pin ───────────────────
+  // Referenciado por: mostrarTarjetaConfirmPing() — Bloque 4
+  UI_PING_CARD: {
+    BTN_CONFIRMAR: "✅ Confirmar",
+    BTN_CANCELAR:  "🗑 Cancelar",
+    SEM_AREA:      "⚠️ Ponto fora de qualquer área. Desenhe a área primeiro.",
+    CRIANDO:       "📍 Novo ponto",
+  },
+
+  // ── Modal simplificado de mapa ───────────────────────────────
+  // Referenciado por: salvarMapa · renomearMapa — Bloque 2
+  UI_MODAL_MAPA: {
+    TITULO_NUEVO:     "💾 Salvar este mapa",
+    LABEL_NOME:       "Nome do Mapa",
+    PLACEHOLDER_NOME: "Ex: Barrio San Martín",
+    BTN_SALVAR:       "💾 Salvar",
+    LABEL_CODIGO:     "Código:",
+    RENOMEAR_PROMPT:  "Novo nome para o mapa:",
+    RENOMEAR_OK:      "✅ Mapa renomeado.",
+    RENOMEAR_VAZIO:   "⚠️ Informe um nome válido.",
+  },
+
+  // ── Tarjeta flotante de confirmação de área ──────────────────
+  // Referenciado por: mostrarTarjetaConfirmArea · renomearArea — Bloque 3
+  UI_MODAL_AREA: {
+    BTN_CONFIRMAR:    "✅ Salvar Área",
+    BTN_CANCELAR:     "🗑 Descartar",
+    PLACEHOLDER_NOME: "Nome da área (opcional)",
+    NOME_DEFAULT:     "Área ",
+    RENOMEAR_PROMPT:  "Novo nome para a área:",
+    RENOMEAR_OK:      "✅ Área renomeada.",
+  },
+
 };
 
 </script>
@@ -1458,6 +1538,39 @@ textarea{resize:vertical;min-height:65px;}
 }
 /* ── FIM [FASE 5] CSS ── */
 
+/* ── [B3] Tarjeta flotante confirmación de área ───────────────
+   Position:absolute dentro de .map-canvas-wrap (position:absolute inset:0)
+   Aparece sobre el mapa al cerrar el polígono — sin modal separado.
+   ─────────────────────────────────────────────────────────── */
+#tarjetaConfirmArea {
+  position:absolute;
+  bottom:80px;left:50%;transform:translateX(-50%);
+  z-index:900;
+  background:var(--navy-mid);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 16px;
+  min-width:240px;max-width:320px;width:calc(100% - 48px);
+  box-shadow:0 8px 32px rgba(0,0,0,.55);
+  backdrop-filter:blur(8px);
+  display:none;
+  flex-direction:column;
+  gap:10px;
+}
+#tarjetaConfirmArea.aberta { display:flex; }
+#tarjetaConfirmArea .tca-titulo {
+  font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:13px;letter-spacing:.5px;color:var(--orange);
+}
+#tarjetaConfirmArea .tca-input {
+  width:100%;background:var(--navy-light);border:1px solid var(--border);
+  border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;
+  font-family:'Inter',sans-serif;
+}
+#tarjetaConfirmArea .tca-input:focus { outline:none;border-color:var(--orange); }
+#tarjetaConfirmArea .tca-btns { display:flex;gap:8px;justify-content:flex-end; }
+/* ── FIM [B3] CSS ── */
+
 /* ── [FASE 6] Monitoreo mapa-céntrico ─────────────────────────
    #page-monitoreo es transparente — el mapa base se ve siempre.
    El panel de stats flota sobre el mapa.
@@ -1582,6 +1695,39 @@ textarea{resize:vertical;min-height:65px;}
 }
 .bsp-overlay.visivel{display:block;}
 /* ── FIM [FASE 8] CSS ── */
+
+/* ── [B4] Tarjeta flotante confirmación de ping ───────────────
+   Position:absolute dentro de .map-canvas-wrap.
+   Aparece sobre el mapa al hacer drop de un pin — sin modal.
+   ─────────────────────────────────────────────────────────── */
+#tarjetaConfirmPing {
+  position:absolute;
+  bottom:80px;left:50%;transform:translateX(-50%);
+  z-index:901;
+  background:var(--navy-mid);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 16px;
+  min-width:220px;max-width:300px;width:calc(100% - 64px);
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  backdrop-filter:blur(8px);
+  display:none;
+  flex-direction:column;
+  gap:8px;
+}
+#tarjetaConfirmPing.aberta { display:flex; }
+#tarjetaConfirmPing .tcp-codigo {
+  font-family:'Rajdhani',sans-serif;font-weight:700;
+  font-size:15px;letter-spacing:.8px;
+}
+#tarjetaConfirmPing .tcp-area {
+  font-size:11px;color:var(--muted);letter-spacing:.3px;
+}
+#tarjetaConfirmPing .tcp-coords {
+  font-size:10px;color:var(--muted);font-family:'Rajdhani',sans-serif;
+}
+#tarjetaConfirmPing .tcp-btns { display:flex;gap:8px;justify-content:flex-end;margin-top:2px; }
+/* ── FIM [B4] CSS ── */
 
 /* ── [FASE 9] Sync — lista detallada de pendientes ────────────
    Muestra cada formulario pendiente con código de pin y fecha.
@@ -2358,6 +2504,25 @@ textarea{resize:vertical;min-height:65px;}
             <button id="btnGuardarMapa" onclick="_abrirModalGuardarMapa()"></button>
             <div class="map-hint" id="hintDraw" style="color:var(--orange)"></div>
             <div class="map-hint" id="hintPing" style="color:var(--red)"></div>
+            <!-- [B3] Tarjeta flotante confirmación área — textos asignados en runtime via CONFIG -->
+            <div id="tarjetaConfirmArea">
+              <div class="tca-titulo" id="tcaTitulo"></div>
+              <input type="text" class="tca-input" id="tcaNomeInput" placeholder="">
+              <div class="tca-btns">
+                <button class="btn btn-ghost" id="tcaBtnCancelar" onclick="descartarTarjetaConfirmArea()"></button>
+                <button class="btn btn-primary" id="tcaBtnConfirmar" onclick="salvarArea()"></button>
+              </div>
+            </div>
+            <!-- [B4] Tarjeta flotante confirmación ping — textos asignados en runtime via CONFIG -->
+            <div id="tarjetaConfirmPing">
+              <div class="tcp-codigo" id="tcpCodigo"></div>
+              <div class="tcp-area"   id="tcpArea"></div>
+              <div class="tcp-coords" id="tcpCoords"></div>
+              <div class="tcp-btns">
+                <button class="btn btn-ghost"   id="tcpBtnCancelar"  onclick="descartarTarjetaConfirmPing()"></button>
+                <button class="btn btn-primary" id="tcpBtnConfirmar" onclick="confirmarPingDesdeTargeta()"></button>
+              </div>
+            </div>
             <div class="area-info-panel" id="areaInfoPanel">
               <div class="aip-hdr">
                 <div class="aip-title" id="aipTitle">Área</div>
@@ -2561,19 +2726,23 @@ textarea{resize:vertical;min-height:65px;}
       </div>
       <div class="modal-body">
         <div class="mgrid">
-          <div class="field full"><label>Nome do Mapa *</label><input type="text" id="mapName" placeholder="Ex: Mapa Cidade Cruz Alta"></div>
-          <div class="field full"><label>Descrição / Evento</label><input type="text" id="mapDesc" placeholder="Ex: Enchente Janeiro 2025"></div>
-          <div class="field"><label>Tipo de Desastre</label><select id="mapType"></select></div>
-          <div class="field"><label>Prioridade</label><select id="mapPrio"></select></div>
-          <!-- F-03: campos explícitos de lat/lng/zoom (opcionais — fallback = posição atual do Leaflet) -->
-          <div class="field"><label>Latitude Central (opcional)</label><input type="number" id="mapLat" placeholder="Ex: -25.4284"></div>
-          <div class="field"><label>Longitude Central (opcional)</label><input type="number" id="mapLng" placeholder="Ex: -49.2733"></div>
-          <div class="field"><label>Zoom Inicial (opcional)</label><input type="number" id="mapZoom" placeholder="Ex: 13"></div>
+          <!-- [B2] Modal simplificado — só nome. lat/lng/zoom capturados da vista atual. -->
+          <div class="field full">
+            <label id="lblMapNome"></label>
+            <input type="text" id="mapName" placeholder="">
+          </div>
+          <!-- Campos legados mantidos como hidden para compatibilidade — não expostos ao usuário -->
+          <input type="hidden" id="mapDesc">
+          <input type="hidden" id="mapType">
+          <input type="hidden" id="mapPrio">
+          <input type="hidden" id="mapLat">
+          <input type="hidden" id="mapLng">
+          <input type="hidden" id="mapZoom">
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btnCancelarMapa" class="btn btn-ghost" onclick="closeModal('modalSaveMap')">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarMapa()">💾 Salvar</button>
+        <button id="btnCancelarMapa" class="btn btn-ghost" onclick="closeModal('modalSaveMap')"></button>
+        <button id="btnSalvarMapa" class="btn btn-primary" onclick="salvarMapa()"></button>
       </div>
     </div>
   </div>
@@ -3052,6 +3221,10 @@ let offlineVol   = false;
 let _pingBspAtual  = null;    // ping actualmente mostrado en la bottom sheet
 let _rutaLayer     = null;    // L.polyline de la ruta activa en mapVol
 let viewAtual    = 'mapa';
+// [B4] Variables del ping pendiente en la tarjeta flotante del coordinador
+let _pingPendenteLat  = null;
+let _pingPendenteLng  = null;
+let _pingPendenteArea = null;
 
 // ── Variables globales — Formulario ─────────────────────────────
 let pingAtualForm  = null;
@@ -3223,7 +3396,13 @@ function renderizarTextos() {
   _txt('lblBtnSalvarArea',  CONFIG.UI.MODAL_AREA_CONF);
 
   // Modais títulos
-  _txt('modalSaveMapTitle', U.MOD_SALVAR_MAPA);
+  _txt('modalSaveMapTitle', CONFIG.UI_MODAL_MAPA.TITULO_NUEVO);
+  _txt('lblMapNome',        CONFIG.UI_MODAL_MAPA.LABEL_NOME);
+  _txt('btnCancelarMapa',   CONFIG.UI_S5.BTN_CANCELAR);
+  _txt('btnSalvarMapa',     CONFIG.UI_MODAL_MAPA.BTN_SALVAR);
+  // Placeholder do input via JS (não existe _placeholder helper — feito inline)
+  const mapNameEl = document.getElementById('mapName');
+  if (mapNameEl) mapNameEl.placeholder = CONFIG.UI_MODAL_MAPA.PLACEHOLDER_NOME;
   _txt('modalDesignarTitle',U.MOD_DESIGNAR);
   _txt('modalPingTitle',    U.MOD_NOVO_PING);
   _txt('modalVolTitle',     U.MOD_NOVO_VOL);
@@ -3767,17 +3946,19 @@ function renderizarListaMapas() {
     el.innerHTML = `<div style="padding:16px;text-align:center;font-size:11px;color:var(--muted)">${CONFIG.UI.SEM_DADOS}</div>`;
     return;
   }
-  el.innerHTML = ESTADO.mapas.map(m => `
+  const MC = CONFIG.UI_MODAL_MAPA;
+  const CC = CONFIG.UI_CICLO;
+  el.innerHTML = ESTADO.mapas.map(m => {
+    const codigo = m.Codigo ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:11px;letter-spacing:.5px;margin-right:6px">${_esc(m.Codigo)}</span>` : '';
+    return `
     <div class="map-list-item${ESTADO.mapaAtual && ESTADO.mapaAtual.ID_Mapa===m.ID_Mapa?' selected':''}" onclick="carregarMapa(${JSON.stringify(m).replace(/"/g,'&quot;')})">
-      <div class="mli-name">${_esc(m.Nome)}</div>
-      <div class="mli-meta">
-        <span>${_esc(m.Tipo_Desastre)||'—'}</span>
-        <span class="tag ${m.Prioridade==='Alta'?'tag-critical':m.Prioridade==='Media'?'tag-pending':'tag-done'}">${_esc(m.Prioridade)||'—'}</span>
-      </div>
+      <div class="mli-name">${codigo}${_esc(m.Nome)}</div>
       <div class="mli-actions">
-        <button class="btn btn-ghost" onclick="event.stopPropagation();deletarMapa('${_esc(m.ID_Mapa)}')">🗑</button>
+        <button class="btn btn-ghost" title="${MC.RENOMEAR_PROMPT}" onclick="event.stopPropagation();renomearMapa('${_esc(m.ID_Mapa)}','${_esc(m.Nome).replace(/'/g,"\\'")}')">✏️</button>
+        <button class="btn btn-ghost" title="${CC.BTN_ELIMINAR}" onclick="event.stopPropagation();deletarMapa('${_esc(m.ID_Mapa)}')">🗑</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderizarAreas() {
@@ -3790,20 +3971,24 @@ function renderizarAreas() {
     el.innerHTML = `<div style="color:var(--muted);font-size:12px">${CONFIG.UI.SEM_DADOS}</div>`;
     return;
   }
+  const CC = CONFIG.UI_CICLO;
+  const MA = CONFIG.UI_MODAL_AREA;
   el.innerHTML = lista.map(a => {
     const pingsDaArea = ESTADO.pings.filter(p => p.ID_Area === a.ID_Area);
     const feitos  = pingsDaArea.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
     const total   = pingsDaArea.length;
     const pct     = total > 0 ? Math.round(feitos/total*100) : 0;
+    const codigo  = a.Codigo
+      ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:11px;letter-spacing:.5px;margin-right:5px">${_esc(a.Codigo)}</span>`
+      : '';
     return `
     <div class="area-card">
-      <div class="area-thumb"><span style="opacity:.5">📐 ${_esc(a.Nome)}</span></div>
+      <div class="area-thumb"><span style="opacity:.5">📐 ${codigo}${_esc(a.Nome)}</span></div>
       <div class="area-card-body">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-          <div class="area-name">${_esc(a.Nome)}</div>
+          <div class="area-name">${codigo}${_esc(a.Nome)}</div>
           <span class="tag ${pct===100?'tag-done':pct>60?'tag-active':'tag-pending'}">${pct}%</span>
         </div>
-        <div class="area-desc">${_esc(a.Descricao)||'—'}</div>
         <div class="area-stats">
           <div class="area-stat"><strong>${total}</strong><br>Pings</div>
           <div class="area-stat"><strong>${feitos}</strong><br>Concluídos</div>
@@ -3811,7 +3996,8 @@ function renderizarAreas() {
         <div class="area-prog"><div class="area-prog-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
         <div class="area-acts">
           <button class="btn btn-ghost" onclick="navegarCoord('mapas',_navEl('mapas'));toast('🗺 Navegando para ${_esc(a.Nome)}')">🗺 Ver</button>
-          <button class="btn btn-primary" onclick="openModal('modalDesignar')">👤 Designar</button>
+          <button class="btn btn-ghost" title="${MA.RENOMEAR_PROMPT}" onclick="renomearArea('${_esc(a.ID_Area)}','${_esc(a.Nome).replace(/'/g,"\\'")}')">✏️</button>
+          <button class="btn btn-ghost" title="${CC.BTN_ELIMINAR}" onclick="deleteArea('${_esc(a.ID_Area)}')">🗑</button>
         </div>
       </div>
     </div>`;
@@ -3848,6 +4034,7 @@ function renderizarPings(lista) {
       <td><div class="row-acts">
         <div class="ico-btn" onclick="focarPingMapa(${p.Latitude||0},${p.Longitude||0})" title="Ver no mapa">📍</div>
         <div class="ico-btn" onclick="openModal('modalDesignar')" title="Redesignar">👤</div>
+        <div class="ico-btn" onclick="eliminarPing('${_esc(p.ID_Ping)}')" title="${CONFIG.UI_CICLO.BTN_ELIMINAR}">🗑</div>
       </div></td>
     </tr>`;
   }).join('');
@@ -3880,15 +4067,77 @@ function carregarMarcadoresPings() {
     const icon = pingIcon(cor);
     // [F4] Mostrar código legible no popup — fallback para ID se não existir
     const codigo = p.Codigo || p.codigo || '';
-    const m = L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], { icon })
+    const m = L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
+      icon,
+      draggable: true,  // [B5] Pin arrastrable — código no cambia al mover
+    })
       .addTo(mapCoord)
       .bindPopup(`
         ${codigo ? `<div style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:13px;letter-spacing:.5px;margin-bottom:4px">${_esc(codigo)}</div>` : ''}
         <strong style="font-family:'Rajdhani',sans-serif">${_esc(p.Endereco)||'Ping'}</strong><br>
         <span style="color:${cor};font-size:11px">${CONFIG.STATUS_LABEL[p.Status]||p.Status}</span>`);
+
+    // [B5] Listener dragend — verificar área y guardar nueva posición
+    const latOrig = parseFloat(p.Latitude);
+    const lngOrig = parseFloat(p.Longitude);
+    const idAreaOrig = p.ID_Area || '';
+
+    m.on('dragend', async function(ev) {
+      const nuevaPos = ev.target.getLatLng();
+      const nuevaLat = nuevaPos.lat;
+      const nuevaLng = nuevaPos.lng;
+
+      // Verificar que el nuevo punto sigue dentro del área original
+      const areaEnNuevaPosicion = detectarAreaPorPonto(nuevaLat, nuevaLng);
+      const mismaArea = areaEnNuevaPosicion && areaEnNuevaPosicion.ID_Area === idAreaOrig;
+
+      if (!mismaArea) {
+        // Revertir al original — el pin no puede salir de su área
+        ev.target.setLatLng([latOrig, lngOrig]);
+        toast(CONFIG.UI_CICLO.PING_FORA_AREA);
+        return;
+      }
+
+      toast(CONFIG.UI_CICLO.PING_MOVENDO);
+      await moverPing(p.ID_Ping, nuevaLat, nuevaLng);
+    });
+
     pingMarkers.push(m);
   });
 }
+
+// ── [B5] moverPing ───────────────────────────────────────────
+// Actualiza lat/lng del ping en el backend.
+// El Codigo es inmutable — no se toca nunca.
+// Si éxito → actualiza ESTADO.pings en memoria (sin recargar todo).
+// Si error → revierte el marcador a la posición original.
+async function moverPing(idPing, lat, lng) {
+  try {
+    const r = await chamarBackend({
+      acao:      CONFIG.ACOES.MOVER_PING,
+      id:        idPing,
+      latitude:  lat,
+      longitude: lng,
+    });
+    if (r.sucesso) {
+      // Actualizar coordenadas en ESTADO.pings sin recargar todo
+      const idx = ESTADO.pings.findIndex(p => p.ID_Ping === idPing);
+      if (idx >= 0) {
+        ESTADO.pings[idx].Latitude  = lat;
+        ESTADO.pings[idx].Longitude = lng;
+      }
+      toast(CONFIG.UI_CICLO.PING_MOVIDO_OK);
+    } else {
+      // Error del backend — recargar para restaurar posición real
+      toast('⚠️ ' + (r.mensagem || CONFIG.UI.TOAST_BACKEND_ERR));
+      await carregarDadosCoord();
+    }
+  } catch(e) {
+    toast(CONFIG.UI.TOAST_BACKEND_ERR);
+    await carregarDadosCoord();
+  }
+}
+// ── FIM [B5] ─────────────────────────────────────────────────
 
 // Carrega polígonos das áreas salvas no backend e os desenha no mapa
 function carregarPoligonosAreas() {
@@ -3909,9 +4158,9 @@ function carregarPoligonosAreas() {
   });
 
   ESTADO.areas.forEach(area => {
-    if (!area.Coordenadas) return;
+    if (!area[CONFIG.CAMPO_POLIGONO]) return;
     try {
-      const pts = JSON.parse(area.Coordenadas);
+      const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
       if (!pts || pts.length < 3) return;
       // [F3] Polígono vai para _capaAreasExistentes — fixo, semitransparente, só visual
       const poly = L.polygon(pts, {
@@ -4019,10 +4268,14 @@ function onMapClick(e) {
       drawTempLine = L.polyline(ESTADO.drawPoints, { color:'#F4521E', weight:2, dashArray:'5,5' }).addTo(mapCoord);
     }
   } else if (ESTADO.currentTool === 'ping') {
-    document.getElementById('pingLat').value = e.latlng.lat.toFixed(6);
-    document.getElementById('pingLng').value = e.latlng.lng.toFixed(6);
-    openModal('modalPing');
+    // [B4] Pin solo dentro de un área — imposible crear fuera
+    const area = detectarAreaPorPonto(e.latlng.lat, e.latlng.lng);
+    if (!area) {
+      toast(CONFIG.UI_PING_CARD.SEM_AREA);
+      return;  // Regla inamovible: sin área → no se crea el pin
+    }
     setTool('nav');
+    mostrarTarjetaConfirmPing(e.latlng.lat, e.latlng.lng, area);
   }
 }
 
@@ -4041,52 +4294,42 @@ function finalizarPoligono() {
     toast(CONFIG.UI.TOAST_AREA_MAPA);
     return;
   }
-  // Guardar pontos pendentes e abrir modal para nome/desc/voluntário
+  // Guardar pontos pendentes e mostrar tarjeta flotante
   ESTADO.pendingPolyPoints = [...ESTADO.drawPoints];
-  _txt('areaNumPontos', ESTADO.pendingPolyPoints.length);
-  // Pre-preencher select de voluntários no modal área
-  const nomesVols = [CONFIG.UI.SEM_DESIGNACAO, ...ESTADO.voluntarios.map(v => v.Nome)];
-  _populateSelect('areaVolInput', nomesVols);
-  document.getElementById('areaNomeInput').value = CONFIG.UI.AREA_NOME_DEFAULT + (ESTADO.areas.length + 1);
-  document.getElementById('areaDescInput').value = '';
-  openModal('modalSalvarArea');
+  mostrarTarjetaConfirmArea();
 }
 
 async function salvarArea() {
-  const nome = document.getElementById('areaNomeInput').value.trim();
-  if (!nome) { toast(CONFIG.UI.TOAST_AREA_NOME); return; }
-  const vol  = document.getElementById('areaVolInput')?.value;
-  const desc = document.getElementById('areaDescInput').value;
+  // [B3] Leer nombre de la tarjeta flotante (tcaNomeInput)
+  // Si vacío → usar nombre por defecto desde CONFIG
+  const MA = CONFIG.UI_MODAL_AREA;
+  const inputEl = document.getElementById('tcaNomeInput');
+  const nomeRaw = inputEl ? inputEl.value.trim() : '';
+  const areasDelMapa = ESTADO.mapaAtual
+    ? ESTADO.areas.filter(a => a.ID_Mapa === ESTADO.mapaAtual.ID_Mapa).length
+    : ESTADO.areas.length;
+  const nome = nomeRaw || (MA.NOME_DEFAULT + (areasDelMapa + 1));
   const pts  = ESTADO.pendingPolyPoints;
 
-  // Desenhar polígono visualmente no mapa
+  // Dibujar polígono visualmente en el mapa
   const poly = L.polygon(pts, {
     color: '#F4521E', fillColor: '#F4521E', fillOpacity: 0.1, weight: 2,
   }).addTo(mapCoord);
-
-  // Guardar referência com nome para identificação
   poly._areaName = nome;
   poly.on('click', () => mostrarInfoArea(nome));
   ESTADO.drawnPolygons.push(poly);
 
-  // Limpar pontos temporários da capa de dibujo ativa
-  ESTADO.drawPoints = [];
-  drawTempMarkers.forEach(m => m.remove());
-  drawTempMarkers = [];
-  if (drawTempLine) { drawTempLine.remove(); drawTempLine = null; }
-  setTool('nav');
-  closeModal('modalSalvarArea');
+  // Limpiar capa de dibujo activa y cerrar tarjeta
+  descartarTarjetaConfirmArea();
   toast(CONFIG.UI.TOAST_CARREGANDO);
 
   try {
     const r = await chamarBackend({
-      acao:        CONFIG.ACOES.SALVAR_AREA,
-      idMapa:      ESTADO.mapaAtual.ID_Mapa,
-      nome:        nome,
-      descricao:   desc,
-      voluntario:  vol && vol !== CONFIG.UI.SEM_DESIGNACAO ? vol : '',
-      coordenadas: JSON.stringify(pts),
-      criadoPor:   ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
+      acao:     CONFIG.ACOES.SALVAR_AREA,
+      idMapa:   ESTADO.mapaAtual.ID_Mapa,
+      nome:     nome,
+      [CONFIG.CAMPO_POLIGONO]: JSON.stringify(pts),
+      criadoPor: ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
     });
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_AREA_CRIADA);
@@ -4101,16 +4344,79 @@ async function salvarArea() {
 }
 
 function cancelarArea() {
-  // Descartar polígono pendente — só a capa de dibujo ativa
-  ESTADO.drawPoints = [];
+  // [B3] Descartar polígono pendente via tarjeta flotante
+  // [F3] As áreas existentes (_capaAreasExistentes) permanecem — não são tocadas ao cancelar
+  descartarTarjetaConfirmArea();
+}
+
+// ── [B3] mostrarTarjetaConfirmArea ───────────────────────────
+// Exibe tarjeta flotante sobre o mapa ao fechar o polígono.
+// Todos os textos via CONFIG.UI_MODAL_AREA — sem hardcode.
+function mostrarTarjetaConfirmArea() {
+  const MA  = CONFIG.UI_MODAL_AREA;
+  const CC  = CONFIG.UI_CICLO;
+  const tarjeta = document.getElementById('tarjetaConfirmArea');
+  if (!tarjeta) return;
+
+  // Título com número de pontos
+  _txt('tcaTitulo', '📐 ' + ESTADO.pendingPolyPoints.length + ' pontos');
+
+  // Input nome — placeholder e vazio para digitar
+  const input = document.getElementById('tcaNomeInput');
+  if (input) {
+    input.placeholder = MA.PLACEHOLDER_NOME;
+    input.value = '';
+    setTimeout(() => input.focus(), 120);
+  }
+
+  // Textos dos botões via CONFIG
+  _txt('tcaBtnCancelar',  MA.BTN_CANCELAR);
+  _txt('tcaBtnConfirmar', MA.BTN_CONFIRMAR);
+
+  tarjeta.classList.add('aberta');
+}
+
+// ── [B3] descartarTarjetaConfirmArea ─────────────────────────
+// Remove a tarjeta e limpa toda la capa de dibujo activa.
+function descartarTarjetaConfirmArea() {
+  const tarjeta = document.getElementById('tarjetaConfirmArea');
+  if (tarjeta) tarjeta.classList.remove('aberta');
+
+  // Limpiar puntos temporales de dibujo
+  ESTADO.drawPoints        = [];
   ESTADO.pendingPolyPoints = [];
   drawTempMarkers.forEach(m => m.remove());
   drawTempMarkers = [];
   if (drawTempLine) { drawTempLine.remove(); drawTempLine = null; }
-  // [F3] As áreas existentes (_capaAreasExistentes) permanecem — não são tocadas ao cancelar
   setTool('nav');
-  closeModal('modalSalvarArea');
 }
+
+// ── [B3] renomearArea ────────────────────────────────────────
+// Edita SOLO o Nome da área — Codigo é imutável e nunca muda.
+// Textos do prompt via CONFIG.UI_MODAL_AREA — sem hardcode.
+async function renomearArea(id, nomeAtual) {
+  const MA = CONFIG.UI_MODAL_AREA;
+  const novoNome = prompt(MA.RENOMEAR_PROMPT, nomeAtual || '');
+  if (novoNome === null) return;           // usuário cancelou
+  if (!novoNome.trim()) {
+    toast(CONFIG.UI.TOAST_AREA_NOME);
+    return;
+  }
+  try {
+    const r = await chamarBackend({
+      acao: CONFIG.ACOES.RENOMEAR_AREA,
+      id:   id,
+      nome: novoNome.trim(),
+    });
+    if (r.sucesso) {
+      toast(MA.RENOMEAR_OK);
+      await carregarDadosCoord();
+    } else {
+      toast('⚠️ ' + (r.mensagem || CONFIG.UI.TOAST_BACKEND_ERR));
+    }
+  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+}
+// ── FIM [B3] ────────────────────────────────────────────────
 
 function mostrarInfoArea(nome) {
   const panel = document.getElementById('areaInfoPanel');
@@ -4142,22 +4448,94 @@ function clearLastDraw() {
   }
 }
 
-async function deleteArea() {
-  const nome = document.getElementById('aipTitle').textContent;
-  const area = ESTADO.areas.find(a => a.Nome === nome);
+// [B6] deleteArea acepta id directo (desde renderizarAreas) o lee del panel (compatibilidad)
+async function deleteArea(idParam) {
+  const CC   = CONFIG.UI_CICLO;
+  let area;
+
+  if (idParam) {
+    area = ESTADO.areas.find(a => a.ID_Area === idParam);
+  } else {
+    // Compatibilidad con llamada desde areaInfoPanel (sin parámetro)
+    const nome = document.getElementById('aipTitle')?.textContent;
+    area = ESTADO.areas.find(a => a.Nome === nome);
+  }
+
   document.getElementById('areaInfoPanel').style.display = 'none';
-  if (!confirm(CONFIG.UI.CONFIRMAR_AREA_DEL)) return;
-  if (area) {
+  if (!area) return;
+
+  const nome = area.Codigo ? area.Codigo + ' · ' + area.Nome : area.Nome;
+  const fase = await estaEnFaseOperativa('area', area.ID_Area);
+
+  if (!fase.operativo) {
+    // FASE BORRADOR — eliminación real
+    if (!confirm(CC.AREA_BORRADOR_CONF)) return;
     try {
       await chamarBackend({ acao: CONFIG.ACOES.DELETAR_AREA, id: area.ID_Area });
-    } catch(e) {}
+      // Remover polígono visual del mapa
+      const idx = ESTADO.drawnPolygons.findIndex(p => p._areaName === area.Nome);
+      if (idx >= 0) { ESTADO.drawnPolygons[idx].remove(); ESTADO.drawnPolygons.splice(idx, 1); }
+      toast(CONFIG.UI.TOAST_AREA_DEL);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+
+  } else {
+    // FASE OPERATIVA — archivado con cascada
+    const pingsArea   = ESTADO.pings.filter(p => p.ID_Area === area.ID_Area);
+    const concluidos  = pingsArea.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
+    const pendentes   = pingsArea.filter(p => p.Status !== CONFIG.STATUS_PING.CONCLUIDO).length;
+    const msg = _interpolar(CC.AREA_OP_CONF, {
+      nome:       nome,
+      pings:      pingsArea.length,
+      concluidos: concluidos,
+      pendentes:  pendentes,
+    });
+    if (!confirm(msg)) return;
+    try {
+      await chamarBackend({ acao: CONFIG.ACOES.ARQUIVAR_AREA, id: area.ID_Area });
+      const idx = ESTADO.drawnPolygons.findIndex(p => p._areaName === area.Nome);
+      if (idx >= 0) { ESTADO.drawnPolygons[idx].remove(); ESTADO.drawnPolygons.splice(idx, 1); }
+      toast(CC.BTN_ARQUIVAR + ' · ' + nome);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
   }
-  // Remover polígono visual do mapa
-  const idx = ESTADO.drawnPolygons.findIndex(p => p._areaName === nome);
-  if (idx >= 0) { ESTADO.drawnPolygons[idx].remove(); ESTADO.drawnPolygons.splice(idx,1); }
-  toast(CONFIG.UI.TOAST_AREA_DEL);
-  await carregarDadosCoord();
 }
+
+// ── [B6] eliminarPing ─────────────────────────────────────────
+// Borrador → eliminación real | Operativo → archivado con desasignación.
+// Llamada desde la tabla de pings y desde el popup del marcador en el mapa.
+async function eliminarPing(idPing) {
+  const CC   = CONFIG.UI_CICLO;
+  const ping = ESTADO.pings.find(p => p.ID_Ping === idPing);
+  if (!ping) return;
+
+  const codigo = ping.Codigo || ping.codigo || idPing;
+  const fase   = await estaEnFaseOperativa('ping', idPing);
+
+  if (!fase.operativo) {
+    // FASE BORRADOR — eliminación real
+    if (!confirm(CC.PING_BORRADOR_CONF)) return;
+    try {
+      await chamarBackend({ acao: CONFIG.ACOES.DELETAR_PING, id: idPing });
+      toast(CONFIG.UI.CONFIRMAR_PING_DEL);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+
+  } else {
+    // FASE OPERATIVA — archivado con desasignación
+    const msg = _interpolar(CC.PING_OP_CONF, {
+      codigo: codigo,
+      forms:  fase.stats.forms,
+    });
+    if (!confirm(msg)) return;
+    try {
+      await chamarBackend({ acao: CONFIG.ACOES.ARQUIVAR_PING, id: idPing });
+      toast(CC.BTN_ARQUIVAR + ' · ' + codigo);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+  }
+}
+// ── FIM [B6] eliminarPing ────────────────────────────────────
 
 async function searchLocation() {
   const q   = document.getElementById('mapSearchInput').value.trim();
@@ -4190,28 +4568,20 @@ function irPara(lat, lon, nome) {
 }
 
 async function salvarMapa() {
+  // [B2] Payload simplificado — solo nome + posição atual do mapa
+  // lat/lng/zoom capturados da vista Leaflet, nunca de inputs manuais
   const nome = document.getElementById('mapName').value.trim();
   if (!nome) { toast(CONFIG.UI.TOAST_MAPA_NOME); return; }
-  const mapLatInput  = parseFloat(document.getElementById('mapLat')?.value);
-  const mapLngInput  = parseFloat(document.getElementById('mapLng')?.value);
-  const mapZoomInput = parseInt(document.getElementById('mapZoom')?.value);
   const centro = mapCoord ? mapCoord.getCenter() : { lat: CONFIG.MAPA.LAT_PADRAO, lng: CONFIG.MAPA.LNG_PADRAO };
   const zoom   = mapCoord ? mapCoord.getZoom()   : CONFIG.MAPA.ZOOM_PADRAO;
-  // F-03: usar campo explícito se preenchido; fallback para posição atual do Leaflet
-  const latFinal  = !isNaN(mapLatInput)  ? mapLatInput  : centro.lat;
-  const lngFinal  = !isNaN(mapLngInput)  ? mapLngInput  : centro.lng;
-  const zoomFinal = !isNaN(mapZoomInput) ? mapZoomInput : zoom;
   try {
     const r = await chamarBackend({
-      acao:         CONFIG.ACOES.SALVAR_MAPA,
-      nome:         nome,
-      descricao:    document.getElementById('mapDesc').value,
-      tipoDesastre: document.getElementById('mapType').value,
-      prioridade:   document.getElementById('mapPrio').value,
-      latCentro:    latFinal,
-      lngCentro:    lngFinal,
-      zoom:         zoomFinal,
-      criadoPor:    ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
+      acao:      CONFIG.ACOES.SALVAR_MAPA,
+      nome:      nome,
+      latCentro: centro.lat,
+      lngCentro: centro.lng,
+      zoom:      zoom,
+      criadoPor: ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
     });
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_MAPA_SALVO);
@@ -4219,6 +4589,7 @@ async function salvarMapa() {
       // [F2] Ocultar botão flutuante após salvar com sucesso
       const btn = document.getElementById('btnGuardarMapa');
       if (btn) btn.style.display = 'none';
+      document.getElementById('mapName').value = '';
       await carregarDadosCoord();
     } else {
       toast('⚠️ ' + r.mensagem);
@@ -4226,19 +4597,16 @@ async function salvarMapa() {
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
 }
 
-// [F2] Abre o modal de salvar mapa pré-preenchendo lat/lng/zoom da vista atual
+// [B2] Abre o modal de salvar mapa — vista atual capturada em salvarMapa()
+// Não pré-preenche lat/lng/zoom (campos removidos do modal)
 function _abrirModalGuardarMapa() {
-  if (mapCoord) {
-    const c = mapCoord.getCenter();
-    const z = mapCoord.getZoom();
-    const latEl  = document.getElementById('mapLat');
-    const lngEl  = document.getElementById('mapLng');
-    const zoomEl = document.getElementById('mapZoom');
-    if (latEl)  latEl.value  = c.lat.toFixed(6);
-    if (lngEl)  lngEl.value  = c.lng.toFixed(6);
-    if (zoomEl) zoomEl.value = z;
-  }
+  document.getElementById('mapName').value = '';
   openModal('modalSaveMap');
+  // Foco no input para digitação imediata
+  setTimeout(() => {
+    const el = document.getElementById('mapName');
+    if (el) el.focus();
+  }, 100);
 }
 
 // [SIDEBAR] Toggle do painel de mapas salvos
@@ -4258,18 +4626,139 @@ function _toggleMapasSidebar() {
   setTimeout(() => mapCoord && mapCoord.invalidateSize(), 300);
 }
      
-async function deletarMapa(id) {
-  if (!confirm(CONFIG.UI.CONFIRMAR_MAPA_DEL)) return;
-  try {
-    await chamarBackend({ acao: CONFIG.ACOES.DELETAR_MAPA, id });
-    if (ESTADO.mapaAtual && ESTADO.mapaAtual.ID_Mapa === id) {
-      ESTADO.mapaAtual = null;
-      _txt('incidentName', CONFIG.UI.COORD_SEM_MAPA);
+// ── [B6] _interpolar ─────────────────────────────────────────
+// Reemplaza {clave} en un texto de CONFIG por valores reales.
+// Uso: _interpolar(CONFIG.UI_CICLO.MAPA_OP_CONF, { nome:'M01', areas:3 })
+function _interpolar(template, valores) {
+  return template.replace(/\{(\w+)\}/g, (_, k) =>
+    valores[k] !== undefined ? valores[k] : '{' + k + '}');
+}
+
+// ── [B6] estaEnFaseOperativa ──────────────────────────────────
+// Detecta si un mapa/área/ping ya tiene formularios enviados.
+// Usa ESTADO.formularios si está cargado; si no, consulta el backend.
+// Retorna Promise<{ operativo: boolean, stats: { areas, pings, forms, vols } }>
+async function estaEnFaseOperativa(tipo, id) {
+  // Si tenemos formularios cargados en memoria, consultar localmente
+  if (ESTADO.formularios && ESTADO.formularios.length > 0) {
+    let forms = 0;
+    const stats = { areas: 0, pings: 0, forms: 0, vols: 0 };
+
+    if (tipo === 'ping') {
+      forms = ESTADO.formularios.filter(f =>
+        (f.ID_Ping || f.idPing || '') === id).length;
+      stats.forms = forms;
+
+    } else if (tipo === 'area') {
+      const pingsArea = ESTADO.pings.filter(p => p.ID_Area === id);
+      stats.pings = pingsArea.length;
+      const volsSet = {};
+      pingsArea.forEach(p => { if (p.Voluntario_Responsavel) volsSet[p.Voluntario_Responsavel] = true; });
+      stats.vols = Object.keys(volsSet).length;
+      const pingIds = pingsArea.map(p => p.ID_Ping);
+      forms = ESTADO.formularios.filter(f =>
+        pingIds.includes(f.ID_Ping || f.idPing || '')).length;
+      stats.forms = forms;
+
+    } else if (tipo === 'mapa') {
+      const areasM  = ESTADO.areas.filter(a => a.ID_Mapa === id);
+      const pingsM  = ESTADO.pings.filter(p => p.ID_Mapa === id);
+      const volsSet = {};
+      pingsM.forEach(p => { if (p.Voluntario_Responsavel) volsSet[p.Voluntario_Responsavel] = true; });
+      stats.areas = areasM.length;
+      stats.pings = pingsM.length;
+      stats.vols  = Object.keys(volsSet).length;
+      const pingIds = pingsM.map(p => p.ID_Ping);
+      forms = ESTADO.formularios.filter(f =>
+        pingIds.includes(f.ID_Ping || f.idPing || '')).length;
+      stats.forms = forms;
     }
-    toast(CONFIG.UI.TOAST_MAPA_DEL);
-    await carregarDadosCoord();
+
+    return { operativo: forms > 0, stats };
+  }
+
+  // Sin formularios en memoria → consultar backend
+  try {
+    const r = await chamarBackend({
+      acao: CONFIG.ACOES.VERIFICAR_OPERATIVO,
+      tipo: tipo,
+      id:   id,
+    });
+    if (r.sucesso && r.dados) return r.dados;
+  } catch(e) {}
+
+  // Fallback conservador: asumir operativo para proteger datos
+  return { operativo: true, stats: { areas: 0, pings: 0, forms: 0, vols: 0 } };
+}
+// ── FIM [B6] estaEnFaseOperativa ─────────────────────────────
+
+async function deletarMapa(id) {
+  // [B6] Detectar fase: Borrador (eliminación real) vs Operativo (archivado con cascada)
+  const CC    = CONFIG.UI_CICLO;
+  const mapa  = ESTADO.mapas.find(m => m.ID_Mapa === id);
+  const nome  = mapa ? (mapa.Codigo ? mapa.Codigo + ' · ' + mapa.Nome : mapa.Nome) : id;
+  const fase  = await estaEnFaseOperativa('mapa', id);
+
+  if (!fase.operativo) {
+    // FASE BORRADOR — eliminación real sin restricciones
+    if (!confirm(CC.MAPA_BORRADOR_CONF)) return;
+    try {
+      await chamarBackend({ acao: CONFIG.ACOES.DELETAR_MAPA, id });
+      if (ESTADO.mapaAtual && ESTADO.mapaAtual.ID_Mapa === id) {
+        ESTADO.mapaAtual = null;
+        _txt('incidentName', CONFIG.UI.COORD_SEM_MAPA);
+      }
+      toast(CONFIG.UI.TOAST_MAPA_DEL);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+
+  } else {
+    // FASE OPERATIVA — archivado con cascada
+    const msg = _interpolar(CC.MAPA_OP_CONF, {
+      nome:  nome,
+      areas: fase.stats.areas,
+      pings: fase.stats.pings,
+      vols:  fase.stats.vols,
+    });
+    if (!confirm(msg)) return;
+    try {
+      await chamarBackend({ acao: CONFIG.ACOES.ARQUIVAR_MAPA, id });
+      if (ESTADO.mapaAtual && ESTADO.mapaAtual.ID_Mapa === id) {
+        ESTADO.mapaAtual = null;
+        _txt('incidentName', CONFIG.UI.COORD_SEM_MAPA);
+      }
+      toast(CC.BTN_ARQUIVAR + ' · ' + nome);
+      await carregarDadosCoord();
+    } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+  }
+}
+
+// ── [B2] renomearMapa ─────────────────────────────────────────
+// Edita SOLO o Nome do mapa — Codigo é imutável e nunca muda.
+// Textos do prompt via CONFIG.UI_MODAL_MAPA — sem hardcode.
+async function renomearMapa(id, nomeAtual) {
+  const MC = CONFIG.UI_MODAL_MAPA;
+  const novoNome = prompt(MC.RENOMEAR_PROMPT, nomeAtual || '');
+  if (novoNome === null) return;           // usuário cancelou
+  if (!novoNome.trim()) {
+    toast(MC.RENOMEAR_VAZIO);
+    return;
+  }
+  try {
+    const r = await chamarBackend({
+      acao: CONFIG.ACOES.RENOMEAR_MAPA,
+      id:   id,
+      nome: novoNome.trim(),
+    });
+    if (r.sucesso) {
+      toast(MC.RENOMEAR_OK);
+      await carregarDadosCoord();
+    } else {
+      toast('⚠️ ' + (r.mensagem || MC.RENOMEAR_VAZIO));
+    }
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
 }
+// ── FIM [B2] renomearMapa ────────────────────────────────────
 
 // ── [FASE 4] generarCodigoPing ────────────────────────────────
 // Genera el código legible M01-A02-P003 usando CONFIG.CODIGO_PING.
@@ -4301,48 +4790,111 @@ function generarCodigoPing(mapaId, areaId, numPing) {
 }
 // ── FIM [FASE 4] generarCodigoPing ───────────────────────────
 
-async function confirmarPing() {
-  const lat  = parseFloat(document.getElementById('pingLat').value);
-  const lng  = parseFloat(document.getElementById('pingLng').value);
-  const addr = document.getElementById('pingAddr').value.trim() || 'Novo Ping';
+// [B4] confirmarPing acepta parámetros directos (desde tarjeta flotante)
+// o lee del DOM del modal (compatibilidad hacia atrás con llamadas existentes)
+async function confirmarPing(latParam, lngParam, idAreaParam, idMapaParam) {
+  const lat    = latParam    || parseFloat(document.getElementById('pingLat')?.value);
+  const lng    = lngParam    || parseFloat(document.getElementById('pingLng')?.value);
+  const idArea = idAreaParam || '';
+  const idMapa = idMapaParam || (ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '');
+
   if (!lat || !lng) { toast(CONFIG.UI.TOAST_PING_SEM_POS); return; }
-
-  // Detectar automaticamente qual área contém este ponto
-  const areaDetectada = detectarAreaPorPonto(lat, lng);
-
-  // [F4] Calcular número secuencial del ping dentro del área y generar código legible
-  const idMapa = ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '';
-  const idArea = areaDetectada ? areaDetectada.ID_Area : '';
-  const pingsEnArea = idArea
-    ? ESTADO.pings.filter(p => p.ID_Area === idArea).length + 1
-    : ESTADO.pings.filter(p => p.ID_Mapa === idMapa).length + 1;
-  const codigoPing = generarCodigoPing(idMapa, idArea, pingsEnArea);
 
   try {
     const r = await chamarBackend({
-      acao:         CONFIG.ACOES.SALVAR_PING,
-      endereco:     addr,
-      latitude:     lat,
-      longitude:    lng,
-      idMapa:       idMapa,
-      idArea:       idArea,
-      codigo:       codigoPing,   // [F4] código legible M01-A02-P003
-      tipoUnidade:  document.getElementById('pingTipoUnidade').value,
-      voluntario:   document.getElementById('pingDesignarVol').value !== CONFIG.UI.SEM_DESIGNACAO
-                    ? document.getElementById('pingDesignarVol').value : '',
-      criadoPor:    ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
-      status:       CONFIG.STATUS_PING.PENDENTE,
+      acao:      CONFIG.ACOES.SALVAR_PING,
+      latitude:  lat,
+      longitude: lng,
+      idMapa:    idMapa,
+      idArea:    idArea,
+      // [B1] El código lo asigna el backend al crear — no se envía desde el frontend
+      criadoPor: ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
+      status:    CONFIG.STATUS_PING.PENDENTE,
     });
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_PING_CRIADO_COORD);
-      closeModal('modalPing');
-      document.getElementById('pingAddr').value = '';
+      descartarTarjetaConfirmPing();
+      // Compatibilidad: cerrar modal si estuviera abierto
+      const modalPing = document.getElementById('modalPing');
+      if (modalPing && modalPing.classList.contains('open')) {
+        closeModal('modalPing');
+      }
       await carregarDadosCoord();
     } else {
       toast('⚠️ ' + (r.mensagem || 'Erro ao criar ping'));
     }
   } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
 }
+
+// ── [B4] mostrarTarjetaConfirmPing ───────────────────────────
+// Drop → tarjeta flotante con código provisional, nombre del área,
+// coordenadas y dos botones. Un toque confirma, ningún campo manual.
+// Todos los textos via CONFIG.UI_PING_CARD — sin hardcode.
+function mostrarTarjetaConfirmPing(lat, lng, area) {
+  const PC = CONFIG.UI_PING_CARD;
+  const tarjeta = document.getElementById('tarjetaConfirmPing');
+  if (!tarjeta) return;
+
+  // Guardar estado pendiente en variables de módulo
+  _pingPendenteLat  = lat;
+  _pingPendenteLng  = lng;
+  _pingPendenteArea = area;
+
+  // Código provisional: usar la función existente generarCodigoPing para preview
+  const idMapa = ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '';
+  const idArea = area ? area.ID_Area : '';
+  const codigoPreview = generarCodigoPing(idMapa, idArea,
+    (ESTADO.pings.filter(p => p.ID_Area === idArea).length + 1));
+
+  // Color del área si tiene Codigo, sino default
+  const cor = CONFIG.COR_PINES.DEFAULT;
+
+  // Contenido de la tarjeta
+  const codigoEl = document.getElementById('tcpCodigo');
+  if (codigoEl) {
+    codigoEl.textContent = codigoPreview;
+    codigoEl.style.color = CONFIG.COR_PINES['Em Curso'];
+  }
+  _txt('tcpArea',   '📐 ' + _esc(area.Nome || '—'));
+  _txt('tcpCoords', lat.toFixed(5) + ', ' + lng.toFixed(5));
+
+  // Textos de botones via CONFIG
+  _txt('tcpBtnCancelar',  PC.BTN_CANCELAR);
+  _txt('tcpBtnConfirmar', PC.BTN_CONFIRMAR);
+
+  // Mostrar tarjeta
+  tarjeta.classList.add('aberta');
+
+  // Marcador visual temporal en el mapa
+  if (mapCoord) {
+    if (window._pingTempMarker) { window._pingTempMarker.remove(); }
+    window._pingTempMarker = L.circleMarker([lat, lng], {
+      radius: 8, color: CONFIG.COR_PINES['Em Curso'],
+      fillColor: CONFIG.COR_PINES['Em Curso'], fillOpacity: 0.7,
+    }).addTo(mapCoord);
+  }
+}
+
+// ── [B4] confirmarPingDesdeTargeta ────────────────────────────
+// Lee lat/lng/área de las variables de módulo y llama confirmarPing.
+async function confirmarPingDesdeTargeta() {
+  if (_pingPendenteLat === null || _pingPendenteLng === null) return;
+  const idArea = _pingPendenteArea ? _pingPendenteArea.ID_Area : '';
+  const idMapa = ESTADO.mapaAtual  ? ESTADO.mapaAtual.ID_Mapa  : '';
+  await confirmarPing(_pingPendenteLat, _pingPendenteLng, idArea, idMapa);
+}
+
+// ── [B4] descartarTarjetaConfirmPing ─────────────────────────
+// Oculta la tarjeta, limpia el marcador temporal y las variables.
+function descartarTarjetaConfirmPing() {
+  const tarjeta = document.getElementById('tarjetaConfirmPing');
+  if (tarjeta) tarjeta.classList.remove('aberta');
+  if (window._pingTempMarker) { window._pingTempMarker.remove(); window._pingTempMarker = null; }
+  _pingPendenteLat  = null;
+  _pingPendenteLng  = null;
+  _pingPendenteArea = null;
+}
+// ── FIM [B4] ─────────────────────────────────────────────────
 
 // Detecta se o ponto (lat,lng) está dentro de alguma área desenhada no mapa
 function detectarAreaPorPonto(lat, lng) {
@@ -4358,9 +4910,9 @@ function detectarAreaPorPonto(lat, lng) {
   }
   // Fallback: tentar via coordenadas salvas nas áreas
   for (const area of ESTADO.areas) {
-    if (!area.Coordenadas) continue;
+    if (!area[CONFIG.CAMPO_POLIGONO]) continue;
     try {
-      const pts = JSON.parse(area.Coordenadas);
+      const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
       if (ptoNoPoli([lat, lng], pts)) return area;
     } catch(e) {}
   }
@@ -4793,9 +5345,9 @@ function colorearAreasPorAvance() {
   }
 
   ESTADO.areas.forEach(area => {
-    if (!area.Coordenadas) return;
+    if (!area[CONFIG.CAMPO_POLIGONO]) return;
     try {
-      const pts = JSON.parse(area.Coordenadas);
+      const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
       if (!pts || pts.length < 3) return;
 
       const pingsArea   = ESTADO.pings.filter(p => p.ID_Area === area.ID_Area);
