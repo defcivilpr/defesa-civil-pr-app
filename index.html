@@ -3688,7 +3688,7 @@ window.addEventListener('load', () => {
 // V5: Incluye token automáticamente en cada request autenticado.
 // ════════════════════════════════════════════════════════════════
 async function chamarBackend(params) {
-  // V5: Agregar token si existe y la acción no es pública
+  // V5: Agregar token si existe
   const token = obterToken();
   const paramsConToken = { ...params };
   if (token) {
@@ -3703,14 +3703,7 @@ async function chamarBackend(params) {
   });
   const text = await res.text();
   try {
-    const data = JSON.parse(text);
-    // V5: Si el token expiró, limpiar sesión y mostrar mensaje
-    if (!data.sucesso && data.mensagem && data.mensagem.includes('Token')) {
-      encerrarSessao();
-      toast(CONFIG.UI.TOAST_SESSAO_ERR);
-      setTimeout(() => mostrarTela(CONFIG.TELAS.LOGIN), 1500);
-    }
-    return data;
+    return JSON.parse(text);
   } catch(e) {
     return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
   }
