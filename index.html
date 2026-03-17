@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v5.0",
+    VERSAO:     "v6.0",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -490,6 +490,10 @@ const CONFIG = {
     STORE_FILA:     "fila_offline",
     STORE_FOTOS:    "fotos_offline",
     STORE_CACHE:    "cache_dados",
+    // V6: Límite de reintentos para evitar loops infinitos
+    MAX_REINTENTOS: 5,
+    // Campo donde se guarda el contador de intentos
+    CAMPO_INTENTOS: "_intentos",
   },
 
   // ── Service Worker — B-16 ────────────────────────────────────
@@ -833,6 +837,9 @@ const CONFIG = {
     ITEM_ERR:          "⚠️ Erro ao enviar",
     NOTIF_SYNC_OK:     "✅ Sincronização completa",
     NOTIF_SYNC_PARCIAL:"⚠️ Sincronização parcial — verifique conexão",
+    // V6: Mensajes para límite de reintentos
+    ITEM_FALLIDO:      "❌ Falhou após múltiplas tentativas",
+    ITEM_REMOVIDO:     "🗑 Item removido da fila (máximo de tentativas)",
   },
 
   // ════════════════════════════════════════════════════════════════
@@ -3860,9 +3867,13 @@ async function doLogin() {
     });
 
     if (data.sucesso) {
-      // V5: Guardar token retornado por el backend
-      if (data.dados.token) {
+      // V6: Verificar que el token existe y no es null/undefined
+      if (data.dados.token && data.dados.token !== 'null') {
         guardarToken(data.dados.token);
+      } else {
+        // V6: Token inválido retornado — mostrar error
+        console.error('Login: token inválido recebido do servidor');
+        throw new Error('token_invalid');
       }
       // BUG-04: Usar o tipo retornado pelo backend — nunca o roleSelecionado do frontend
       const tipoReal = data.dados.Tipo || data.dados.tipo || roleSelecionado;
@@ -3878,9 +3889,13 @@ async function doLogin() {
     const isNetworkErr = e instanceof TypeError
                       || e.message === 'Failed to fetch'
                       || e.message === 'NetworkError';
+    // V6: Manejar error de token inválido
+    const isTokenErr = e.message === 'token_invalid';
     errEl.textContent  = isNetworkErr
       ? CONFIG.UI.LOGIN_ERR_REDE
-      : CONFIG.UI.LOGIN_ERR_AUTH;
+      : isTokenErr
+        ? CONFIG.UI.LOGIN_ERR_REDE  // Mostrar como error de red (problema del servidor)
+        : CONFIG.UI.LOGIN_ERR_AUTH;
     errEl.style.display = 'block';
     document.getElementById('inputSenha').value = '';
   }
@@ -6271,21 +6286,47 @@ async function sincronizarAgora() {
 async function _sincronizarFila() {
   let enviados = 0;
   let fotosEnviadas = 0;
+  let fallidos = 0;
+
+  // V6: Configuración de reintentos
+  const MAX_REINTENTOS = CONFIG.IDB.MAX_REINTENTOS || 5;
+  const CAMPO_INTENTOS = CONFIG.IDB.CAMPO_INTENTOS || '_intentos';
 
   // 1. Sincronizar formulários da fila IDB
   try {
     const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
     for (const item of fila) {
       try {
-        const { _id, _ts, ...dados } = item;
+        const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
+        const intentos = (intentosActuales || 0) + 1;
+        
         const r = await chamarBackend(dados);
         if (r.sucesso) {
           await idbDelete(CONFIG.IDB.STORE_FILA, _id);
           enviados++;
           // [F9] Notificar progreso ítem por ítem
           if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(true);
+        } else {
+          // V6: Incrementar contador de intentos o eliminar si excede límite
+          if (intentos >= MAX_REINTENTOS) {
+            // Eliminar item que falló demasiadas veces
+            await idbDelete(CONFIG.IDB.STORE_FILA, _id);
+            fallidos++;
+            console.warn('Item removido da fila após', MAX_REINTENTOS, 'tentativas:', dados.acao, dados.idPing);
+          } else {
+            // Actualizar contador de intentos
+            await idbSet(CONFIG.IDB.STORE_FILA, _id, { ...item, [CAMPO_INTENTOS]: intentos });
+          }
         }
-      } catch(e) { /* manter na fila */ }
+      } catch(e) {
+        // V6: También contar intentos en errores de red
+        const intentos = (item[CAMPO_INTENTOS] || 0) + 1;
+        if (intentos >= MAX_REINTENTOS) {
+          try { await idbDelete(CONFIG.IDB.STORE_FILA, item._id); fallidos++; } catch(de) {}
+        } else {
+          try { await idbSet(CONFIG.IDB.STORE_FILA, item._id, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
+        }
+      }
     }
     // BUG-18: após processar IDB, limpar sessionStorage para evitar reenvio duplicado
     if (enviados > 0) {
@@ -6299,13 +6340,28 @@ async function _sincronizarFila() {
     const restante = [];
     for (const item of filaSession) {
       try {
+        const intentos = (item[CAMPO_INTENTOS] || 0) + 1;
         const r = await chamarBackend(item);
         if (r.sucesso) {
           enviados++;
           // [F9] Notificar progreso
           if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(true);
-        } else restante.push(item);
-      } catch(e) { restante.push(item); }
+        } else {
+          // V6: Incrementar intentos o descartar
+          if (intentos >= MAX_REINTENTOS) {
+            fallidos++;
+          } else {
+            restante.push({ ...item, [CAMPO_INTENTOS]: intentos });
+          }
+        }
+      } catch(e) {
+        const intentos = (item[CAMPO_INTENTOS] || 0) + 1;
+        if (intentos < MAX_REINTENTOS) {
+          restante.push({ ...item, [CAMPO_INTENTOS]: intentos });
+        } else {
+          fallidos++;
+        }
+      }
     }
     sessionStorage.setItem(CONFIG.STORAGE.FILA_OFFLINE, JSON.stringify(restante));
   } catch(e) {}
@@ -6315,13 +6371,29 @@ async function _sincronizarFila() {
     const filaFotos = await idbGetAll(CONFIG.IDB.STORE_FOTOS);
     for (const item of filaFotos) {
       try {
-        const { _id, _ts, ...dados } = item;
+        const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
+        const intentos = (intentosActuales || 0) + 1;
+        
         const r = await chamarBackend(dados);
         if (r.sucesso) {
           await idbDelete(CONFIG.IDB.STORE_FOTOS, _id);
           fotosEnviadas++;
+        } else {
+          if (intentos >= MAX_REINTENTOS) {
+            await idbDelete(CONFIG.IDB.STORE_FOTOS, _id);
+            fallidos++;
+          } else {
+            await idbSet(CONFIG.IDB.STORE_FOTOS, _id, { ...item, [CAMPO_INTENTOS]: intentos });
+          }
         }
-      } catch(e) {}
+      } catch(e) {
+        const intentos = (item[CAMPO_INTENTOS] || 0) + 1;
+        if (intentos >= MAX_REINTENTOS) {
+          try { await idbDelete(CONFIG.IDB.STORE_FOTOS, item._id); fallidos++; } catch(de) {}
+        } else {
+          try { await idbSet(CONFIG.IDB.STORE_FOTOS, item._id, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
+        }
+      }
     }
   } catch(e) {}
 
@@ -6336,7 +6408,12 @@ async function _sincronizarFila() {
     _txt('syncUltima', new Date().toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA));
   } catch(e) {}
 
-  return { enviados, fotosEnviadas };
+  // V6: Log de items fallidos
+  if (fallidos > 0) {
+    console.warn('Sync: ', fallidos, ' item(s) removido(s) após máximo de tentativas');
+  }
+
+  return { enviados, fotosEnviadas, fallidos };
 }
 
 // Listener de reconexão — B-19
