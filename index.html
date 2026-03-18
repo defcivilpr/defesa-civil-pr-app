@@ -3713,7 +3713,7 @@ async function chamarBackend(params) {
     method: CONFIG.HTTP_METHOD,
     redirect: 'follow',
     headers: { 
-      'Content-Type': 'application/json'   // ← CAMBIO CLAVE (mejor para Apps Script)
+      'Content-Type': CONFIG.HTTP_CONTENT_TYPE   // ← CAMBIO CLAVE (mejor para Apps Script)
     },
     body: JSON.stringify(paramsConToken),
   });
