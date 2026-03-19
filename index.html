@@ -3419,7 +3419,7 @@ textarea{resize:vertical;min-height:65px;}
 
 // ── Estado general de la aplicación ─────────────────────────────
 const ESTADO = {
-  sessao:     null,    // { nome, usuario, tipo, area, timestamp }
+  sessao:     null,    // { nome, usuario, tipo, area, timestamp 
   mapas:      [],      // lista de mapas do backend
   areas:      [],      // lista de áreas do backend
   pings:      [],      // todos os pings
@@ -5765,11 +5765,11 @@ async function salvarVoluntarioCompleto() {
     const payload = {
       acao: CONFIG.ACOES.EDITAR_USUARIO,
       id: idUsuario,
-      nome,
-      usuario,
-      areasPermitidas: area,
-    };
-    if (senha) payload.senha = senha;
+      Nome: nome,                    
+      Usuario: usuario,              
+      Areas_Permitidas: area,        
+   };
+   if (senha) payload.Senha = senha;  
     
     const r = await chamarBackend(payload);
     
