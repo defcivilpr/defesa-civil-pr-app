@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v6.0",
+    VERSAO:     "v8.0",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -452,7 +452,7 @@ const CONFIG = {
     DUP_AVISO:          "Use o campo <strong>Complemento</strong> para diferenciar unidades no mesmo local.",
 
     // Versão
-    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v7.1 · PWA",
+    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v8.0 · PWA",
 
     // Sprint 3 — Voluntário
     FORM_CAMPO_OBRIG:   "⚠️ Preencha o endereço e as coordenadas GPS.",
@@ -498,7 +498,9 @@ const CONFIG = {
 
   // ── Service Worker — B-16 ────────────────────────────────────
   SW: {
-    CACHE_NOME:     "dcpr-cache-v5",
+    // [V8] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
+    CACHE_PREFIX:   "dcpr-",
+    CACHE_NOME:     "dcpr-cache-v4",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -796,15 +798,11 @@ const CONFIG = {
     TOAST_ERR:           "⚠️ Erro ao atualizar voluntário.",
     TOAST_CAMPOS:        "⚠️ Nome e usuário são obrigatórios.",
     TOAST_SENHA_CURTA:   "⚠️ Senha deve ter ao menos 4 caracteres.",
-    // Eliminar voluntario
+    // [V8] Eliminar voluntario
     BTN_ELIMINAR:        "🗑 Eliminar",
-    ELIMINAR_TITULO:     "⚠️ Eliminar Voluntário",
-    ELIMINAR_CONFIRMAR:  "Tem certeza que deseja eliminar este voluntário?",
-    ELIMINAR_COM_FORMS:  "Este voluntário possui {n} formulário(s) concluído(s). Os formulários serão preservados e continuarão visíveis para consulta.",
-    ELIMINAR_SEM_FORMS:  "Este voluntário não possui formulários concluídos.",
-    ELIMINAR_OK:         "✅ Voluntário eliminado com sucesso.",
-    ELIMINAR_ERR:        "⚠️ Erro ao eliminar voluntário.",
-    BTN_CONFIRMAR_ELIM:  "Sim, eliminar",
+    CONFIRM_ELIMINAR:    "¿Deseja realmente eliminar o voluntário {nome}?\n\n⚠️ Esta ação remove o acesso ao sistema.\n✅ Os formulários já enviados permanecerão visíveis.",
+    TOAST_ELIMINADO:     "✅ Voluntário removido com sucesso.",
+    TOAST_ELIMINAR_ERR:  "⚠️ Erro ao remover voluntário.",
   },
 
   // ── Duração do toast (ms) ────────────────────────────────────
@@ -5556,6 +5554,7 @@ function renderizarVoluntarios() {
   }
   const statusLabel = CONFIG.STATUS_VOL_LABEL;
   const statusTag   = CONFIG.STATUS_VOL_CSS;
+  const EV = CONFIG.UI_EDITAR_VOL; // [V8] Textos de voluntario
   el.innerHTML = ESTADO.voluntarios.map(v => {
     const ini = (v.Nome||'?').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
     // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
@@ -5587,10 +5586,53 @@ function renderizarVoluntarios() {
       </div>
       <div class="vc-acts">
         <button class="btn btn-ghost" onclick="abrirEditarVoluntario('${_esc(v.ID)}')">✏️ Editar</button>
-        <button class="btn btn-ghost" style="color:var(--red)" onclick="confirmarEliminarVoluntario('${_esc(v.ID)}', '${_esc(v.Nome).replace(/'/g, "\\'")}')">🗑</button>
+        <button class="btn btn-ghost" style="color:var(--red)" onclick="eliminarVoluntario('${_esc(v.ID)}','${_esc(v.Nome).replace(/'/g,"\\'")}','${pingsFeitosVol}')">${EV.BTN_ELIMINAR}</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8] ELIMINAR VOLUNTÁRIO — Soft delete con confirmación
+// ════════════════════════════════════════════════════════════════
+/**
+ * Elimina (desactiva) un voluntario después de confirmación.
+ * - Los formularios ya enviados permanecen visibles (nombre guardado como texto)
+ * - El voluntario pierde acceso al sistema
+ * - Se invalidan todos sus tokens activos
+ * @param {string} idUsuario - ID del voluntario
+ * @param {string} nome - Nombre para mostrar en confirmación
+ * @param {string|number} formulariosEnviados - Cantidad de formularios concluidos
+ */
+async function eliminarVoluntario(idUsuario, nome, formulariosEnviados) {
+  const EV = CONFIG.UI_EDITAR_VOL;
+  
+  // Construir mensaje de confirmación con datos del voluntario
+  const mensaje = EV.CONFIRM_ELIMINAR.replace('{nome}', nome);
+  
+  // Modal de confirmación
+  if (!confirm(mensaje)) {
+    return; // Usuario canceló
+  }
+  
+  try {
+    // Llamar al backend para desactivar (soft delete)
+    const r = await chamarBackend({
+      acao: CONFIG.ACOES.DESATIVAR_USUARIO,
+      id:   idUsuario,
+    });
+    
+    if (r.sucesso) {
+      toast(EV.TOAST_ELIMINADO);
+      // Refrescar lista de voluntarios
+      await carregarDadosCoord();
+    } else {
+      toast(EV.TOAST_ELIMINAR_ERR + ' ' + (r.mensagem || ''));
+    }
+  } catch(e) {
+    toast(EV.TOAST_ELIMINAR_ERR);
+    console.error('Erro ao eliminar voluntário:', e);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -5841,61 +5883,6 @@ async function salvarVoluntarioCompleto() {
   } catch (e) {
     document.getElementById('evErro').textContent = EV.TOAST_ERR;
     document.getElementById('evErro').style.display = 'block';
-  }
-}
-
-// ════════════════════════════════════════════════════════════════
-// [V7] ELIMINAR VOLUNTÁRIO — Desactiva preservando formularios
-// ════════════════════════════════════════════════════════════════
-
-/**
- * Muestra confirmación antes de eliminar un voluntario.
- * Si tiene formularios concluidos, muestra aviso de que serán preservados.
- * @param {string} idUsuario - ID del voluntario a eliminar
- * @param {string} nomeVol - Nombre del voluntario (para mostrar en mensaje)
- */
-async function confirmarEliminarVoluntario(idUsuario, nomeVol) {
-  const EV = CONFIG.UI_EDITAR_VOL;
-  
-  // Contar formularios/pings concluidos por este voluntario
-  const nomeNorm = (nomeVol || '').trim().toLowerCase();
-  const pingsConcluidosVol = ESTADO.pings.filter(p => 
-    (p.Voluntario_Responsavel || '').trim().toLowerCase() === nomeNorm && 
-    (p.Status === CONFIG.STATUS_PING.CONCLUIDO || p.Status === CONFIG.STATUS_PING.CRITICO)
-  );
-  const numForms = pingsConcluidosVol.length;
-  
-  // Construir mensaje de confirmación
-  let mensaje = EV.ELIMINAR_CONFIRMAR + '\n\n' + nomeVol + '\n\n';
-  
-  if (numForms > 0) {
-    mensaje += EV.ELIMINAR_COM_FORMS.replace('{n}', numForms);
-  } else {
-    mensaje += EV.ELIMINAR_SEM_FORMS;
-  }
-  
-  // Mostrar diálogo de confirmación
-  if (!confirm(mensaje)) return;
-  
-  try {
-    // Desactivar usuario (no eliminarlo físicamente)
-    // Los formularios quedan vinculados al nombre del voluntario en la BD
-    const r = await chamarBackend({ 
-      acao: CONFIG.ACOES.DESATIVAR_USUARIO, 
-      id: idUsuario 
-    });
-    
-    if (r.sucesso) {
-      toast(EV.ELIMINAR_OK);
-      
-      // Recargar datos para actualizar la lista
-      await carregarDadosCoord();
-    } else {
-      toast(EV.ELIMINAR_ERR + ' ' + (r.mensagem || ''));
-    }
-  } catch(e) {
-    toast(EV.ELIMINAR_ERR);
-    console.error('Error al eliminar voluntario:', e);
   }
 }
 
@@ -6738,80 +6725,45 @@ function injetarManifest() {
 // SERVICE WORKER — B-16
 // BUG-26: Safari não suporta blob: URLs para Service Worker.
 // Para Safari: extrair SW para /sw.js no servidor e definir CONFIG.SW.PATH = "/sw.js"
+// [V8] Cache versionado automáticamente con APP.VERSAO
 // ════════════════════════════════════════════════════════════════
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  const CN = CONFIG.SW.CACHE_NOME;
+  // [V8] Usar versión del app para invalidar cache automáticamente
+  const CACHE_NAME = CONFIG.SW.CACHE_PREFIX + CONFIG.APP.VERSAO;
   const ASSETS = CONFIG.SW.ASSETS;
   const swCode = `
-const CACHE = '${CN}';
+const CACHE = '${CACHE_NAME}';
+const CACHE_PREFIX = '${CONFIG.SW.CACHE_PREFIX}';
 const ASSETS = ${JSON.stringify(ASSETS)};
 
-// ══ INSTALL: Cachear assets y forzar activación inmediata ══
 self.addEventListener('install', e => {
-  console.log('[SW] Instalando versión:', CACHE);
   e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
-      .then(() => self.skipWaiting()) // Forzar activación inmediata
-      .catch(err => {
-        console.warn('[SW] Error cacheando assets:', err);
-        return self.skipWaiting();
-      })
+    caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
   );
+  self.skipWaiting();
 });
 
-// ══ ACTIVATE: Limpiar TODOS los caches viejos y tomar control ══
 self.addEventListener('activate', e => {
-  console.log('[SW] Activando versión:', CACHE);
+  // [V8] Eliminar TODOS los caches antiguos que empiecen con el prefijo
   e.waitUntil(
-    caches.keys()
-      .then(keys => {
-        console.log('[SW] Caches existentes:', keys);
-        return Promise.all(
-          keys.map(k => {
-            if (k !== CACHE) {
-              console.log('[SW] Eliminando cache viejo:', k);
-              return caches.delete(k);
-            }
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(k => k.startsWith(CACHE_PREFIX) && k !== CACHE)
+          .map(k => {
+            console.log('[SW] Eliminando cache antiguo:', k);
+            return caches.delete(k);
           })
-        );
-      })
-      .then(() => {
-        console.log('[SW] Tomando control de todos los clientes');
-        return self.clients.claim(); // Tomar control inmediato de todas las pestañas
-      })
+      )
+    )
   );
+  self.clients.claim();
 });
 
-// ══ FETCH: Network-first para HTML, cache-first para assets ══
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
-  
-  // No interceptar backend de Google
-  if (url.includes('script.google.com')) return;
-  
-  // No interceptar blobs
-  if (url.startsWith('blob:')) return;
-  
-  // HTML y navegación: siempre ir a red primero (para ver cambios inmediatamente)
-  if (e.request.mode === 'navigate' || e.request.destination === 'document' || url.endsWith('.html')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(resp => {
-          // Cachear la nueva versión
-          if (resp && resp.status === 200) {
-            const clone = resp.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return resp;
-        })
-        .catch(() => caches.match(e.request)) // Fallback a cache si no hay red
-    );
-    return;
-  }
-  
-  // Assets estáticos: cache-first
+  // Não interceptar chamadas ao backend do Google
+  if (e.request.url.includes('script.google.com')) return;
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
@@ -6825,95 +6777,20 @@ self.addEventListener('fetch', e => {
     })
   );
 });
-
-// ══ MESSAGE: Permitir forzar actualización desde la página ══
-self.addEventListener('message', e => {
-  if (e.data === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (e.data === 'CLEAR_CACHE') {
-    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
-  }
-});
 `;
-
-  // ══ Registrar SW con manejo de actualizaciones ══
   try {
-    // Primero: desregistrar cualquier SW viejo para evitar conflictos
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      // Si hay SW registrado, forzar actualización
-      if (regs.length > 0) {
-        regs.forEach(reg => {
-          reg.update(); // Forzar chequeo de nueva versión
-          if (reg.waiting) {
-            // Hay una versión esperando - activarla
-            reg.waiting.postMessage('SKIP_WAITING');
-          }
-        });
-      }
-    });
-
-    // Escuchar cuando el SW se actualiza
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[App] Service Worker actualizado - recargando para aplicar cambios');
-      // Opcional: recargar automáticamente cuando hay nueva versión
-      // window.location.reload();
-    });
-
     if (CONFIG.SW.PATH) {
       navigator.serviceWorker.register(CONFIG.SW.PATH, { scope: './' })
-        .then(reg => {
-          console.log('[App] SW registrado desde archivo');
-          reg.addEventListener('updatefound', () => {
-            const newWorker = reg.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Nueva versión instalada y lista
-                toast('🔄 Nueva versión disponible. Recargá la página.');
-              }
-            });
-          });
-        })
+        .then(() => toast(CONFIG.UI_S4.PWA_PRONTO))
         .catch(() => {});
     } else {
       const blob = new Blob([swCode], { type:'application/javascript' });
       const url  = URL.createObjectURL(blob);
       navigator.serviceWorker.register(url, { scope: './' })
-        .then(reg => {
-          console.log('[App] SW registrado desde blob, versión:', CN);
-          toast(CONFIG.UI_S4.PWA_PRONTO);
-        })
+        .then(() => toast(CONFIG.UI_S4.PWA_PRONTO))
         .catch(() => {}); // SW pode falhar em alguns contextos — silencioso
     }
-  } catch(e) {
-    console.warn('[App] Error registrando SW:', e);
-  }
-}
-
-/**
- * Forzar limpieza completa de cache y SW (usar en emergencias)
- * Llamar desde consola: limpiarCacheCompleto()
- */
-async function limpiarCacheCompleto() {
-  try {
-    // 1. Limpiar todos los caches
-    const keys = await caches.keys();
-    await Promise.all(keys.map(k => caches.delete(k)));
-    console.log('[App] Caches eliminados:', keys);
-    
-    // 2. Desregistrar todos los SW
-    const regs = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(regs.map(r => r.unregister()));
-    console.log('[App] Service Workers desregistrados:', regs.length);
-    
-    // 3. Notificar
-    toast('✅ Cache limpiado. Recargando...');
-    
-    // 4. Recargar
-    setTimeout(() => window.location.reload(true), 1000);
-  } catch(e) {
-    console.error('[App] Error limpiando cache:', e);
-  }
+  } catch(e) {}
 }
 
 // ════════════════════════════════════════════════════════════════
