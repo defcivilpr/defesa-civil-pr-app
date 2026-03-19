@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v8.0",
+    VERSAO:     "v8.1",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -452,7 +452,7 @@ const CONFIG = {
     DUP_AVISO:          "Use o campo <strong>Complemento</strong> para diferenciar unidades no mesmo local.",
 
     // Versão
-    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v8.0 · PWA",
+    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v8.1 · PWA",
 
     // Sprint 3 — Voluntário
     FORM_CAMPO_OBRIG:   "⚠️ Preencha o endereço e as coordenadas GPS.",
@@ -500,7 +500,7 @@ const CONFIG = {
   SW: {
     // [V8] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v5",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v4",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -5748,6 +5748,9 @@ function renderizarPingsEditarVol() {
       ? ESTADO.voluntarios.some(v => (v.Nome || '').trim().toLowerCase() === volResponsavel.toLowerCase())
       : false;
     
+    // [V8] DEBUG - remover después de confirmar que funciona
+    console.log('[V8 DEBUG]', codigo, '| Vol:', volResponsavel, '| Activo:', volResponsavelActivo, '| Status:', status);
+    
     // tieneOtro = tiene voluntario asignado, no soy yo, Y ese voluntario sigue activo
     // Si el voluntario fue eliminado Y el ping está pendiente → NO está bloqueado
     const esPendiente = status === CONFIG.STATUS_PING.PENDENTE;
@@ -5766,13 +5769,19 @@ function renderizarPingsEditarVol() {
     if (bloqueado) itemClass += ' disabled';
     if (esMio) itemClass += ' assigned-me';
     if (tieneOtroActivo) itemClass += ' assigned-other';
-    // [V8] Ping de voluntario eliminado pero pendiente: mostrar como disponible
+    // [V8] Ping de voluntario eliminado pero pendiente: mostrar como disponible (visual naranja)
     if (tieneOtroEliminado && esPendiente) itemClass += ' available-reassign';
     
-    // Texto de bloqueo
+    // [V8] Texto de estado - ahora incluye caso de voluntario eliminado
     let lockReason = '';
-    if (tieneOtroActivo) lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
-    if (estaCompleto) lockReason = '🔒 Formulário já enviado';
+    if (tieneOtroActivo) {
+      lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
+    } else if (estaCompleto) {
+      lockReason = '🔒 Formulário já enviado';
+    } else if (tieneOtroEliminado && esPendiente) {
+      // [V8] Mostrar que estaba asignado pero ahora está libre
+      lockReason = `🔓 Ex: ${volResponsavel} (disponível)`;
+    }
     
     return `
     <div class="${itemClass}" onclick="${bloqueado ? '' : `togglePingEv('${p.ID_Ping}')`}">
@@ -5780,7 +5789,9 @@ function renderizarPingsEditarVol() {
       <div class="ev-ping-info">
         <div class="ev-ping-addr">${_esc(codigo)} · ${_esc(endereco)}</div>
         <div class="ev-ping-meta">
-          ${lockReason ? `<span style="color:var(--red)">${lockReason}</span>` : `<span>${_esc(p.Tipo_Unidade || '—')}</span>`}
+          ${lockReason 
+            ? `<span style="color:${(tieneOtroEliminado && esPendiente) ? 'var(--green)' : 'var(--red)'}">${lockReason}</span>` 
+            : `<span>${_esc(p.Tipo_Unidade || '—')}</span>`}
         </div>
       </div>
       <div class="ev-ping-status ${statusCss}">${statusLabel}</div>
@@ -6807,6 +6818,55 @@ self.addEventListener('fetch', e => {
     }
   } catch(e) {}
 }
+
+// ════════════════════════════════════════════════════════════════
+// [V8] LIMPIAR CACHE — Función manual para forzar actualización
+// Ejecutar desde consola: limparCache()
+// ════════════════════════════════════════════════════════════════
+async function limparCache() {
+  console.log('[V8] Iniciando limpieza de cache...');
+  try {
+    // 1. Eliminar todos los caches
+    const keys = await caches.keys();
+    console.log('[V8] Caches encontrados:', keys);
+    for (const key of keys) {
+      await caches.delete(key);
+      console.log('[V8] Cache eliminado:', key);
+    }
+    
+    // 2. Desregistrar Service Workers
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const reg of registrations) {
+      await reg.unregister();
+      console.log('[V8] SW desregistrado:', reg.scope);
+    }
+    
+    // 3. Limpiar sessionStorage
+    sessionStorage.clear();
+    console.log('[V8] sessionStorage limpiado');
+    
+    // 4. Limpiar IndexedDB
+    if (_idb) {
+      _idb.close();
+      _idb = null;
+    }
+    
+    toast('✅ Cache limpo! Recarregando...');
+    console.log('[V8] Limpieza completa. Recargando página...');
+    
+    // 5. Recargar página sin cache
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 1000);
+    
+  } catch(e) {
+    console.error('[V8] Error limpiando cache:', e);
+    toast('⚠️ Erro ao limpar cache: ' + e.message);
+  }
+}
+
+// Exponer globalmente para uso en consola
+window.limparCache = limparCache;
 
 // ════════════════════════════════════════════════════════════════
 // INDEXEDDB — B-15
