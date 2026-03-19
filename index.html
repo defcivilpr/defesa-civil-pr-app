@@ -498,7 +498,7 @@ const CONFIG = {
 
   // ── Service Worker — B-16 ────────────────────────────────────
   SW: {
-    CACHE_NOME:     "dcpr-cache-v4",
+    CACHE_NOME:     "dcpr-cache-v5",
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -796,6 +796,15 @@ const CONFIG = {
     TOAST_ERR:           "⚠️ Erro ao atualizar voluntário.",
     TOAST_CAMPOS:        "⚠️ Nome e usuário são obrigatórios.",
     TOAST_SENHA_CURTA:   "⚠️ Senha deve ter ao menos 4 caracteres.",
+    // Eliminar voluntario
+    BTN_ELIMINAR:        "🗑 Eliminar",
+    ELIMINAR_TITULO:     "⚠️ Eliminar Voluntário",
+    ELIMINAR_CONFIRMAR:  "Tem certeza que deseja eliminar este voluntário?",
+    ELIMINAR_COM_FORMS:  "Este voluntário possui {n} formulário(s) concluído(s). Os formulários serão preservados e continuarão visíveis para consulta.",
+    ELIMINAR_SEM_FORMS:  "Este voluntário não possui formulários concluídos.",
+    ELIMINAR_OK:         "✅ Voluntário eliminado com sucesso.",
+    ELIMINAR_ERR:        "⚠️ Erro ao eliminar voluntário.",
+    BTN_CONFIRMAR_ELIM:  "Sim, eliminar",
   },
 
   // ── Duração do toast (ms) ────────────────────────────────────
@@ -5578,6 +5587,7 @@ function renderizarVoluntarios() {
       </div>
       <div class="vc-acts">
         <button class="btn btn-ghost" onclick="abrirEditarVoluntario('${_esc(v.ID)}')">✏️ Editar</button>
+        <button class="btn btn-ghost" style="color:var(--red)" onclick="confirmarEliminarVoluntario('${_esc(v.ID)}', '${_esc(v.Nome).replace(/'/g, "\\'")}')">🗑</button>
       </div>
     </div>`;
   }).join('');
@@ -5831,6 +5841,61 @@ async function salvarVoluntarioCompleto() {
   } catch (e) {
     document.getElementById('evErro').textContent = EV.TOAST_ERR;
     document.getElementById('evErro').style.display = 'block';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V7] ELIMINAR VOLUNTÁRIO — Desactiva preservando formularios
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Muestra confirmación antes de eliminar un voluntario.
+ * Si tiene formularios concluidos, muestra aviso de que serán preservados.
+ * @param {string} idUsuario - ID del voluntario a eliminar
+ * @param {string} nomeVol - Nombre del voluntario (para mostrar en mensaje)
+ */
+async function confirmarEliminarVoluntario(idUsuario, nomeVol) {
+  const EV = CONFIG.UI_EDITAR_VOL;
+  
+  // Contar formularios/pings concluidos por este voluntario
+  const nomeNorm = (nomeVol || '').trim().toLowerCase();
+  const pingsConcluidosVol = ESTADO.pings.filter(p => 
+    (p.Voluntario_Responsavel || '').trim().toLowerCase() === nomeNorm && 
+    (p.Status === CONFIG.STATUS_PING.CONCLUIDO || p.Status === CONFIG.STATUS_PING.CRITICO)
+  );
+  const numForms = pingsConcluidosVol.length;
+  
+  // Construir mensaje de confirmación
+  let mensaje = EV.ELIMINAR_CONFIRMAR + '\n\n' + nomeVol + '\n\n';
+  
+  if (numForms > 0) {
+    mensaje += EV.ELIMINAR_COM_FORMS.replace('{n}', numForms);
+  } else {
+    mensaje += EV.ELIMINAR_SEM_FORMS;
+  }
+  
+  // Mostrar diálogo de confirmación
+  if (!confirm(mensaje)) return;
+  
+  try {
+    // Desactivar usuario (no eliminarlo físicamente)
+    // Los formularios quedan vinculados al nombre del voluntario en la BD
+    const r = await chamarBackend({ 
+      acao: CONFIG.ACOES.DESATIVAR_USUARIO, 
+      id: idUsuario 
+    });
+    
+    if (r.sucesso) {
+      toast(EV.ELIMINAR_OK);
+      
+      // Recargar datos para actualizar la lista
+      await carregarDadosCoord();
+    } else {
+      toast(EV.ELIMINAR_ERR + ' ' + (r.mensagem || ''));
+    }
+  } catch(e) {
+    toast(EV.ELIMINAR_ERR);
+    console.error('Error al eliminar voluntario:', e);
   }
 }
 
