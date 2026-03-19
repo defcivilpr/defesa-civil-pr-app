@@ -498,7 +498,7 @@ const CONFIG = {
 
   // ── Service Worker — B-16 ────────────────────────────────────
   SW: {
-    CACHE_NOME:     "dcpr-cache-v2",
+    CACHE_NOME:     "dcpr-cache-v3",
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -5577,7 +5577,7 @@ function renderizarVoluntarios() {
         <div class="vcs"><div class="vcs-v" style="color:${pingsCrit>0?'var(--red)':'var(--muted)'}">${pingsCrit}</div><div class="vcs-l">Críticos</div></div>
       </div>
       <div class="vc-acts">
-        <button class="btn btn-ghost" onclick="abrirEditarVoluntario('${_esc(v.ID_Usuario || v.id)}')">✏️ Editar</button>
+        <button class="btn btn-ghost" onclick="abrirEditarVoluntario('${_esc(v.ID)}')">✏️ Editar</button>
       </div>
     </div>`;
   }).join('');
@@ -5593,13 +5593,12 @@ let _evPingsSeleccionados = [];
 
 // Abre el modal de editar voluntario
 function abrirEditarVoluntario(idUsuario) {
-  // Buscar voluntario por ID
-  const vol = ESTADO.voluntarios.find(v => 
-    (v.ID_Usuario || v.id) === idUsuario
-  );
+  // Buscar voluntario por ID (campo correcto del backend)
+  const vol = ESTADO.voluntarios.find(v => v.ID === idUsuario);
   
   if (!vol) {
     toast('⚠️ Voluntário não encontrado.');
+    console.warn('ID buscado:', idUsuario, 'Voluntarios:', ESTADO.voluntarios);
     return;
   }
   
