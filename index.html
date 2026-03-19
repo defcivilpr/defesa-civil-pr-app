@@ -3695,11 +3695,16 @@ window.addEventListener('load', () => {
 // V5: Incluye token automáticamente en cada request autenticado.
 // ════════════════════════════════════════════════════════════════
 async function chamarBackend(params) {
-  // V5: Agregar token si existe
+  // V6 FIX: Token + debug claro para ver exactamente qué está enviando
   const token = obterToken();
+  
+  console.log('🔍 DEBUG chamarBackend → token enviado:', token ? token.substring(0,15)+'...' : 'NULL ← ESTE ES EL PROBLEMA');
+
   const paramsConToken = { ...params };
   if (token) {
     paramsConToken.token = token;
+  } else {
+    console.error('🚨 ERRO: No hay token! Todas las llamadas van a fallar');
   }
   
   const res = await fetch(CONFIG.BACKEND_URL, {
@@ -3710,38 +3715,36 @@ async function chamarBackend(params) {
   });
   const text = await res.text();
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(text);
+    console.log('📥 Respuesta backend:', data.sucesso ? '✅ OK' : '❌ '+data.mensagem);
+    return data;
   } catch(e) {
+    console.error('❌ Error parseando JSON del backend');
     return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
   }
 }
 
-// ════════════════════════════════════════════════════════════════
-// V5: GESTIÓN DE TOKENS
-// ════════════════════════════════════════════════════════════════
+// ================================================
+// V6 FIX: GESTIÓN DE TOKENS (las que faltaban)
+// ================================================
+
 function guardarToken(token) {
-  try {
-    sessionStorage.setItem(CONFIG.AUTH.CHAVE_TOKEN, token);
-  } catch(e) {
-    console.warn('Erro ao salvar token:', e);
-  }
+  if (!token) return;
+  sessionStorage.setItem(CONFIG.AUTH.CHAVE_TOKEN, token);
+  console.log('✅ TOKEN GUARDADO correctamente en sessionStorage');
 }
 
 function obterToken() {
-  try {
-    return sessionStorage.getItem(CONFIG.AUTH.CHAVE_TOKEN);
-  } catch(e) {
-    return null;
-  }
+  const token = sessionStorage.getItem(CONFIG.AUTH.CHAVE_TOKEN);
+  console.log('🔑 obterToken() devolvió:', token ? token.substring(0,15)+'...' : 'NULL');
+  return token;
 }
 
-function limparToken() {
-  try {
-    sessionStorage.removeItem(CONFIG.AUTH.CHAVE_TOKEN);
-  } catch(e) {}
+function removerToken() {
+  sessionStorage.removeItem(CONFIG.AUTH.CHAVE_TOKEN);
+  console.log('🗑️ Token removido (logout)');
 }
-
-</script>
+     
 <!-- ============================================================
      FIM SECCIÓN 3 — BACKEND / API
      ============================================================ -->
@@ -3929,7 +3932,7 @@ function mostrarResultado(nome, role) {
     } else {
       inicializarVoluntario();  // definido en S9 — runtime call ✅
     }
-  }, CONFIG.REDIR_DELAY);
+  }, (CONFIG.REDIR_DELAY || 2200));
 }
 
 function sairSessao() {
