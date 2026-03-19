@@ -504,9 +504,9 @@ const CONFIG = {
 
   // ── Service Worker — B-16 ────────────────────────────────────
   SW: {
-    // [V8] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
+    // [V8.2] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v6",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v4",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -514,6 +514,10 @@ const CONFIG = {
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
     ],
+    // [V8.2] Clave para guardar versión en localStorage
+    VERSION_KEY: "dcpr_app_version",
+    // [V8.2] Habilitar auto-actualización
+    AUTO_UPDATE: true,
   },
 
   // ── PWA Manifest — B-22 ──────────────────────────────────────
@@ -4040,6 +4044,9 @@ window.addEventListener('load', () => {
   // 1. PWA: manifest dinâmico + service worker (definidos en S8)
   injetarManifest();
   registrarServiceWorker();
+  
+  // [V8.2] Verificar si hay nueva versión y limpiar cache si es necesario
+  verificarActualizacion();
 
   // 2. Renderizar todos os textos a partir do CONFIG
   renderizarTextos();
@@ -7001,19 +7008,22 @@ function injetarManifest() {
 // SERVICE WORKER — B-16
 // BUG-26: Safari não suporta blob: URLs para Service Worker.
 // Para Safari: extrair SW para /sw.js no servidor e definir CONFIG.SW.PATH = "/sw.js"
-// [V8] Cache versionado automáticamente con APP.VERSAO
+// [V8.2] Cache versionado + Network-First para HTML + Auto-update
 // ════════════════════════════════════════════════════════════════
 function registrarServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
-  // [V8] Usar versión del app para invalidar cache automáticamente
+  
   const CACHE_NAME = CONFIG.SW.CACHE_PREFIX + CONFIG.APP.VERSAO;
   const ASSETS = CONFIG.SW.ASSETS;
+  
+  // [V8.2] Service Worker con estrategia Network-First para HTML
   const swCode = `
 const CACHE = '${CACHE_NAME}';
 const CACHE_PREFIX = '${CONFIG.SW.CACHE_PREFIX}';
 const ASSETS = ${JSON.stringify(ASSETS)};
 
 self.addEventListener('install', e => {
+  console.log('[SW] Instalando versión:', CACHE);
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
   );
@@ -7021,7 +7031,7 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // [V8] Eliminar TODOS los caches antiguos que empiecen con el prefijo
+  console.log('[SW] Activando versión:', CACHE);
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
@@ -7038,8 +7048,32 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = e.request.url;
+  
   // Não interceptar chamadas ao backend do Google
-  if (e.request.url.includes('script.google.com')) return;
+  if (url.includes('script.google.com')) return;
+  
+  // [V8.2] NETWORK-FIRST para documentos HTML — nunca cachear el HTML principal
+  if (e.request.mode === 'navigate' || 
+      e.request.destination === 'document' ||
+      url.endsWith('.html') || 
+      url.endsWith('/') ||
+      (!url.includes('.') && !url.includes('cdnjs'))) {
+    e.respondWith(
+      fetch(e.request)
+        .then(resp => {
+          console.log('[SW] HTML desde red:', url);
+          return resp;
+        })
+        .catch(() => {
+          console.log('[SW] HTML desde cache (offline):', url);
+          return caches.match(e.request);
+        })
+    );
+    return;
+  }
+  
+  // Cache-First para assets estáticos (CSS, JS, imágenes)
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
@@ -7054,19 +7088,77 @@ self.addEventListener('fetch', e => {
   );
 });
 `;
+
   try {
     if (CONFIG.SW.PATH) {
       navigator.serviceWorker.register(CONFIG.SW.PATH, { scope: './' })
-        .then(() => toast(CONFIG.UI_S4.PWA_PRONTO))
+        .then(reg => {
+          console.log('[SW] Registrado desde archivo:', CONFIG.SW.PATH);
+          reg.update();
+        })
         .catch(() => {});
     } else {
       const blob = new Blob([swCode], { type:'application/javascript' });
-      const url  = URL.createObjectURL(blob);
-      navigator.serviceWorker.register(url, { scope: './' })
-        .then(() => toast(CONFIG.UI_S4.PWA_PRONTO))
-        .catch(() => {}); // SW pode falhar em alguns contextos — silencioso
+      const blobUrl = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(blobUrl, { scope: './' })
+        .then(reg => {
+          console.log('[SW] Registrado desde blob');
+          reg.update();
+        })
+        .catch(() => {});
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[SW] Error al registrar:', e);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8.2] VERIFICAR ACTUALIZACIÓN DE VERSIÓN
+// Compara versión actual con la guardada en localStorage
+// Si hay cambio, limpia cache automáticamente
+// ════════════════════════════════════════════════════════════════
+function verificarActualizacion() {
+  if (!CONFIG.SW.AUTO_UPDATE) return;
+  
+  const versionKey = CONFIG.SW.VERSION_KEY;
+  const versionActual = CONFIG.APP.VERSAO;
+  const versionGuardada = localStorage.getItem(versionKey);
+  
+  console.log('[V8.2] Versión actual:', versionActual, '| Guardada:', versionGuardada);
+  
+  if (versionGuardada && versionGuardada !== versionActual) {
+    console.log('[V8.2] ¡Nueva versión detectada! Limpiando cache...');
+    
+    // Limpiar caches del Service Worker
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(key => {
+          if (key.startsWith(CONFIG.SW.CACHE_PREFIX)) {
+            caches.delete(key);
+            console.log('[V8.2] Cache eliminado:', key);
+          }
+        });
+      });
+    }
+    
+    // Forzar actualización del Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(reg => {
+          reg.update();
+          console.log('[V8.2] SW actualizado:', reg.scope);
+        });
+      });
+    }
+    
+    // Mostrar notificación al usuario
+    setTimeout(() => {
+      toast('🔄 App atualizado para ' + versionActual);
+    }, 500);
+  }
+  
+  // Guardar versión actual
+  localStorage.setItem(versionKey, versionActual);
 }
 
 // ════════════════════════════════════════════════════════════════
