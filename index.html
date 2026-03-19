@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v8.1",
+    VERSAO:     "v8.2",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -260,12 +260,18 @@ const CONFIG = {
   ],
 
   // ── Views do voluntário (bottom nav) ────────────────────────
+  // [V8.2] Reducido de 5 a 3 tabs para mejor UX en campo
   VIEWS_VOL: [
     { id:"mapa",   icon:"🗺",  label:"Mapa" },
     { id:"pontos", icon:"📋", label:"Pontos",  badge:"pendBadge" },
-    { id:"novo",   icon:"➕", label:"Novo" },
-    { id:"sync",   icon:"☁️", label:"Sync" },
-    { id:"perfil", icon:"👤", label:"Perfil" },
+    { id:"menu",   icon:"☰",  label:"Menu" },
+  ],
+
+  // [V8.2] Items del menú desplegable del voluntario
+  MENU_VOL: [
+    { id:"sync",   icon:"☁️", label:"Sincronização", action:"switchView('sync')" },
+    { id:"perfil", icon:"👤", label:"Meu Perfil",    action:"switchView('perfil')" },
+    { id:"sair",   icon:"🚪", label:"Sair",          action:"sairSessao()" },
   ],
 
   // ── Textos da interface ──────────────────────────────────────
@@ -452,7 +458,7 @@ const CONFIG = {
     DUP_AVISO:          "Use o campo <strong>Complemento</strong> para diferenciar unidades no mesmo local.",
 
     // Versão
-    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v8.1 · PWA",
+    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v8.2 · PWA",
 
     // Sprint 3 — Voluntário
     FORM_CAMPO_OBRIG:   "⚠️ Preencha o endereço e as coordenadas GPS.",
@@ -529,6 +535,65 @@ const CONFIG = {
     LARGURA_MAX_PX:  1280,
     TIPOS_ACEITOS:   ["image/jpeg", "image/png", "image/webp"],
     EXTENSOES:       ".jpg,.jpeg,.png,.webp",
+  },
+
+  // ── [V8.2] Polling de notificaciones ─────────────────────────
+  POLLING: {
+    INTERVALO_MS: 30000,  // 30 segundos
+    HABILITADO: true,
+  },
+
+  // ── [V8.2] Textos para visualización de formulario completo ──
+  UI_FORMULARIO: {
+    TITULO:           "📋 Formulário Completo",
+    BTN_VER:          "📋",
+    BTN_VER_TITLE:    "Ver Formulário",
+    BTN_BAIXAR_PDF:   "📥 Baixar PDF",
+    BTN_FECHAR:       "Fechar",
+    CARREGANDO:       "⏳ Carregando formulário...",
+    ERRO:             "⚠️ Erro ao carregar formulário.",
+    SEM_DADOS:        "Formulário ainda não preenchido.",
+    // Secciones
+    SEC_PING:         "📍 Dados do Ponto",
+    SEC_UNIDADE:      "🏠 Dados da Unidade",
+    SEC_RESIDENTES:   "👥 Residentes",
+    SEC_DANOS:        "⚠️ Danos",
+    SEC_FOTOS:        "📸 Fotos",
+    // Labels
+    LBL_CODIGO:       "Código",
+    LBL_ENDERECO:     "Endereço",
+    LBL_COORDS:       "Coordenadas",
+    LBL_VOLUNTARIO:   "Voluntário",
+    LBL_STATUS:       "Status",
+    LBL_DATA:         "Data",
+    LBL_TIPO_UNIDADE: "Tipo de Unidade",
+    LBL_TIPO_CONSTRUCAO: "Tipo de Construção",
+    LBL_NUM_PESSOAS:  "Nº Pessoas",
+    LBL_FERIDOS:      "Feridos",
+    LBL_OBITOS:       "Óbitos",
+    LBL_TIPO_DANO:    "Tipo de Dano",
+    LBL_GRAU_DANO:    "Grau do Dano",
+    LBL_HABITAVEL:    "Habitável",
+    LBL_EVACUACAO:    "Evacuação",
+    LBL_OBSERVACOES:  "Observações",
+    LBL_SEM_RESIDENTES: "Nenhum residente registrado.",
+    LBL_SEM_FOTOS:    "Nenhuma foto anexada.",
+    LBL_NOME:         "Nome",
+    LBL_IDADE:        "Idade",
+    LBL_CPF:          "CPF",
+    LBL_CONDICAO:     "Condição",
+    LBL_VULNERABILIDADE: "Vulnerabilidade",
+  },
+
+  // ── [V8.2] Headers de vistas secundarias del voluntario ──────
+  UI_VIEWS_VOL: {
+    PONTOS_TITULO:    "📋 Meus Pontos",
+    PONTOS_SUB:       "Lista de pontos atribuídos",
+    SYNC_TITULO:      "☁️ Sincronização",
+    SYNC_SUB:         "Status de dados offline",
+    PERFIL_TITULO:    "👤 Meu Perfil",
+    PERFIL_SUB:       "Informações da conta",
+    BTN_VOLTAR:       "←",
   },
 
   // ── Textos Sprint 4 ──────────────────────────────────────────
@@ -2020,6 +2085,7 @@ textarea{resize:vertical;min-height:65px;}
   justify-content:center;font-size:11px;cursor:pointer;transition:all .15s;
 }
 .ico-btn:hover{border-color:var(--border);}
+.ico-btn.disabled{opacity:0.3;cursor:not-allowed;pointer-events:none;}
 
 /* VOLUNTÁRIOS */
 .vols-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
@@ -2106,6 +2172,82 @@ textarea{resize:vertical;min-height:65px;}
   color:var(--text);
 }
 
+/* [V8.2] Modal de visualización de formulario completo */
+#modalVerFormulario .modal{max-width:600px;}
+#modalVerFormulario .modal-body{
+  max-height:70vh;overflow-y:auto;padding:0;
+}
+.form-view-section{
+  border-bottom:1px solid var(--border-soft);
+}
+.form-view-section:last-child{border-bottom:none;}
+.form-view-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;background:var(--navy-mid);cursor:pointer;
+  transition:background .15s;
+}
+.form-view-header:hover{background:var(--navy-light);}
+.form-view-header-title{
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.5px;color:var(--orange);display:flex;align-items:center;gap:6px;
+}
+.form-view-toggle{color:var(--muted);font-size:12px;transition:transform .2s;}
+.form-view-section.open .form-view-toggle{transform:rotate(180deg);}
+.form-view-body{
+  display:none;padding:12px 16px;background:var(--card);
+}
+.form-view-section.open .form-view-body{display:block;}
+.form-view-row{
+  display:flex;justify-content:space-between;padding:6px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;
+}
+.form-view-row:last-child{border-bottom:none;}
+.form-view-label{color:var(--muted);}
+.form-view-value{font-weight:500;text-align:right;max-width:60%;}
+.form-view-obs{
+  background:var(--navy-light);border-radius:6px;padding:10px;
+  font-size:11px;color:var(--muted);margin-top:8px;
+  white-space:pre-wrap;
+}
+/* Grid de fotos en modal */
+.form-view-fotos{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  margin-top:8px;
+}
+.form-view-foto{
+  aspect-ratio:1;border-radius:8px;overflow:hidden;
+  border:1px solid var(--border-soft);cursor:pointer;
+  transition:transform .15s;
+}
+.form-view-foto:hover{transform:scale(1.02);}
+.form-view-foto img{width:100%;height:100%;object-fit:cover;}
+/* Lightbox para fotos */
+.foto-lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,.9);
+  z-index:2000;display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+.foto-lightbox.open{display:flex;}
+.foto-lightbox img{max-width:100%;max-height:90vh;border-radius:8px;}
+.foto-lightbox-close{
+  position:absolute;top:20px;right:20px;
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,.1);border:none;
+  color:white;font-size:20px;cursor:pointer;
+}
+/* Lista de residentes */
+.form-view-residente{
+  background:var(--navy-light);border-radius:8px;padding:10px 12px;
+  margin-bottom:8px;
+}
+.form-view-residente:last-child{margin-bottom:0;}
+.form-view-residente-nome{
+  font-weight:600;font-size:13px;margin-bottom:4px;
+}
+.form-view-residente-info{
+  font-size:11px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px;
+}
+
 
 /* ═══════════════════════════════════════════
    TELA VOLUNTÁRIO
@@ -2140,7 +2282,8 @@ textarea{resize:vertical;min-height:65px;}
   flex:1;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;padding-bottom:var(--nav-h);
 }
-#map-vol{height:230px;width:100%;background:var(--navy);position:relative;z-index:1;}
+/* [V8.2] Mapa más grande para mejor uso en campo */
+#map-vol{min-height:45vh;height:45vh;width:100%;background:var(--navy);position:relative;z-index:1;}
 .map-overlay-top{position:absolute;top:8px;left:8px;z-index:10;display:flex;gap:6px;pointer-events:none;}
 .map-tag{
   background:rgba(11,22,40,.85);border:1px solid var(--border);
@@ -2183,15 +2326,17 @@ textarea{resize:vertical;min-height:65px;}
 .ping-card:nth-child(4){animation-delay:.2s}
 .ping-card:active{transform:scale(.98);}
 .ping-card:hover{border-color:var(--border);}
-.ping-card-inner{display:flex;align-items:center;gap:12px;padding:12px 14px;}
+/* [V8.2] Áreas de tap mayores para uso en campo */
+.ping-card-inner{display:flex;align-items:center;gap:12px;padding:16px 18px;min-height:72px;}
 .ping-status-bar{width:3px;height:48px;border-radius:2px;flex-shrink:0;}
 .ping-info{flex:1;min-width:0;}
-.ping-name{font-weight:600;font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ping-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
+/* [V8.2] Textos más grandes para mejor legibilidad en campo */
+.ping-name{font-weight:600;font-size:16px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ping-meta{font-size:13px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;}
 .ping-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
 .status-tag{
-  font-family:'Rajdhani',sans-serif;font-size:10px;font-weight:600;
-  letter-spacing:.5px;padding:3px 8px;border-radius:4px;
+  font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.5px;padding:4px 10px;border-radius:4px;
   text-transform:uppercase;white-space:nowrap;
 }
 .s-pending{background:rgba(245,158,11,.12);color:var(--yellow);}
@@ -2201,6 +2346,49 @@ textarea{resize:vertical;min-height:65px;}
 .s-process{background:rgba(244,82,30,.12);color:var(--orange);}
 .dist-label{font-size:11px;color:var(--muted);font-family:'Rajdhani',sans-serif;}
 .arrow-icon{font-size:16px;color:var(--muted);}
+
+/* [V8.2] Headers de vistas secundarias del voluntario */
+.view-header{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;background:var(--navy-mid);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.view-header .back-btn{
+  width:36px;height:36px;border-radius:8px;background:var(--navy-light);
+  border:1px solid var(--border);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-size:18px;color:var(--text);flex-shrink:0;
+}
+.view-header .back-btn:active{transform:scale(.95);}
+.view-header-content{flex:1;}
+.view-header-title{
+  font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;
+}
+.view-header-sub{font-size:11px;color:var(--muted);}
+
+/* [V8.2] Menú desplegable del voluntario */
+.vol-menu-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:1000;display:none;
+}
+.vol-menu-overlay.open{display:block;}
+.vol-menu{
+  position:fixed;bottom:var(--nav-h);left:50%;transform:translateX(-50%);
+  width:100%;max-width:480px;background:var(--navy-mid);
+  border-top:1px solid var(--border);border-radius:16px 16px 0 0;
+  z-index:1001;padding:8px 0 16px;
+  box-shadow:0 -8px 32px rgba(0,0,0,.5);
+}
+.vol-menu-item{
+  display:flex;align-items:center;gap:12px;padding:14px 20px;
+  font-size:14px;color:var(--text);cursor:pointer;transition:background .15s;
+}
+.vol-menu-item:hover{background:var(--navy-light);}
+.vol-menu-item .ico{font-size:18px;width:24px;text-align:center;}
+.vol-menu-handle{
+  width:40px;height:4px;background:var(--border);border-radius:2px;
+  margin:0 auto 8px;
+}
+
 /* sync box */
 .sync-box{
   margin:4px 12px 16px;background:rgba(34,197,94,.07);
@@ -3107,6 +3295,29 @@ textarea{resize:vertical;min-height:65px;}
     </div>
   </div>
 
+  <!-- [V8.2] MODAL: VER FORMULÁRIO COMPLETO -->
+  <div class="modal-overlay" id="modalVerFormulario">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-hdr">
+        <div class="modal-title" id="modalVerFormTitulo">📋 Formulário Completo</div>
+        <div class="modal-close" onclick="closeModal('modalVerFormulario')">✕</div>
+      </div>
+      <div class="modal-body" id="modalVerFormBody">
+        <!-- Contenido dinámico generado por renderizarFormularioCompleto() -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modalVerFormulario')">Fechar</button>
+        <button class="btn btn-primary" id="btnBaixarPdfForm" onclick="baixarPdfFormulario()">📥 Baixar PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [V8.2] LIGHTBOX PARA FOTOS -->
+  <div class="foto-lightbox" id="fotoLightbox" onclick="fecharLightbox()">
+    <button class="foto-lightbox-close" onclick="fecharLightbox()">✕</button>
+    <img id="fotoLightboxImg" src="" alt="Foto">
+  </div>
+
 </div><!-- /tela-coord -->
 
 
@@ -3173,24 +3384,42 @@ textarea{resize:vertical;min-height:65px;}
     </div>
 
     <!-- PONTOS VIEW -->
-    <div id="pontosView" style="display:none">
-      <div class="pontos-filter" id="pontosFilterEl"></div>
-      <div id="pontosList"></div>
+    <!-- [V8.2] Agregado header con botón atrás -->
+    <div id="pontosView" style="display:none;flex-direction:column">
+      <div class="view-header">
+        <div class="back-btn" onclick="switchView('mapa')">←</div>
+        <div class="view-header-content">
+          <div class="view-header-title" id="pontosViewTitulo"></div>
+          <div class="view-header-sub" id="pontosViewSub"></div>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto">
+        <div class="pontos-filter" id="pontosFilterEl"></div>
+        <div id="pontosList"></div>
+      </div>
     </div>
 
     <!-- SYNC VIEW -->
+    <!-- [V8.2] Agregado header con botón atrás -->
     <div id="syncView" style="display:none;flex-direction:column">
-
-      <!-- [F9] Resumen de pendientes — número grande, estado claro -->
-      <div id="syncResumen">
-        <div id="syncResumenIco">☁️</div>
-        <div id="syncResumenTexto">
-          <div id="syncResumenNum">0</div>
-          <div id="syncResumenSub"></div>
+      <div class="view-header">
+        <div class="back-btn" onclick="switchView('mapa')">←</div>
+        <div class="view-header-content">
+          <div class="view-header-title" id="syncViewTitulo"></div>
+          <div class="view-header-sub" id="syncViewSub"></div>
         </div>
       </div>
+      <div style="flex:1;overflow-y:auto">
+        <!-- [F9] Resumen de pendientes — número grande, estado claro -->
+        <div id="syncResumen">
+          <div id="syncResumenIco">☁️</div>
+          <div id="syncResumenTexto">
+            <div id="syncResumenNum">0</div>
+            <div id="syncResumenSub"></div>
+          </div>
+        </div>
 
-      <!-- [F9] Título de la lista -->
+        <!-- [F9] Título de la lista -->
       <div id="syncListaTitulo"></div>
 
       <!-- [F9] Lista detallada de formularios pendientes -->
@@ -3213,23 +3442,41 @@ textarea{resize:vertical;min-height:65px;}
       <div style="padding:0 12px 12px">
         <button class="btn btn-primary" style="width:100%;padding:13px" id="btnSyncAgora" onclick="sincronizarAgora()"></button>
       </div>
+      </div><!-- /div flex:1 overflow -->
     </div>
 
     <!-- PERFIL VIEW -->
-    <div id="perfilView" style="display:none;padding:16px;flex-direction:column;gap:12px">
-      <div style="background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px;text-align:center">
-        <div id="perfilAvatar" style="width:64px;height:64px;border-radius:50%;background:var(--orange-glow);border:2px solid var(--orange);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;color:var(--orange)"></div>
-        <div id="perfilNome" style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700"></div>
-        <div id="perfilSub" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
-        <div style="margin-top:12px;display:flex;justify-content:center;gap:8px" id="perfilTags"></div>
+    <!-- [V8.2] Agregado header con botón atrás -->
+    <div id="perfilView" style="display:none;flex-direction:column">
+      <div class="view-header">
+        <div class="back-btn" onclick="switchView('mapa')">←</div>
+        <div class="view-header-content">
+          <div class="view-header-title" id="perfilViewTitulo"></div>
+          <div class="view-header-sub" id="perfilViewSub"></div>
+        </div>
       </div>
-      <button class="btn btn-ghost" style="width:100%;padding:13px" onclick="sairSessao()">Sair</button>
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px">
+        <div style="background:var(--card);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:20px;text-align:center">
+          <div id="perfilAvatar" style="width:64px;height:64px;border-radius:50%;background:var(--orange-glow);border:2px solid var(--orange);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-family:'Rajdhani',sans-serif;font-size:24px;font-weight:700;color:var(--orange)"></div>
+          <div id="perfilNome" style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:700"></div>
+          <div id="perfilSub" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+          <div style="margin-top:12px;display:flex;justify-content:center;gap:8px" id="perfilTags"></div>
+        </div>
+        <button class="btn btn-ghost" style="width:100%;padding:13px" onclick="sairSessao()">Sair</button>
+      </div>
     </div>
 
   </div><!-- /main-scroll -->
 
   <!-- FAB -->
   <div class="fab" id="fabVol" onclick="abrirNovoPoint()" title="Novo Ponto">＋</div>
+
+  <!-- [V8.2] Menú desplegable del voluntario -->
+  <div class="vol-menu-overlay" id="volMenuOverlay" onclick="cerrarMenuVol()"></div>
+  <div class="vol-menu" id="volMenu" style="display:none">
+    <div class="vol-menu-handle"></div>
+    <div id="volMenuItems"></div>
+  </div>
 
   <!-- BOTTOM NAV -->
   <div class="bottom-nav" id="bottomNavVol"></div>
@@ -4360,7 +4607,10 @@ function renderizarPings(lista) {
     const areaNome = areaObj ? (areaObj.Codigo ? areaObj.Codigo + ' · ' + areaObj.Nome : areaObj.Nome) : PT.SEM_AREA;
     
     // V5: Mostrar botón "Ver Formulário" si el ping tiene status concluido
-    const tieneForm = p.Status === CONFIG.STATUS_PING.CONCLUIDO || p.Status === CONFIG.STATUS_PING.CRITICO;
+    // [V8.2] Ahora aparece siempre pero con estilo diferente si no hay datos
+    const tieneForm = p.Status === CONFIG.STATUS_PING.CONCLUIDO || 
+                      p.Status === CONFIG.STATUS_PING.CRITICO ||
+                      p.Status === CONFIG.STATUS_PING.EM_CURSO;
     
     // [V7] Voluntario — mostrar "Não designado" si está vacío
     const volNome = p.Voluntario_Responsavel || '';
@@ -4384,7 +4634,7 @@ function renderizarPings(lista) {
       <td style="color:var(--muted)">${_esc(p.Tipo_Unidade)||'—'}</td>
       <td style="color:var(--muted);font-size:10px">${formatarData(p.Atualizado_Em)}</td>
       <td><div class="row-acts">
-        ${tieneForm ? `<div class="ico-btn" onclick="verFormularioCompleto('${_esc(p.ID_Ping)}')" title="Ver Formulário">📋</div>` : ''}
+        <div class="ico-btn${tieneForm ? '' : ' disabled'}" onclick="${tieneForm ? `verFormularioCompleto('${_esc(p.ID_Ping)}')` : ''}" title="${CONFIG.UI_FORMULARIO.BTN_VER_TITLE}">${CONFIG.UI_FORMULARIO.BTN_VER}</div>
         <div class="ico-btn" onclick="focarPingMapa(${p.Latitude||0},${p.Longitude||0})" title="Ver no mapa">📍</div>
         <div class="ico-btn" onclick="abrirDesignar('${_esc(p.ID_Ping)}')" title="Designar voluntário">👤</div>
         <div class="ico-btn" onclick="eliminarPing('${_esc(p.ID_Ping)}')" title="${CONFIG.UI_CICLO.BTN_ELIMINAR}">🗑</div>
@@ -7165,15 +7415,16 @@ function instalarPWA() {
 
 // ════════════════════════════════════════════════════════════════
 // INICIALIZACIÓN DEL VOLUNTARIO
+// [V8.2] Corregido race condition: await en carga de áreas antes de pings
 // ════════════════════════════════════════════════════════════════
-function inicializarVoluntario() {
+async function inicializarVoluntario() {
   const s = ESTADO.sessao;
   if (!s) return;
 
   const nome = s.Nome || s.nome || s.usuario || CONFIG.UI.ROLE_VOL_NOME;
   const ini  = nome.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
 
-  // Preencher UI
+  // Preencher UI básica
   _txt('volNameDisplay', nome);
   _txt('volRoleTag',     CONFIG.UI.VOL_AREA_TAG);
   _txt('volAreaDisplay', s.Areas_Permitidas || '—');
@@ -7186,12 +7437,33 @@ function inicializarVoluntario() {
     s.Areas_Permitidas || '—',
   ].map(t => `<div class="area-tag">${_esc(t)}</div>`).join('');
 
+  // [V8.2] Preencher headers das vistas secundarias
+  _txt('pontosViewTitulo', CONFIG.UI_VIEWS_VOL.PONTOS_TITULO);
+  _txt('pontosViewSub',    CONFIG.UI_VIEWS_VOL.PONTOS_SUB);
+  _txt('syncViewTitulo',   CONFIG.UI_VIEWS_VOL.SYNC_TITULO);
+  _txt('syncViewSub',      CONFIG.UI_VIEWS_VOL.SYNC_SUB);
+  _txt('perfilViewTitulo', CONFIG.UI_VIEWS_VOL.PERFIL_TITULO);
+  _txt('perfilViewSub',    CONFIG.UI_VIEWS_VOL.PERFIL_SUB);
+
+  // 1. Inicializar mapa (sync)
   inicializarMapaVol();
-  carregarPingsVol();
-  // B-18: Carregar área designada do voluntário no mapa
-  carregarAreaVol();
-  // F-22: Carregar ESTADO.areas para que createNewPing possa resolver idArea/idMapa
-  _carregarAreasParaVoluntario();
+  
+  // [V8.2] FIX: PRIMERO cargar áreas para que el filtro de pings funcione
+  await _carregarAreasParaVoluntario();
+  
+  // 2. AHORA cargar pings (ya tiene ESTADO.areas poblado)
+  await carregarPingsVol();
+  
+  // 3. Cargar polígono del área en el mapa
+  await carregarAreaVol();
+  
+  // [V8.2] Iniciar polling de notificaciones si está habilitado
+  if (CONFIG.POLLING && CONFIG.POLLING.HABILITADO) {
+    iniciarPollingPings();
+  }
+  
+  // [V8.2] Renderizar menú desplegable
+  renderizarMenuVol();
 }
 
 // F-22: Carregar áreas para voluntário — necessário para createNewPing resolver idArea/idMapa
@@ -7455,29 +7727,54 @@ function renderizarPingsVol() {
 // ════════════════════════════════════════════════════════════════
 // VISTAS DEL VOLUNTARIO
 // ════════════════════════════════════════════════════════════════
-// Usa CONFIG.VIEWS_VOL — sem hardcode de nomes de views aqui
+// [V8.2] Actualizado para manejar menú desplegable
 function switchView(v) {
-  if (v === 'novo') { abrirNovoPoint(); return; }
+  // [V8.2] Si es "menu", abrir el menú desplegable
+  if (v === 'menu') { 
+    abrirMenuVol(); 
+    return; 
+  }
+  
+  // [V8.2] Si es "novo", abrir overlay de nuevo punto
+  if (v === 'novo') { 
+    abrirNovoPoint(); 
+    return; 
+  }
 
   viewAtual = v;
 
+  // Ocultar todas las vistas y desactivar botones
+  // [V8.2] Incluir también sync y perfil aunque no estén en VIEWS_VOL
+  const todasVistas = ['mapa', 'pontos', 'sync', 'perfil'];
+  todasVistas.forEach(viewId => {
+    const el = document.getElementById(viewId + 'View');
+    if (el) el.style.display = 'none';
+  });
+  
   CONFIG.VIEWS_VOL.forEach(view => {
-    const el  = document.getElementById(view.id + 'View');
     const btn = document.getElementById('nav-' + view.id);
-    if (el)  { el.style.display = 'none'; }
     if (btn) btn.classList.remove('active');
   });
 
-  const activeEl  = document.getElementById(v + 'View');
-  const activeBtn = document.getElementById('nav-' + v);
+  // Mostrar vista activa
+  const activeEl = document.getElementById(v + 'View');
   if (activeEl) {
     activeEl.style.display = (v === 'mapa') ? 'block' : 'flex';
     if (v === 'mapa') setTimeout(() => mapVol && mapVol.invalidateSize(), 100);
   }
+  
+  // Activar botón correspondiente si existe
+  const activeBtn = document.getElementById('nav-' + v);
   if (activeBtn) activeBtn.classList.add('active');
 
   // [F9] Al entrar a la vista Sync → renderizar estado detallado de la cola
   if (v === 'sync') renderizarEstadoSync(false);
+  
+  // [V8.2] Al entrar a pontos → renderizar filtros y lista
+  if (v === 'pontos') {
+    renderizarFiltrosPontos();
+    filtrarPingsView(document.querySelector('#pontosFilterEl .filter-chip'), 'all');
+  }
 }
 
 function filtrarPingsView(el, tipo) {
@@ -8438,6 +8735,371 @@ async function renderizarEstadoSync(sincronizando) {
 // ── FIM [FASE 9] ─────────────────────────────────────────────
 
 // ════════════════════════════════════════════════════════════════
+// [V8.2] MENÚ DESPLEGABLE DEL VOLUNTARIO
+// ════════════════════════════════════════════════════════════════
+function renderizarMenuVol() {
+  const menuEl = document.getElementById('volMenuItems');
+  if (!menuEl) return;
+  
+  menuEl.innerHTML = CONFIG.MENU_VOL.map(item => `
+    <div class="vol-menu-item" onclick="${item.action}; cerrarMenuVol();">
+      <span class="ico">${item.icon}</span>
+      <span>${item.label}</span>
+    </div>
+  `).join('');
+}
+
+function abrirMenuVol() {
+  document.getElementById('volMenuOverlay').classList.add('open');
+  document.getElementById('volMenu').style.display = 'block';
+}
+
+function cerrarMenuVol() {
+  document.getElementById('volMenuOverlay').classList.remove('open');
+  document.getElementById('volMenu').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8.2] POLLING DE NOTIFICACIONES
+// Refresca pings cada 30s para detectar cambios externos
+// ════════════════════════════════════════════════════════════════
+let _pollingInterval = null;
+
+function iniciarPollingPings() {
+  if (_pollingInterval) return; // Ya está corriendo
+  
+  _pollingInterval = setInterval(async () => {
+    // Solo polling si está online y hay sesión activa
+    if (offlineVol || !ESTADO.sessao) return;
+    
+    try {
+      const pingsAnteriores = JSON.stringify(ESTADO.pingsVol.map(p => ({
+        id: p.ID_Ping,
+        status: p.Status
+      })));
+      
+      await carregarPingsVol();
+      
+      const pingsNuevos = JSON.stringify(ESTADO.pingsVol.map(p => ({
+        id: p.ID_Ping,
+        status: p.Status
+      })));
+      
+      // Detectar cambios y notificar
+      if (pingsAnteriores !== pingsNuevos) {
+        toast('🔄 Dados atualizados');
+      }
+    } catch(e) {
+      // Silencioso en caso de error de red
+    }
+  }, CONFIG.POLLING.INTERVALO_MS);
+}
+
+function detenerPollingPings() {
+  if (_pollingInterval) {
+    clearInterval(_pollingInterval);
+    _pollingInterval = null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8.2] VISUALIZACIÓN DE FORMULARIO COMPLETO (COORDINADOR)
+// ════════════════════════════════════════════════════════════════
+let _formularioAtual = null;
+
+async function verFormularioCompleto(idPing) {
+  const UI = CONFIG.UI_FORMULARIO;
+  const bodyEl = document.getElementById('modalVerFormBody');
+  
+  // Mostrar loading
+  bodyEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">${UI.CARREGANDO}</div>`;
+  openModal('modalVerFormulario');
+  
+  try {
+    const r = await chamarBackend({
+      acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO,
+      idPing: idPing
+    });
+    
+    if (r.sucesso && r.dados) {
+      _formularioAtual = r.dados;
+      renderizarFormularioCompleto(r.dados);
+    } else {
+      bodyEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">${UI.SEM_DADOS}</div>`;
+    }
+  } catch(e) {
+    bodyEl.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red)">${UI.ERRO}</div>`;
+  }
+}
+
+function renderizarFormularioCompleto(dados) {
+  const UI = CONFIG.UI_FORMULARIO;
+  const ping = dados.ping || {};
+  const unidade = dados.unidade || {};
+  const residentes = dados.residentes || [];
+  const fotos = dados.fotos || [];
+  
+  const bodyEl = document.getElementById('modalVerFormBody');
+  
+  // Actualizar título con código
+  _txt('modalVerFormTitulo', `${UI.TITULO} — ${ping.Codigo || ping.ID_Ping || ''}`);
+  
+  bodyEl.innerHTML = `
+    <!-- Sección: Dados do Ping -->
+    <div class="form-view-section open">
+      <div class="form-view-header" onclick="toggleFormSection(this)">
+        <div class="form-view-header-title">${UI.SEC_PING}</div>
+        <div class="form-view-toggle">▼</div>
+      </div>
+      <div class="form-view-body">
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_CODIGO}</span>
+          <span class="form-view-value">${_esc(ping.Codigo || ping.ID_Ping || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_ENDERECO}</span>
+          <span class="form-view-value">${_esc(ping.Endereco || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_COORDS}</span>
+          <span class="form-view-value">${ping.Latitude || '—'}, ${ping.Longitude || '—'}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_VOLUNTARIO}</span>
+          <span class="form-view-value">${_esc(ping.Voluntario_Responsavel || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_STATUS}</span>
+          <span class="form-view-value"><span class="status-tag ${CONFIG.STATUS_CSS[ping.Status] || ''}">${ping.Status || '—'}</span></span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_DATA}</span>
+          <span class="form-view-value">${ping.Atualizado_Em || ping.Criado_Em || '—'}</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sección: Dados da Unidade -->
+    <div class="form-view-section open">
+      <div class="form-view-header" onclick="toggleFormSection(this)">
+        <div class="form-view-header-title">${UI.SEC_UNIDADE}</div>
+        <div class="form-view-toggle">▼</div>
+      </div>
+      <div class="form-view-body">
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_TIPO_UNIDADE}</span>
+          <span class="form-view-value">${_esc(unidade.Tipo_Unidade || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_TIPO_CONSTRUCAO}</span>
+          <span class="form-view-value">${_esc(unidade.Tipo_Construcao || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_NUM_PESSOAS}</span>
+          <span class="form-view-value">${unidade.Num_Pessoas || '0'}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_FERIDOS}</span>
+          <span class="form-view-value">${unidade.Feridos || '0'}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_OBITOS}</span>
+          <span class="form-view-value">${unidade.Obitos || '0'}</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sección: Danos -->
+    <div class="form-view-section open">
+      <div class="form-view-header" onclick="toggleFormSection(this)">
+        <div class="form-view-header-title">${UI.SEC_DANOS}</div>
+        <div class="form-view-toggle">▼</div>
+      </div>
+      <div class="form-view-body">
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_TIPO_DANO}</span>
+          <span class="form-view-value">${_esc(unidade.Tipo_Dano || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_GRAU_DANO}</span>
+          <span class="form-view-value">${_esc(unidade.Grau_Dano || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_HABITAVEL}</span>
+          <span class="form-view-value">${_esc(unidade.Unidade_Habitavel || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_EVACUACAO}</span>
+          <span class="form-view-value">${_esc(unidade.Necessita_Evacuacao || '—')}</span>
+        </div>
+        ${unidade.Observacoes ? `<div class="form-view-obs">${_esc(unidade.Observacoes)}</div>` : ''}
+      </div>
+    </div>
+    
+    <!-- Sección: Residentes -->
+    <div class="form-view-section${residentes.length > 0 ? ' open' : ''}">
+      <div class="form-view-header" onclick="toggleFormSection(this)">
+        <div class="form-view-header-title">${UI.SEC_RESIDENTES} (${residentes.length})</div>
+        <div class="form-view-toggle">▼</div>
+      </div>
+      <div class="form-view-body">
+        ${residentes.length === 0 
+          ? `<div style="color:var(--muted);font-size:12px">${UI.LBL_SEM_RESIDENTES}</div>`
+          : residentes.map(r => `
+            <div class="form-view-residente">
+              <div class="form-view-residente-nome">${_esc(r.Nome || 'Sem nome')}</div>
+              <div class="form-view-residente-info">
+                <span>${UI.LBL_IDADE}: ${r.Idade || '—'}</span>
+                <span>${UI.LBL_CPF}: ${_esc(r.CPF || '—')}</span>
+                <span>${UI.LBL_CONDICAO}: ${_esc(r.Condicao || '—')}</span>
+              </div>
+            </div>
+          `).join('')
+        }
+      </div>
+    </div>
+    
+    <!-- Sección: Fotos -->
+    <div class="form-view-section${fotos.length > 0 ? ' open' : ''}">
+      <div class="form-view-header" onclick="toggleFormSection(this)">
+        <div class="form-view-header-title">${UI.SEC_FOTOS} (${fotos.length})</div>
+        <div class="form-view-toggle">▼</div>
+      </div>
+      <div class="form-view-body">
+        ${fotos.length === 0 
+          ? `<div style="color:var(--muted);font-size:12px">${UI.LBL_SEM_FOTOS}</div>`
+          : `<div class="form-view-fotos">
+              ${fotos.map((f, i) => `
+                <div class="form-view-foto" onclick="abrirLightbox('${f.Dados_Base64 || ''}', '${f.Mime_Type || 'image/jpeg'}')">
+                  <img src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" 
+                       alt="${_esc(f.Nome_Foto || 'Foto ' + (i+1))}"
+                       onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📷</text></svg>'">
+                </div>
+              `).join('')}
+            </div>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function toggleFormSection(headerEl) {
+  const section = headerEl.closest('.form-view-section');
+  if (section) section.classList.toggle('open');
+}
+
+function abrirLightbox(base64, mimeType) {
+  if (!base64) return;
+  const img = document.getElementById('fotoLightboxImg');
+  img.src = `data:${mimeType};base64,${base64}`;
+  document.getElementById('fotoLightbox').classList.add('open');
+}
+
+function fecharLightbox() {
+  document.getElementById('fotoLightbox').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8.2] DESCARGA PDF DE FORMULARIO INDIVIDUAL
+// ════════════════════════════════════════════════════════════════
+function baixarPdfFormulario() {
+  if (!_formularioAtual) {
+    toast('⚠️ Nenhum formulário carregado.');
+    return;
+  }
+  
+  const ping = _formularioAtual.ping || {};
+  const unidade = _formularioAtual.unidade || {};
+  const residentes = _formularioAtual.residentes || [];
+  const fotos = _formularioAtual.fotos || [];
+  const UI = CONFIG.UI_FORMULARIO;
+  
+  // Crear contenido HTML para el PDF
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Formulário ${ping.Codigo || ping.ID_Ping}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 20px; }
+        h1 { color: #F4521E; font-size: 18px; border-bottom: 2px solid #F4521E; padding-bottom: 8px; }
+        h2 { color: #666; font-size: 14px; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+        .row { display: flex; padding: 6px 0; border-bottom: 1px solid #eee; }
+        .label { color: #666; width: 40%; }
+        .value { font-weight: 500; }
+        .obs { background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 8px; white-space: pre-wrap; }
+        .residente { background: #f9f9f9; padding: 10px; margin: 8px 0; border-radius: 4px; }
+        .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+        .foto { width: 100%; height: 120px; object-fit: cover; border-radius: 4px; }
+        .footer { margin-top: 30px; text-align: center; color: #999; font-size: 10px; }
+      </style>
+    </head>
+    <body>
+      <h1>🛡️ DEFESA CIVIL PR — Formulário de Levantamento</h1>
+      
+      <h2>📍 Dados do Ponto</h2>
+      <div class="row"><span class="label">Código:</span><span class="value">${_esc(ping.Codigo || ping.ID_Ping || '—')}</span></div>
+      <div class="row"><span class="label">Endereço:</span><span class="value">${_esc(ping.Endereco || '—')}</span></div>
+      <div class="row"><span class="label">Coordenadas:</span><span class="value">${ping.Latitude || '—'}, ${ping.Longitude || '—'}</span></div>
+      <div class="row"><span class="label">Voluntário:</span><span class="value">${_esc(ping.Voluntario_Responsavel || '—')}</span></div>
+      <div class="row"><span class="label">Status:</span><span class="value">${ping.Status || '—'}</span></div>
+      <div class="row"><span class="label">Data:</span><span class="value">${ping.Atualizado_Em || ping.Criado_Em || '—'}</span></div>
+      
+      <h2>🏠 Dados da Unidade</h2>
+      <div class="row"><span class="label">Tipo de Unidade:</span><span class="value">${_esc(unidade.Tipo_Unidade || '—')}</span></div>
+      <div class="row"><span class="label">Tipo de Construção:</span><span class="value">${_esc(unidade.Tipo_Construcao || '—')}</span></div>
+      <div class="row"><span class="label">Nº Pessoas:</span><span class="value">${unidade.Num_Pessoas || '0'}</span></div>
+      <div class="row"><span class="label">Feridos:</span><span class="value">${unidade.Feridos || '0'}</span></div>
+      <div class="row"><span class="label">Óbitos:</span><span class="value">${unidade.Obitos || '0'}</span></div>
+      
+      <h2>⚠️ Danos</h2>
+      <div class="row"><span class="label">Tipo de Dano:</span><span class="value">${_esc(unidade.Tipo_Dano || '—')}</span></div>
+      <div class="row"><span class="label">Grau do Dano:</span><span class="value">${_esc(unidade.Grau_Dano || '—')}</span></div>
+      <div class="row"><span class="label">Habitável:</span><span class="value">${_esc(unidade.Unidade_Habitavel || '—')}</span></div>
+      <div class="row"><span class="label">Necessita Evacuação:</span><span class="value">${_esc(unidade.Necessita_Evacuacao || '—')}</span></div>
+      ${unidade.Observacoes ? `<div class="obs">${_esc(unidade.Observacoes)}</div>` : ''}
+      
+      <h2>👥 Residentes (${residentes.length})</h2>
+      ${residentes.length === 0 
+        ? '<p style="color:#999">Nenhum residente registrado.</p>'
+        : residentes.map(r => `
+          <div class="residente">
+            <strong>${_esc(r.Nome || 'Sem nome')}</strong><br>
+            Idade: ${r.Idade || '—'} · CPF: ${_esc(r.CPF || '—')} · Condição: ${_esc(r.Condicao || '—')}
+          </div>
+        `).join('')
+      }
+      
+      <h2>📸 Fotos (${fotos.length})</h2>
+      ${fotos.length === 0 
+        ? '<p style="color:#999">Nenhuma foto anexada.</p>'
+        : `<div class="foto-grid">
+            ${fotos.map(f => `<img class="foto" src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" alt="Foto">`).join('')}
+          </div>`
+      }
+      
+      <div class="footer">
+        Gerado em ${new Date().toLocaleString(CONFIG.APP.LOCALE)} · DEFESA CIVIL PARANÁ · ${CONFIG.APP.VERSAO}
+      </div>
+    </body>
+    </html>
+  `;
+  
+  // Abrir en nueva ventana para imprimir/guardar como PDF
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+  
+  // Esperar a que cargue y abrir diálogo de impresión
+  setTimeout(() => {
+    printWindow.print();
+  }, 500);
+  
+  toast('📄 PDF pronto para impressão/download');
+}
+
+// ════════════════════════════════════════════════════════════════
 // V5: VALIDACIÓN DE CAMPOS
 // Usa CONFIG.VALIDACIONES para todas las reglas.
 // ════════════════════════════════════════════════════════════════
@@ -8520,317 +9182,6 @@ function validarFormulario(dados, esquema) {
   });
   
   return { valido, errores };
-}
-
-// ════════════════════════════════════════════════════════════════
-// V5: VISTA FORMULARIO COMPLETO + EXPORTAR PDF
-// Muestra modal con todos los datos del ping incluyendo fotos base64.
-// ════════════════════════════════════════════════════════════════
-
-/**
- * Abre modal con formulario completo de un ping
- * @param {string} idPing - ID del ping
- */
-async function verFormularioCompleto(idPing) {
-  const U = CONFIG.UI_FORMULARIO_COMPLETO;
-  
-  // Crear modal si no existe
-  let modal = document.getElementById('modalFormCompleto');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'modalFormCompleto';
-    modal.className = 'modal-form-completo';
-    modal.innerHTML = `
-      <div class="mfc-overlay" onclick="fecharFormularioCompleto()"></div>
-      <div class="mfc-content">
-        <div class="mfc-header">
-          <span class="mfc-titulo">${U.TITULO}</span>
-          <button class="mfc-btn-fechar" onclick="fecharFormularioCompleto()">${U.BTN_FECHAR}</button>
-        </div>
-        <div id="mfcBody" class="mfc-body"></div>
-        <div class="mfc-footer">
-          <button class="mfc-btn-pdf" onclick="exportarFormularioPDF()">
-            ${U.BTN_EXPORTAR_PDF}
-          </button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    
-    // Agregar estilos si no existen
-    if (!document.getElementById('estilosFormCompleto')) {
-      const style = document.createElement('style');
-      style.id = 'estilosFormCompleto';
-      style.textContent = `
-        .modal-form-completo { position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center; }
-        .modal-form-completo.visible { display:flex; }
-        .mfc-overlay { position:absolute;inset:0;background:rgba(0,0,0,0.7); }
-        .mfc-content { position:relative;background:var(--navy-mid);border:1px solid var(--border);border-radius:12px;width:95%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden; }
-        .mfc-header { display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-soft); }
-        .mfc-titulo { font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700; }
-        .mfc-btn-fechar { background:transparent;border:1px solid var(--border-soft);color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px; }
-        .mfc-btn-fechar:hover { border-color:var(--orange);color:var(--orange); }
-        .mfc-body { flex:1;overflow-y:auto;padding:20px; }
-        .mfc-footer { padding:16px 20px;border-top:1px solid var(--border-soft);display:flex;justify-content:flex-end; }
-        .mfc-btn-pdf { background:var(--orange);color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-weight:600; }
-        .mfc-btn-pdf:hover { background:var(--orange-dark); }
-        .mfc-secao { margin-bottom:24px; }
-        .mfc-secao-titulo { font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;color:var(--orange);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-soft); }
-        .mfc-campo { display:flex;margin-bottom:8px;font-size:13px; }
-        .mfc-label { color:var(--muted);min-width:120px;flex-shrink:0; }
-        .mfc-valor { color:var(--text); }
-        .mfc-fotos { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px; }
-        .mfc-foto { background:var(--navy-light);border-radius:8px;overflow:hidden; }
-        .mfc-foto img { width:100%;height:120px;object-fit:cover; }
-        .mfc-foto-desc { padding:8px;font-size:11px;color:var(--muted); }
-        .mfc-residentes { margin-top:12px; }
-        .mfc-residente { background:var(--navy-light);border-radius:8px;padding:12px;margin-bottom:8px; }
-        .mfc-loading { text-align:center;padding:40px;color:var(--muted); }
-        .mfc-erro { text-align:center;padding:40px;color:var(--red); }
-      `;
-      document.head.appendChild(style);
-    }
-  }
-  
-  // Mostrar modal con loading
-  const body = document.getElementById('mfcBody');
-  body.innerHTML = `<div class="mfc-loading">${U.CARREGANDO}</div>`;
-  modal.classList.add('visible');
-  modal.dataset.idPing = idPing;
-  
-  // Cargar datos del backend
-  try {
-    const data = await chamarBackend({
-      acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO,
-      idPing: idPing,
-    });
-    
-    if (!data.sucesso) {
-      body.innerHTML = `<div class="mfc-erro">${U.ERRO_CARREGAR}</div>`;
-      return;
-    }
-    
-    const { ping, unidade, residentes, fotos } = data.dados;
-    
-    // Renderizar contenido
-    let html = '';
-    
-    // Sección Unidade
-    html += `<div class="mfc-secao">
-      <div class="mfc-secao-titulo">${U.SEC_UNIDADE}</div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_TIPO}</span><span class="mfc-valor">${_esc(unidade.Tipo_Unidade || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_ENDERECO}</span><span class="mfc-valor">${_esc(unidade.Endereco || ping.Endereco || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_GPS}</span><span class="mfc-valor">${unidade.Latitude || ping.Latitude || '-'}, ${unidade.Longitude || ping.Longitude || '-'}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_PESSOAS}</span><span class="mfc-valor">${unidade.Num_Pessoas || '0'}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_FERIDOS}</span><span class="mfc-valor">${unidade.Num_Feridos || '0'}</span></div>
-    </div>`;
-    
-    // Sección Danos
-    html += `<div class="mfc-secao">
-      <div class="mfc-secao-titulo">${U.SEC_DANOS}</div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_TIPO_DANO}</span><span class="mfc-valor">${_esc(unidade.Tipo_Dano || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_GRAU_DANO}</span><span class="mfc-valor">${_esc(unidade.Grau_Dano || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_HABITAVEL}</span><span class="mfc-valor">${_esc(unidade.Unidade_Habitavel || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_EVACUACAO}</span><span class="mfc-valor">${_esc(unidade.Necessita_Evacuacao || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_VOLUNTARIO}</span><span class="mfc-valor">${_esc(unidade.Voluntario || ping.Voluntario_Responsavel || '-')}</span></div>
-      <div class="mfc-campo"><span class="mfc-label">${U.LBL_DATA}</span><span class="mfc-valor">${_esc(unidade.Data || '-')} ${_esc(unidade.Hora || '')}</span></div>
-    </div>`;
-    
-    // Sección Residentes
-    html += `<div class="mfc-secao">
-      <div class="mfc-secao-titulo">${U.SEC_RESIDENTES}</div>`;
-    if (residentes && residentes.length > 0) {
-      html += '<div class="mfc-residentes">';
-      residentes.forEach((r, i) => {
-        html += `<div class="mfc-residente">
-          <strong>${i+1}. ${_esc(r.Nome || 'Residente')}</strong>
-          ${r.CPF ? ' — CPF: ' + _esc(r.CPF) : ''}
-          ${r.Idade ? ' — Idade: ' + r.Idade : ''}
-          ${r.Condicao ? ' — ' + _esc(r.Condicao) : ''}
-          ${r.Vulnerabilidade && r.Vulnerabilidade !== 'Nenhuma' ? ' — ' + _esc(r.Vulnerabilidade) : ''}
-        </div>`;
-      });
-      html += '</div>';
-    } else {
-      html += `<div style="color:var(--muted);font-size:13px;">${U.SEM_RESIDENTES}</div>`;
-    }
-    html += '</div>';
-    
-    // Sección Fotos (base64 directo)
-    html += `<div class="mfc-secao">
-      <div class="mfc-secao-titulo">${U.SEC_FOTOS}</div>`;
-    if (fotos && fotos.length > 0) {
-      html += '<div class="mfc-fotos">';
-      fotos.forEach(f => {
-        const src = f.Dados_Base64 
-          ? `data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64}`
-          : '';
-        if (src) {
-          html += `<div class="mfc-foto">
-            <img src="${src}" alt="${_esc(f.Nome_Foto || 'Foto')}" onclick="ampliarFoto(this.src)">
-            <div class="mfc-foto-desc">${_esc(f.Descricao || f.Nome_Foto || '')}</div>
-          </div>`;
-        }
-      });
-      html += '</div>';
-    } else {
-      html += `<div style="color:var(--muted);font-size:13px;">${U.SEM_FOTOS}</div>`;
-    }
-    html += '</div>';
-    
-    body.innerHTML = html;
-    
-    // Guardar datos para PDF
-    modal.dataset.formData = JSON.stringify(data.dados);
-    
-  } catch(e) {
-    body.innerHTML = `<div class="mfc-erro">${U.ERRO_CARREGAR}<br><small>${e.message}</small></div>`;
-  }
-}
-
-function fecharFormularioCompleto() {
-  const modal = document.getElementById('modalFormCompleto');
-  if (modal) modal.classList.remove('visible');
-}
-
-function ampliarFoto(src) {
-  // Crear visor de foto ampliada
-  let visor = document.getElementById('visorFotoAmpliada');
-  if (!visor) {
-    visor = document.createElement('div');
-    visor.id = 'visorFotoAmpliada';
-    visor.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.9);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
-    visor.onclick = () => visor.remove();
-    document.body.appendChild(visor);
-  }
-  visor.innerHTML = `<img src="${src}" style="max-width:95%;max-height:95%;object-fit:contain;border-radius:4px;">`;
-}
-
-/**
- * Exporta formulario actual a PDF usando jsPDF
- */
-async function exportarFormularioPDF() {
-  const U = CONFIG.UI_FORMULARIO_COMPLETO;
-  const modal = document.getElementById('modalFormCompleto');
-  if (!modal || !modal.dataset.formData) {
-    toast(U.PDF_ERRO);
-    return;
-  }
-  
-  toast(U.PDF_GERANDO);
-  
-  try {
-    // Cargar jsPDF si no está cargado
-    if (typeof jspdf === 'undefined' && typeof jsPDF === 'undefined') {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-    }
-    
-    const { jsPDF } = window.jspdf || window;
-    const doc = new jsPDF();
-    const data = JSON.parse(modal.dataset.formData);
-    const { ping, unidade, residentes, fotos } = data;
-    
-    let y = 20;
-    const marginLeft = 20;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Título
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text('DEFESA CIVIL PR — Formulário de Vistoria', marginLeft, y);
-    y += 10;
-    
-    // Código del ping
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Código: ${ping.Codigo || ping.ID_Ping || '-'}`, marginLeft, y);
-    y += 8;
-    doc.text(`Data: ${unidade.Data || '-'} ${unidade.Hora || ''}`, marginLeft, y);
-    y += 12;
-    
-    // Sección Unidade
-    doc.setFont(undefined, 'bold');
-    doc.text('DADOS DA UNIDADE', marginLeft, y);
-    y += 8;
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    doc.text(`Tipo: ${unidade.Tipo_Unidade || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Endereço: ${unidade.Endereco || ping.Endereco || '-'}`, marginLeft, y); y += 6;
-    doc.text(`GPS: ${unidade.Latitude || ping.Latitude || '-'}, ${unidade.Longitude || ping.Longitude || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Pessoas: ${unidade.Num_Pessoas || '0'} | Feridos: ${unidade.Num_Feridos || '0'} | Desaparecidos: ${unidade.Num_Desaparecidos || '0'} | Óbitos: ${unidade.Num_Obitos || '0'}`, marginLeft, y); y += 10;
-    
-    // Sección Danos
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text('DADOS DOS DANOS', marginLeft, y);
-    y += 8;
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    doc.text(`Tipo de Dano: ${unidade.Tipo_Dano || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Grau: ${unidade.Grau_Dano || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Habitável: ${unidade.Unidade_Habitavel || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Evacuação: ${unidade.Necessita_Evacuacao || '-'}`, marginLeft, y); y += 6;
-    doc.text(`Voluntário: ${unidade.Voluntario || ping.Voluntario_Responsavel || '-'}`, marginLeft, y); y += 10;
-    
-    // Sección Residentes
-    if (residentes && residentes.length > 0) {
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text('RESIDENTES', marginLeft, y);
-      y += 8;
-      doc.setFont(undefined, 'normal');
-      doc.setFontSize(10);
-      residentes.forEach((r, i) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.text(`${i+1}. ${r.Nome || 'Residente'} — CPF: ${r.CPF || '-'} — Idade: ${r.Idade || '-'} — ${r.Condicao || '-'}`, marginLeft, y);
-        y += 6;
-      });
-      y += 4;
-    }
-    
-    // Sección Fotos (solo thumbnails)
-    if (fotos && fotos.length > 0) {
-      if (y > 220) { doc.addPage(); y = 20; }
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text('FOTOS', marginLeft, y);
-      y += 8;
-      
-      let x = marginLeft;
-      const imgSize = 40;
-      for (const f of fotos) {
-        if (f.Dados_Base64) {
-          try {
-            if (x + imgSize > pageWidth - 20) {
-              x = marginLeft;
-              y += imgSize + 10;
-            }
-            if (y > 250) { doc.addPage(); y = 20; x = marginLeft; }
-            const imgData = `data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64}`;
-            doc.addImage(imgData, 'JPEG', x, y, imgSize, imgSize);
-            x += imgSize + 5;
-          } catch(imgErr) {
-            console.warn('Erro ao adicionar imagem:', imgErr);
-          }
-        }
-      }
-    }
-    
-    // Guardar PDF
-    const filename = `formulario_${ping.Codigo || ping.ID_Ping || 'vistoria'}.pdf`;
-    doc.save(filename);
-    toast(U.PDF_OK);
-    
-  } catch(e) {
-    console.error('Erro ao gerar PDF:', e);
-    toast(U.PDF_ERRO);
-  }
 }
 
 </script>
