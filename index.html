@@ -48,7 +48,7 @@ const CONFIG = {
   },
 
   // ── Backend ──────────────────────────────────────────────────
-  BACKEND_URL: "https://script.google.com/macros/s/AKfycbzA_zJvUezwh95JxS666Lw144rao28tND3h3XAHGI-D7jUOWiZ-TryFrUCNE7sDiYzi-A/exec",
+  BACKEND_URL: "https://script.google.com/macros/s/AKfycbw5iC3KX8MuuwjCGS31P-EHVJGnJLxcNTPg7aN7RXLliLl-yO5Z2QcfGT7Gc_JcNGn_/exec",
   HTTP_METHOD: 'POST',
   HTTP_CONTENT_TYPE: 'text/plain;charset=utf-8',
 
@@ -452,7 +452,7 @@ const CONFIG = {
     DUP_AVISO:          "Use o campo <strong>Complemento</strong> para diferenciar unidades no mesmo local.",
 
     // Versão
-    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v5.0 · PWA",
+    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v7.0 · PWA",
 
     // Sprint 3 — Voluntário
     FORM_CAMPO_OBRIG:   "⚠️ Preencha o endereço e as coordenadas GPS.",
@@ -724,6 +724,47 @@ const CONFIG = {
     PDF_BTN:           "⬇️ PDF",
     CONFIG_BTN:        "⚙️ Config",
     ALERTA_BTN:        "🔔 Configurar",
+  },
+
+  // ── [V7] UI_PINGS_TABLE — Tabla de pings del coordinador ────
+  // BUG-009: Cabecera y filtros definidos en CONFIG
+  UI_PINGS_TABLE: {
+    // Cabecera de columnas
+    TH_CODIGO:     "Código",
+    TH_ENDERECO:   "Endereço",
+    TH_MAPA:       "Mapa",
+    TH_AREA:       "Área",
+    TH_STATUS:     "Status",
+    TH_VOLUNTARIO: "Voluntário",
+    TH_RESIDENTES: "Res.",
+    TH_TIPO:       "Tipo",
+    TH_ATUALIZADO: "Atualizado",
+    TH_ACOES:      "Ações",
+    // Filtros
+    FILTRO_TODOS_MAPAS:  "Todos os mapas",
+    FILTRO_TODAS_AREAS:  "Todas as áreas",
+    FILTRO_TODOS_STATUS: "Todos os status",
+    // Placeholder búsqueda
+    BUSCA_PLACEHOLDER:   "Buscar por endereço, área ou voluntário...",
+    // Mensajes
+    SEM_MAPA:      "—",
+    SEM_AREA:      "—",
+    SEM_VOL:       "Não designado",
+  },
+
+  // ── [V7] UI_DESIGNAR — Modal de designación ─────────────────
+  // BUG-001/002/003: Textos para modal de designar voluntario
+  UI_DESIGNAR: {
+    TITULO:           "👤 Designar Voluntário",
+    TITULO_PING:      "Designar voluntário ao ping:",
+    LABEL_VOLUNTARIO: "Voluntário",
+    LABEL_NOTAS:      "Notas (opcional)",
+    PLACEHOLDER_NOTAS:"Instruções especiais...",
+    BTN_CANCELAR:     "Cancelar",
+    BTN_CONFIRMAR:    "✓ Designar",
+    TOAST_OK:         "✅ Voluntário designado com sucesso.",
+    TOAST_ERR:        "⚠️ Erro ao designar voluntário.",
+    TOAST_SEM_VOL:    "⚠️ Selecione um voluntário.",
   },
 
   // ── Duração do toast (ms) ────────────────────────────────────
@@ -2644,10 +2685,12 @@ textarea{resize:vertical;min-height:65px;}
         <div class="table-toolbar">
           <div class="search-wrap">
             <span class="search-ico">🔍</span>
-            <input type="text" id="pingSearch" placeholder="" oninput="filtrarPings(this.value)">
+            <input type="text" id="pingSearch" placeholder="" oninput="aplicarFiltrosPings()">
           </div>
-          <select class="flt" id="filtroArea" onchange="filtrarPingsPorArea(this.value)"></select>
-          <select class="flt" id="filtroStatus" onchange="filtrarPingsPorStatus(this.value)"></select>
+          <!-- V7: Filtro por Mapa (BUG-006) -->
+          <select class="flt" id="filtroMapa" onchange="aplicarFiltrosPings()"></select>
+          <select class="flt" id="filtroArea" onchange="aplicarFiltrosPings()"></select>
+          <select class="flt" id="filtroStatus" onchange="aplicarFiltrosPings()"></select>
         </div>
         <div style="flex:1;overflow-y:auto">
           <table class="data-table">
@@ -2830,23 +2873,22 @@ textarea{resize:vertical;min-height:65px;}
     </div>
   </div>
 
+  <!-- V7: Modal Designar actualizado - BUG-002/003 FIX -->
   <div class="modal-overlay" id="modalDesignar">
     <div class="modal">
       <div class="modal-hdr">
-        <div class="modal-title" id="modalDesignarTitle"></div>
+        <div class="modal-title" id="designarTitulo">👤 Designar Voluntário</div>
         <div class="modal-close" onclick="closeModal('modalDesignar')">✕</div>
       </div>
       <div class="modal-body">
-        <div class="info-box" id="modalDesignarInfo"></div>
         <div class="mgrid">
-          <div class="field"><label>Voluntário</label><select id="designarVol"></select></div>
-          <div class="field"><label>Área</label><select id="designarArea"></select></div>
-          <div class="field full"><label>Notas</label><textarea id="designarNotas" placeholder="Instruções especiais, prioridades..."></textarea></div>
+          <div class="field full"><label>Voluntário</label><select id="designarVol"></select></div>
+          <div class="field full"><label>Notas (opcional)</label><textarea id="designarNotas" placeholder="Instruções especiais..."></textarea></div>
         </div>
       </div>
       <div class="modal-footer">
-        <button id="btnCancelarPing" class="btn btn-ghost" onclick="closeModal('modalDesignar')">Cancelar</button>
-        <button class="btn btn-primary" onclick="confirmarDesignar()">Designar</button>
+        <button class="btn btn-ghost" onclick="closeModal('modalDesignar')">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarDesignar()">✓ Designar</button>
       </div>
     </div>
   </div>
@@ -4048,12 +4090,51 @@ async function carregarDadosCoord() {
 }
 
 function preencherSelectsCoord() {
-  // Filtro de áreas
-  let filtroArea = document.getElementById('filtroArea');
-  filtroArea.innerHTML = `<option value="">${CONFIG.UI.TODAS_AREAS}</option>`;
-  ESTADO.areas.forEach(a => {
-    filtroArea.innerHTML += `<option value="${a.Nome}">${a.Nome}</option>`;
-  });
+  const PT = CONFIG.UI_PINGS_TABLE;
+  
+  // V7: Filtro de mapas (BUG-006)
+  const filtroMapa = document.getElementById('filtroMapa');
+  if (filtroMapa) {
+    filtroMapa.innerHTML = `<option value="">${PT.FILTRO_TODOS_MAPAS}</option>`;
+    ESTADO.mapas.forEach(m => {
+      const codigo = m.Codigo ? m.Codigo + ' · ' : '';
+      filtroMapa.innerHTML += `<option value="${m.ID_Mapa}">${codigo}${m.Nome}</option>`;
+    });
+  }
+
+  // V7: Filtro de áreas — BUG-007 FIX: value usa ID_Area, no Nome
+  const filtroArea = document.getElementById('filtroArea');
+  if (filtroArea) {
+    filtroArea.innerHTML = `<option value="">${PT.FILTRO_TODAS_AREAS}</option>`;
+    ESTADO.areas.forEach(a => {
+      const codigo = a.Codigo ? a.Codigo + ' · ' : '';
+      // BUG-007 FIX: value="${a.ID_Area}" en vez de "${a.Nome}"
+      filtroArea.innerHTML += `<option value="${a.ID_Area}">${codigo}${a.Nome}</option>`;
+    });
+  }
+
+  // V7: Filtro de status
+  const filtroStatus = document.getElementById('filtroStatus');
+  if (filtroStatus) {
+    filtroStatus.innerHTML = `<option value="">${PT.FILTRO_TODOS_STATUS}</option>`;
+    Object.keys(CONFIG.STATUS_LABEL).forEach(s => {
+      filtroStatus.innerHTML += `<option value="${s}">${CONFIG.STATUS_LABEL[s]}</option>`;
+    });
+  }
+
+  // V7: Placeholder de búsqueda
+  const pingSearch = document.getElementById('pingSearch');
+  if (pingSearch) pingSearch.placeholder = PT.BUSCA_PLACEHOLDER;
+
+  // V7: Cabecera de tabla (BUG-009)
+  const thead = document.getElementById('pingsTHead');
+  if (thead) {
+    thead.innerHTML = [
+      PT.TH_CODIGO, PT.TH_ENDERECO, PT.TH_MAPA, PT.TH_AREA,
+      PT.TH_STATUS, PT.TH_VOLUNTARIO, PT.TH_RESIDENTES,
+      PT.TH_TIPO, PT.TH_ATUALIZADO, PT.TH_ACOES
+    ].map(h => `<th>${h}</th>`).join('');
+  }
 
   // Selects de voluntários nos modais
   const nomesVols = [CONFIG.UI.SEM_DESIGNACAO, ...ESTADO.voluntarios.map(v => v.Nome)];
@@ -4135,18 +4216,37 @@ function renderizarAreas() {
 
 function renderizarPings(lista) {
   const el = document.getElementById('pingsBody');
+  const PT = CONFIG.UI_PINGS_TABLE;
+  
   if (!lista.length) {
-    el.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px">${CONFIG.UI.SEM_DADOS}</td></tr>`;
+    el.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px">${CONFIG.UI.SEM_DADOS}</td></tr>`;
     return;
   }
+  
   el.innerHTML = lista.map(p => {
     const css   = CONFIG.STATUS_CSS[p.Status]  || 's-pending';
     const label = CONFIG.STATUS_LABEL[p.Status]|| p.Status;
-    const volIni = (_esc(p.Voluntario_Responsavel)||'—').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
-    // [F4] Código legible — usa p.Codigo si existe, fallback al ID corto
+    const volIni = (_esc(p.Voluntario_Responsavel)||'').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
+    
+    // [V7] Código legible — usa p.Codigo si existe, fallback al ID corto
     const codigo = p.Codigo || p.codigo || '';
+    
+    // [V7] BUG-005 FIX: Obtener nombre del MAPA
+    const mapaObj = ESTADO.mapas.find(m => m.ID_Mapa === p.ID_Mapa);
+    const mapaNome = mapaObj ? (mapaObj.Codigo ? mapaObj.Codigo + ' · ' + mapaObj.Nome : mapaObj.Nome) : PT.SEM_MAPA;
+    
+    // [V7] BUG-005 FIX: Obtener nombre del ÁREA
+    const areaObj = ESTADO.areas.find(a => a.ID_Area === p.ID_Area);
+    const areaNome = areaObj ? (areaObj.Codigo ? areaObj.Codigo + ' · ' + areaObj.Nome : areaObj.Nome) : PT.SEM_AREA;
+    
     // V5: Mostrar botón "Ver Formulário" si el ping tiene status concluido
     const tieneForm = p.Status === CONFIG.STATUS_PING.CONCLUIDO || p.Status === CONFIG.STATUS_PING.CRITICO;
+    
+    // [V7] Voluntario — mostrar "Não designado" si está vacío
+    const volNome = p.Voluntario_Responsavel || '';
+    const volDisplay = volNome ? `<div class="vol-chip"><div class="vol-ava">${volIni}</div>${_esc(volNome)}</div>` 
+                               : `<span style="color:var(--muted);font-size:11px;font-style:italic">${PT.SEM_VOL}</span>`;
+    
     return `
     <tr>
       <td style="color:var(--muted);font-family:'Rajdhani',sans-serif;font-size:10px">
@@ -4156,16 +4256,17 @@ function renderizarPings(lista) {
         }
       </td>
       <td><div style="font-weight:500;color:var(--text)">${_esc(p.Endereco)||'—'}</div></td>
-      <td style="color:var(--muted);font-size:10px">${_esc(p.ID_Area)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${_esc(mapaNome)}</td>
+      <td style="font-size:11px;color:var(--text)">${_esc(areaNome)}</td>
       <td><span class="tag ${css==='s-done'?'tag-done':css==='s-critical'?'tag-critical':css==='s-process'?'tag-active':'tag-pending'}">${label}</span></td>
-      <td><div class="vol-chip"><div class="vol-ava">${volIni}</div>${_esc(p.Voluntario_Responsavel)||'—'}</div></td>
+      <td>${volDisplay}</td>
       <td style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700">${_esc(p.num_residentes)||'—'}</td>
       <td style="color:var(--muted)">${_esc(p.Tipo_Unidade)||'—'}</td>
       <td style="color:var(--muted);font-size:10px">${formatarData(p.Atualizado_Em)}</td>
       <td><div class="row-acts">
         ${tieneForm ? `<div class="ico-btn" onclick="verFormularioCompleto('${_esc(p.ID_Ping)}')" title="Ver Formulário">📋</div>` : ''}
         <div class="ico-btn" onclick="focarPingMapa(${p.Latitude||0},${p.Longitude||0})" title="Ver no mapa">📍</div>
-        <div class="ico-btn" onclick="openModal('modalDesignar')" title="Redesignar">👤</div>
+        <div class="ico-btn" onclick="abrirDesignar('${_esc(p.ID_Ping)}')" title="Designar voluntário">👤</div>
         <div class="ico-btn" onclick="eliminarPing('${_esc(p.ID_Ping)}')" title="${CONFIG.UI_CICLO.BTN_ELIMINAR}">🗑</div>
       </div></td>
     </tr>`;
@@ -5065,37 +5166,101 @@ function ptoNoPoli(ponto, vertices) {
   return dentro;
 }
 
+// ════════════════════════════════════════════════════════════════
+// [V7] DESIGNAR VOLUNTARIO — BUG-002/003/010 FIX
+// ════════════════════════════════════════════════════════════════
+
+// Variable para guardar el ping actual siendo designado
+let _pingDesignarAtual = null;
+
+// [V7] BUG-003 FIX: Función que abre el modal CON contexto del ping
+function abrirDesignar(idPing) {
+  const DES = CONFIG.UI_DESIGNAR;
+  
+  // Buscar el ping en ESTADO
+  const ping = ESTADO.pings.find(p => p.ID_Ping === idPing);
+  if (!ping) {
+    toast('⚠️ Ping não encontrado.');
+    return;
+  }
+  
+  // Guardar referencia al ping actual
+  _pingDesignarAtual = ping;
+  
+  // Actualizar título del modal con info del ping
+  const tituloEl = document.getElementById('designarTitulo');
+  if (tituloEl) {
+    const codigo = ping.Codigo || ping.ID_Ping;
+    const endereco = ping.Endereco || '—';
+    tituloEl.innerHTML = `${DES.TITULO}<br><span style="font-size:12px;color:var(--muted);font-weight:400">${codigo} · ${endereco}</span>`;
+  }
+  
+  // Pre-seleccionar voluntario actual si existe
+  const volSelect = document.getElementById('designarVol');
+  if (volSelect && ping.Voluntario_Responsavel) {
+    volSelect.value = ping.Voluntario_Responsavel;
+  }
+  
+  // Limpiar notas
+  const notasEl = document.getElementById('designarNotas');
+  if (notasEl) notasEl.value = '';
+  
+  openModal('modalDesignar');
+}
+
+// [V7] BUG-002/010 FIX: Enviar idPing al backend y mostrar error real
 async function confirmarDesignar() {
-  const vol   = document.getElementById('designarVol').value;
-  const area  = document.getElementById('designarArea').value;
-  const notas = document.getElementById('designarNotas').value;
-  if (!vol) { toast('⚠️ Selecione um voluntário.'); return; }
+  const DES = CONFIG.UI_DESIGNAR;
+  const vol = document.getElementById('designarVol')?.value;
+  
+  if (!vol) { 
+    toast(DES.TOAST_SEM_VOL); 
+    return; 
+  }
+  
+  // [V7] BUG-002 FIX: Verificar que tenemos un ping seleccionado
+  if (!_pingDesignarAtual) {
+    toast('⚠️ Nenhum ping selecionado.');
+    return;
+  }
+  
   try {
     const r = await chamarBackend({
-      acao:      CONFIG.ACOES.DESIGNAR_VOLUNTARIO,
+      acao:       CONFIG.ACOES.DESIGNAR_VOLUNTARIO,
+      // [V7] BUG-002 FIX: Enviar idPing (REQUERIDO por el backend)
+      idPing:     _pingDesignarAtual.ID_Ping,
       voluntario: vol,
-      area:      area !== CONFIG.UI.SEM_DESIGNACAO ? area : '',
-      notas:     notas,
-      idMapa:    ESTADO.mapaAtual ? ESTADO.mapaAtual.ID_Mapa : '',
-      criadoPor: ESTADO.sessao ? (ESTADO.sessao.Nome || ESTADO.sessao.usuario) : '',
     });
+    
+    // [V7] BUG-010 FIX: Mostrar error real del backend, no fallback optimista
     if (r.sucesso) {
-      toast(CONFIG.UI.TOAST_DESIGNAR_SALVO);
+      toast(DES.TOAST_OK);
+      closeModal('modalDesignar');
+      _pingDesignarAtual = null;
+      await carregarDadosCoord();
     } else {
-      toast(CONFIG.UI.TOAST_DESIGNAR_OK); // fallback optimista
+      toast(DES.TOAST_ERR + ' ' + (r.mensagem || ''));
     }
   } catch(e) {
-    toast(CONFIG.UI.TOAST_DESIGNAR_OK); // fallback se backend indisponível
+    toast(DES.TOAST_ERR);
   }
-  closeModal('modalDesignar');
-  document.getElementById('designarNotas').value = '';
-  await carregarDadosCoord();
+}
+
+// Mantener compatibilidad con código existente que llama openModal('modalDesignar') sin contexto
+// Esto no debería pasar en V7, pero por seguridad mostramos advertencia
+function _onModalDesignarOpen() {
+  if (!_pingDesignarAtual) {
+    console.warn('Modal de designar abierto sin contexto de ping. Use abrirDesignar(idPing) en su lugar.');
+  }
 }
 
 async function criarVoluntario() {
   const nome    = document.getElementById('volNomeInput').value.trim();
   const usuario = document.getElementById('volUsuarioInput').value.trim();
   const senha   = document.getElementById('volSenhaInput').value;
+  // [V7] BUG-001 FIX: Leer área seleccionada del dropdown
+  const area    = document.getElementById('volAreaInput')?.value || '';
+  
   if (!nome || !usuario || !senha) { toast(CONFIG.UI.TOAST_VOL_CAMPOS); return; }
   try {
     const r = await chamarBackend({
@@ -5103,10 +5268,16 @@ async function criarVoluntario() {
       nome, usuario, senha,
       tipo:    CONFIG.ROLE_TIPO_BACKEND[CONFIG.ROLES.VOL],
       ativo:   'true',
+      // [V7] BUG-001 FIX: Enviar área al backend
+      areasPermitidas: area !== CONFIG.UI.SEM_DESIGNACAO ? area : '',
     });
     if (r.sucesso) {
       toast(CONFIG.UI.TOAST_VOLS_OK);
       closeModal('modalVoluntario');
+      // Limpiar campos del modal
+      document.getElementById('volNomeInput').value = '';
+      document.getElementById('volUsuarioInput').value = '';
+      document.getElementById('volSenhaInput').value = '';
       await carregarDadosCoord();
     } else {
       toast('⚠️ ' + r.mensagem);
@@ -5140,25 +5311,50 @@ function goAddPing() {
   }, 100);
 }
 
-function filtrarPings(q) {
-  const low = q.toLowerCase();
-  renderizarPings(ESTADO.pings.filter(p =>
-    (p.Endereco||'').toLowerCase().includes(low) ||
-    (p.ID_Area||'').toLowerCase().includes(low) ||
-    (p.Voluntario_Responsavel||'').toLowerCase().includes(low)
-  ));
+// ════════════════════════════════════════════════════════════════
+// [V7] FILTROS COMBINADOS — BUG-008 FIX
+// Una sola función que aplica todos los filtros simultáneamente
+// ════════════════════════════════════════════════════════════════
+function aplicarFiltrosPings() {
+  const mapa   = document.getElementById('filtroMapa')?.value   || '';
+  const area   = document.getElementById('filtroArea')?.value   || '';
+  const status = document.getElementById('filtroStatus')?.value || '';
+  const busca  = (document.getElementById('pingSearch')?.value  || '').toLowerCase().trim();
+  
+  let resultado = ESTADO.pings;
+  
+  // Filtrar por mapa
+  if (mapa) {
+    resultado = resultado.filter(p => p.ID_Mapa === mapa);
+  }
+  
+  // Filtrar por área (BUG-007 FIX: ahora compara ID_Area correctamente)
+  if (area) {
+    resultado = resultado.filter(p => p.ID_Area === area);
+  }
+  
+  // Filtrar por status
+  if (status) {
+    resultado = resultado.filter(p => p.Status === status);
+  }
+  
+  // Filtrar por búsqueda de texto
+  if (busca) {
+    resultado = resultado.filter(p =>
+      (p.Endereco || '').toLowerCase().includes(busca) ||
+      (p.Codigo || '').toLowerCase().includes(busca) ||
+      (p.Voluntario_Responsavel || '').toLowerCase().includes(busca) ||
+      (p.Tipo_Unidade || '').toLowerCase().includes(busca)
+    );
+  }
+  
+  renderizarPings(resultado);
 }
 
-function filtrarPingsPorArea(area) {
-  renderizarPings(area ? ESTADO.pings.filter(p => p.ID_Area === area) : ESTADO.pings);
-}
-
-function filtrarPingsPorStatus(status) {
-  renderizarPings(status
-    ? ESTADO.pings.filter(p => CONFIG.STATUS_LABEL[p.Status] === status || p.Status === status)
-    : ESTADO.pings
-  );
-}
+// Mantener compatibilidad con llamadas existentes (deprecated)
+function filtrarPings(q) { aplicarFiltrosPings(); }
+function filtrarPingsPorArea(area) { aplicarFiltrosPings(); }
+function filtrarPingsPorStatus(status) { aplicarFiltrosPings(); }
 
 function toggleOfflineCoord() {
   offlineCoord = !offlineCoord;
@@ -6589,6 +6785,7 @@ async function carregarAreaVol() {
 
 // ════════════════════════════════════════════════════════════════
 // PINGS DEL VOLUNTARIO
+// [V7] BUG-004 FIX: Cargar TODOS los pings del área, no solo los asignados
 // ════════════════════════════════════════════════════════════════
 async function carregarPingsVol() {
   const s = ESTADO.sessao;
@@ -6598,14 +6795,37 @@ async function carregarPingsVol() {
   if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_PINGS_CARREGANDO}</div>`;
 
   try {
-    // B-11: Buscar todos os pings e filtrar pelo voluntário logado no frontend
     const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
     if (r.sucesso && Array.isArray(r.dados)) {
-      const nomeVol = s.Nome || s.nome || s.usuario || '';
-      ESTADO.pingsVol = r.dados.filter(p =>
-        p.Voluntario_Responsavel &&
-        p.Voluntario_Responsavel.toString().trim() === nomeVol.trim()
+      const nomeVol = (s.Nome || s.nome || s.usuario || '').trim();
+      const areaVol = (s.Areas_Permitidas || '').trim();
+      
+      // [V7] BUG-004 FIX: Buscar el ID_Area del voluntario
+      const areaObj = ESTADO.areas.find(a => 
+        (a.Nome || '').trim() === areaVol || 
+        (a.ID_Area || '') === areaVol
       );
+      const idAreaVol = areaObj ? areaObj.ID_Area : null;
+      
+      // [V7] BUG-004 FIX: Cargar TODOS los pings del área O los asignados directamente
+      ESTADO.pingsVol = r.dados.filter(p => {
+        // Ping asignado directamente al voluntario
+        const esMio = p.Voluntario_Responsavel && 
+                      p.Voluntario_Responsavel.toString().trim() === nomeVol;
+        
+        // Ping en el área del voluntario (aunque no esté asignado a él)
+        const enMiArea = idAreaVol && p.ID_Area === idAreaVol;
+        
+        return esMio || enMiArea;
+      });
+      
+      // [V7] BUG-004/013: Marcar cada ping con flag "esMio" para diferenciación visual
+      ESTADO.pingsVol = ESTADO.pingsVol.map(p => ({
+        ...p,
+        _esMio: p.Voluntario_Responsavel && 
+                p.Voluntario_Responsavel.toString().trim() === nomeVol
+      }));
+      
       try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e){}
       // [F8] Pre-calcular rotas quando há sinal — guarda no IndexedDB para uso offline
       if (!offlineVol) precalcularRutas();
@@ -6622,37 +6842,60 @@ async function carregarPingsVol() {
 
 function renderizarPingsVol() {
   const lista = ESTADO.pingsVol;
-  const total   = lista.length;
-  const feitos  = lista.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
+  
+  // [V7] BUG-004: Separar pings propios de otros para estadísticas
+  const mios = lista.filter(p => p._esMio);
+  const otros = lista.filter(p => !p._esMio);
+  
+  const total   = mios.length; // Solo contar los míos para progreso
+  const feitos  = mios.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
   const pct     = total>0 ? Math.round(feitos/total*100) : 0;
 
   _txt('volProgNum', feitos+'/'+total);
   document.getElementById('volProgFill').style.width = pct+'%';
-  _txt('pingCountVol', total + ' ' + CONFIG.UI.PINGS_ATRIBUIDOS);
+  // [V7] Mostrar total propio + otros en el área
+  const labelPings = total + ' ' + CONFIG.UI.PINGS_ATRIBUIDOS + (otros.length > 0 ? ` · ${otros.length} na área` : '');
+  _txt('pingCountVol', labelPings);
 
-  const pend = lista.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE||p.Status===CONFIG.STATUS_PING.CRITICO).length;
+  const pend = mios.filter(p=>p.Status===CONFIG.STATUS_PING.PENDENTE||p.Status===CONFIG.STATUS_PING.CRITICO).length;
   const badge = document.getElementById('pendBadge');
   if (badge) { badge.textContent = pend; badge.style.display = pend>0?'block':'none'; }
 
-  const pingsHTML = total === 0
+  const pingsHTML = lista.length === 0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
     : lista.map((p,i) => {
         const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
         const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
         const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+        
+        // [V7] BUG-004/013: Diferenciación visual — ping propio vs de otro
+        const esMio = p._esMio;
+        const cardStyle = esMio 
+          ? '' 
+          : 'opacity:0.6;border-left:3px solid var(--muted);';
+        const tagOtro = esMio 
+          ? '' 
+          : `<span style="font-size:9px;color:var(--muted);margin-left:6px;font-style:italic">(${p.Voluntario_Responsavel || 'não designado'})</span>`;
+        
+        // [V7] Solo permitir abrir formulario si es mío
+        const onclickAction = esMio 
+          ? `onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')"`
+          : `onclick="toast('ℹ️ Este ponto pertence a outro voluntário.')"`;
+        
         return `
-        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
+        <div class="ping-card" style="animation-delay:${i*0.05}s;${cardStyle}" ${onclickAction}>
           <div class="ping-card-inner">
             <div class="ping-status-bar" style="background:${cor}"></div>
             <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+_esc(p.ID_Ping)}</div>
+              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+_esc(p.ID_Ping)}${tagOtro}</div>
               <div class="ping-meta">
-                <span>${_esc(p.ID_Area)||'—'}</span>
+                <span>${_esc(p.Codigo)||_esc(p.ID_Area)||'—'}</span>
                 <span>${_esc(p.Tipo_Unidade)||'—'}</span>
               </div>
             </div>
             <div class="ping-right">
               <span class="status-tag ${css}">${lbl}</span>
+              ${esMio ? '' : '<span style="font-size:16px;margin-left:4px">👁</span>'}
             </div>
           </div>
         </div>`;
@@ -6668,20 +6911,38 @@ function renderizarPingsVol() {
   _txt('syncEnviados',  feitos);
   _txt('syncPendentes', pend);
 
+  // [V7] BUG-004: Renderizar marcadores en mapa con diferenciación visual
   lista.forEach(p => {
     if (!p.Latitude || !p.Longitude) return;
     const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
     const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
+    const esMio = p._esMio;
+    
+    // [V7] Marcador diferente para pings propios vs de otros
+    const size = esMio ? 14 : 10;
+    const border = esMio ? 'white' : 'rgba(255,255,255,0.4)';
+    const opacity = esMio ? 1 : 0.5;
+    
     L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
       icon: L.divIcon({
         className:'',
-        html:`<div style="width:14px;height:14px;border-radius:50%;background:${cor};border:2px solid white;box-shadow:0 0 8px ${cor}"></div>`,
-        iconSize:[14,14], iconAnchor:[7,7],
+        html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${cor};border:2px solid ${border};box-shadow:0 0 8px ${cor};opacity:${opacity}"></div>`,
+        iconSize:[size,size], iconAnchor:[size/2,size/2],
       })
     }).addTo(mapVol)
-      .bindPopup(`<strong>${_esc(p.Endereco)||'Ponto'}</strong><br><span style="color:${cor};font-size:11px">${lbl}</span>`)
-      // [F8] Click abre bottom sheet en lugar de formulario directamente
-      .on('click', () => { setTimeout(() => abrirBottomSheetPin(p), 80); });
+      .bindPopup(`
+        <strong>${_esc(p.Endereco)||'Ponto'}</strong><br>
+        <span style="color:${cor};font-size:11px">${lbl}</span>
+        ${esMio ? '' : `<br><span style="font-size:10px;color:#888">👤 ${p.Voluntario_Responsavel || 'Não designado'}</span>`}
+      `)
+      // [F8] Click abre bottom sheet solo para pings propios
+      .on('click', () => { 
+        if (esMio) {
+          setTimeout(() => abrirBottomSheetPin(p), 80); 
+        } else {
+          toast('👁 Ponto de outro voluntário: ' + (p.Voluntario_Responsavel || 'não designado'));
+        }
+      });
   });
 }
 
