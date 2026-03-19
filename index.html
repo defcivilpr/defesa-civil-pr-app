@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v8.2",
+    VERSAO:     "v8.3",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -2288,7 +2288,8 @@ textarea{resize:vertical;min-height:65px;}
 }
 /* [V8.2] Mapa más grande para mejor uso en campo */
 #map-vol{min-height:45vh;height:45vh;width:100%;background:var(--navy);position:relative;z-index:1;}
-.map-overlay-top{position:absolute;top:8px;left:8px;z-index:10;display:flex;gap:6px;pointer-events:none;}
+/* [V8.3] BUG-5 FIX: Mover tag ONLINE a la derecha para no superponerse con +/- */
+.map-overlay-top{position:absolute;top:8px;right:8px;z-index:10;display:flex;gap:6px;pointer-events:none;}
 .map-tag{
   background:rgba(11,22,40,.85);border:1px solid var(--border);
   border-radius:5px;padding:4px 9px;font-size:10px;
@@ -2465,21 +2466,26 @@ textarea{resize:vertical;min-height:65px;}
   font-family:'Inter',sans-serif;
 }
 /* OVERLAY PANELS */
+/* [V8.3] BUG-1 FIX: z-index aumentado a 500 para estar encima de todo */
 .overlay{
   display:none;position:fixed;inset:0;background:var(--navy);
-  z-index:200;flex-direction:column;max-width:480px;margin:0 auto;overflow:hidden;
+  z-index:500;flex-direction:column;max-width:480px;margin:0 auto;overflow:hidden;
 }
 .overlay.open{display:flex;animation:slideUp .3s cubic-bezier(.32,.72,0,1);}
 .overlay-topbar{
   height:var(--topbar-h);background:var(--navy-mid);
   border-bottom:1px solid var(--border);
   display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0;
+  /* [V8.3] Asegurar que el topbar siempre sea visible */
+  position:relative;z-index:10;
 }
 .back-btn{
   width:34px;height:34px;border-radius:8px;background:var(--navy-light);
   border:1px solid var(--border);display:flex;align-items:center;
   justify-content:center;cursor:pointer;font-size:18px;color:var(--text);flex-shrink:0;
 }
+.back-btn:hover{background:var(--orange-glow);border-color:var(--orange);color:var(--orange);}
+.back-btn:active{transform:scale(0.95);}
 .overlay-title{
   font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;flex:1;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -7505,9 +7511,14 @@ function instalarPWA() {
      ============================================================ -->
 <script id="s9-voluntario">
 
+// [V8.3] Variables globales para marcadores y polígono del voluntario
+let _markersVol = [];      // Array de marcadores de pings
+let _polygonVol = null;    // Polígono del área asignada
+let _areaVolObj = null;    // Objeto del área asignada (para validación)
+
 // ════════════════════════════════════════════════════════════════
 // INICIALIZACIÓN DEL VOLUNTARIO
-// [V8.2] Corregido race condition: await en carga de áreas antes de pings
+// [V8.3] Corregido: centrar mapa en área asignada, dibujar polígono y pings
 // ════════════════════════════════════════════════════════════════
 async function inicializarVoluntario() {
   const s = ESTADO.sessao;
@@ -7537,17 +7548,17 @@ async function inicializarVoluntario() {
   _txt('perfilViewTitulo', CONFIG.UI_VIEWS_VOL.PERFIL_TITULO);
   _txt('perfilViewSub',    CONFIG.UI_VIEWS_VOL.PERFIL_SUB);
 
-  // 1. Inicializar mapa (sync)
+  // 1. Inicializar mapa (sync) — se centrará después en el área
   inicializarMapaVol();
   
-  // [V8.2] FIX: PRIMERO cargar áreas para que el filtro de pings funcione
+  // [V8.3] FIX: Cargar áreas y encontrar la del voluntario
   await _carregarAreasParaVoluntario();
   
-  // 2. AHORA cargar pings (ya tiene ESTADO.areas poblado)
-  await carregarPingsVol();
-  
-  // 3. Cargar polígono del área en el mapa
+  // [V8.3] FIX: Cargar y dibujar área PRIMERO (centra el mapa)
   await carregarAreaVol();
+  
+  // [V8.3] FIX: AHORA cargar pings (ya tiene ESTADO.areas y mapa centrado)
+  await carregarPingsVol();
   
   // [V8.2] Iniciar polling de notificaciones si está habilitado
   if (CONFIG.POLLING && CONFIG.POLLING.HABILITADO) {
@@ -7564,8 +7575,11 @@ async function _carregarAreasParaVoluntario() {
     const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
     if (r.sucesso && Array.isArray(r.dados)) {
       ESTADO.areas = r.dados;
+      console.log('[V8.3] Áreas cargadas:', ESTADO.areas.length);
     }
-  } catch(e) { /* falha silenciosa — ESTADO.areas permanece vazio */ }
+  } catch(e) { 
+    console.warn('[V8.3] Error cargando áreas:', e);
+  }
 }
 
 function inicializarMapaVol() {
@@ -7583,79 +7597,98 @@ function inicializarMapaVol() {
     );
   });
 
-  // GPS próprio
+  // [V8.3] GPS propio — marcador azul pero NO centrar aquí (se centra en área)
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(pos => {
       const { latitude: lat, longitude: lng } = pos.coords;
-      mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PADRAO);
       L.circleMarker([lat, lng], { radius:8, color:'#3B82F6', fillColor:'#3B82F6', fillOpacity:0.8 })
         .addTo(mapVol).bindPopup(CONFIG.UI.GPS_VOCE_AQUI);
-    });
+    }, () => {}, { enableHighAccuracy: true, timeout: 5000 });
   }
 }
 
-function initNewPingMap() {
-  if (newPingMapVol) { newPingMapVol.invalidateSize(); return; }
-  const M = CONFIG.MAPA;
-  const lat = parseFloat(document.getElementById('npLat').value) || M.LAT_PADRAO;
-  const lng = parseFloat(document.getElementById('npLng').value) || M.LNG_PADRAO;
-  newPingMapVol = L.map('new-ping-map', {
-    center: [lat, lng], zoom: M.ZOOM_NOVO,
-  });
-  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(newPingMapVol);
-}
-
-// B-18: Carregar polígono da área designada ao voluntário no mapa
+// [V8.3] BUG-3 FIX: Cargar y dibujar área del voluntario
 async function carregarAreaVol() {
   const s = ESTADO.sessao;
-  if (!s || !mapVol) return;
-  const areaNome = s.Areas_Permitidas;
-  if (!areaNome || areaNome === '—') return;
+  if (!s || !mapVol) {
+    console.warn('[V8.3] carregarAreaVol: sin sesión o mapa');
+    return;
+  }
+  
+  const areaNome = (s.Areas_Permitidas || '').trim();
+  console.log('[V8.3] Buscando área:', areaNome);
+  
+  if (!areaNome || areaNome === '—' || areaNome === '') {
+    console.warn('[V8.3] Voluntario sin área asignada');
+    return;
+  }
 
+  // [V8.3] Buscar área en ESTADO.areas (ya cargado)
+  const areaObj = ESTADO.areas.find(a => {
+    const nombreArea = (a.Nome || '').trim();
+    return nombreArea === areaNome;
+  });
+  
+  if (!areaObj) {
+    console.warn('[V8.3] Área no encontrada:', areaNome, 'en', ESTADO.areas.map(a => a.Nome));
+    toast(CONFIG.UI.TOAST_AREA_NAO_ENCONTRADA);
+    return;
+  }
+  
+  console.log('[V8.3] Área encontrada:', areaObj.Nome, areaObj.ID_Area);
+  _areaVolObj = areaObj; // Guardar para validación en nuevo ping
+  
+  // Parsear polígono
+  if (!areaObj.Pontos_Poligono) {
+    console.warn('[V8.3] Área sin polígono');
+    return;
+  }
+  
   try {
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
-    if (!r.sucesso || !Array.isArray(r.dados)) return;
+    const pts = JSON.parse(areaObj.Pontos_Poligono);
+    if (!pts || pts.length < 3) {
+      console.warn('[V8.3] Polígono inválido');
+      return;
+    }
+    
+    // Limpiar polígono anterior si existe
+    if (_polygonVol) {
+      mapVol.removeLayer(_polygonVol);
+    }
+    
+    // Dibujar polígono
+    _polygonVol = L.polygon(pts, {
+      color: '#F59E0B',
+      fillColor: '#F59E0B',
+      fillOpacity: 0.15,
+      weight: 3,
+      dashArray: '8,4',
+    }).addTo(mapVol);
 
-    const areas = r.dados.filter(a =>
-      a.Nome && a.Nome.toString().trim() === areaNome.toString().trim()
-    );
+    _polygonVol.bindPopup(`
+      <strong style="font-family:'Rajdhani',sans-serif;font-size:14px">${areaObj.Nome}</strong><br>
+      <span style="font-size:11px;color:#888">${CONFIG.UI.AREA_LABEL}</span>
+    `);
 
-    let encontrou = false;
-    areas.forEach(area => {
-      if (!area.Pontos_Poligono) return;
-      try {
-        const pts = JSON.parse(area.Pontos_Poligono);
-        if (!pts || pts.length < CONFIG.FORM_LIMITES.MIN_POLIGONO_PTS) return;
-
-        const poly = L.polygon(pts, {
-          color: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
-          fillColor: CONFIG.COR_STATUS[CONFIG.STATUS_PING.PENDENTE],
-          fillOpacity: 0.12,
-          weight: 2,
-          dashArray: '5,5',
-        }).addTo(mapVol);
-
-        poly.bindPopup(`
-          <strong style="font-family:'Rajdhani',sans-serif;font-size:13px">${area.Nome}</strong><br>
-          <span style="font-size:11px;color:#888">${CONFIG.UI.AREA_LABEL}</span>
-        `);
-
-        mapVol.fitBounds(poly.getBounds(), { padding: [20, 20] });
-        encontrou = true;
-
-        try { sessionStorage.setItem(CONFIG.STORAGE.AREA_CACHE, JSON.stringify(area)); } catch(e){}
-      } catch(e) {}
-    });
-
-    if (encontrou) toast(CONFIG.UI.TOAST_AREA_CARREGADA);
+    // [V8.3] BUG-2 FIX: Centrar mapa en el área
+    mapVol.fitBounds(_polygonVol.getBounds(), { padding: [30, 30] });
+    console.log('[V8.3] Mapa centrado en área');
+    
+    toast(CONFIG.UI.TOAST_AREA_CARREGADA);
+    
+    // Cache para offline
+    try { 
+      sessionStorage.setItem(CONFIG.STORAGE.AREA_CACHE, JSON.stringify(areaObj)); 
+    } catch(e) {}
+    
   } catch(e) {
-    // Modo offline: não exibir erro — o mapa já tem GPS ativo
+    console.error('[V8.3] Error parseando polígono:', e);
   }
 }
 
 // ════════════════════════════════════════════════════════════════
 // PINGS DEL VOLUNTARIO
-// [V7] BUG-004 FIX: Cargar TODOS los pings del área, no solo los asignados
+// [V8.3] BUG-4 FIX: Limpiar marcadores anteriores antes de agregar nuevos
 // ════════════════════════════════════════════════════════════════
 async function carregarPingsVol() {
   const s = ESTADO.sessao;
@@ -7670,60 +7703,64 @@ async function carregarPingsVol() {
       const nomeVol = (s.Nome || s.nome || s.usuario || '').trim();
       const areaVol = (s.Areas_Permitidas || '').trim();
       
-      // [V7] BUG-004 FIX: Buscar el ID_Area del voluntario
+      console.log('[V8.3] Filtrando pings para:', nomeVol, 'área:', areaVol);
+      
+      // [V8.3] Buscar ID_Area del voluntario
       const areaObj = ESTADO.areas.find(a => 
         (a.Nome || '').trim() === areaVol || 
         (a.ID_Area || '') === areaVol
       );
       const idAreaVol = areaObj ? areaObj.ID_Area : null;
+      console.log('[V8.3] ID_Area encontrado:', idAreaVol);
       
-      // [V7] BUG-004 FIX: Cargar TODOS los pings del área O los asignados directamente
+      // Filtrar pings: asignados a mí O en mi área
       ESTADO.pingsVol = r.dados.filter(p => {
-        // Ping asignado directamente al voluntario
         const esMio = p.Voluntario_Responsavel && 
                       p.Voluntario_Responsavel.toString().trim() === nomeVol;
-        
-        // Ping en el área del voluntario (aunque no esté asignado a él)
         const enMiArea = idAreaVol && p.ID_Area === idAreaVol;
-        
         return esMio || enMiArea;
       });
       
-      // [V7] BUG-004/013: Marcar cada ping con flag "esMio" para diferenciación visual
+      console.log('[V8.3] Pings encontrados:', ESTADO.pingsVol.length);
+      
+      // Marcar pings propios vs de otros
       ESTADO.pingsVol = ESTADO.pingsVol.map(p => ({
         ...p,
         _esMio: p.Voluntario_Responsavel && 
                 p.Voluntario_Responsavel.toString().trim() === nomeVol
       }));
       
-      try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e){}
-      // [F8] Pre-calcular rotas quando há sinal — guarda no IndexedDB para uso offline
+      try { 
+        sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); 
+      } catch(e) {}
+      
       if (!offlineVol) precalcularRutas();
     }
   } catch(e) {
+    console.warn('[V8.3] Error cargando pings:', e);
     try {
       const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
       if (cached) ESTADO.pingsVol = JSON.parse(cached);
     } catch(ce) {}
     ESTADO.pingsVol = ESTADO.pingsVol || [];
   }
+  
   renderizarPingsVol();
 }
 
 function renderizarPingsVol() {
-  const lista = ESTADO.pingsVol;
+  const lista = ESTADO.pingsVol || [];
   
-  // [V7] BUG-004: Separar pings propios de otros para estadísticas
+  // Separar pings propios de otros para estadísticas
   const mios = lista.filter(p => p._esMio);
   const otros = lista.filter(p => !p._esMio);
   
-  const total   = mios.length; // Solo contar los míos para progreso
+  const total   = mios.length;
   const feitos  = mios.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length;
   const pct     = total>0 ? Math.round(feitos/total*100) : 0;
 
   _txt('volProgNum', feitos+'/'+total);
   document.getElementById('volProgFill').style.width = pct+'%';
-  // [V7] Mostrar total propio + otros en el área
   const labelPings = total + ' ' + CONFIG.UI.PINGS_ATRIBUIDOS + (otros.length > 0 ? ` · ${otros.length} na área` : '');
   _txt('pingCountVol', labelPings);
 
@@ -7731,23 +7768,16 @@ function renderizarPingsVol() {
   const badge = document.getElementById('pendBadge');
   if (badge) { badge.textContent = pend; badge.style.display = pend>0?'block':'none'; }
 
+  // Renderizar lista HTML
   const pingsHTML = lista.length === 0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
     : lista.map((p,i) => {
         const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
         const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
         const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-        
-        // [V7] BUG-004/013: Diferenciación visual — ping propio vs de otro
         const esMio = p._esMio;
-        const cardStyle = esMio 
-          ? '' 
-          : 'opacity:0.6;border-left:3px solid var(--muted);';
-        const tagOtro = esMio 
-          ? '' 
-          : `<span style="font-size:9px;color:var(--muted);margin-left:6px;font-style:italic">(${p.Voluntario_Responsavel || 'não designado'})</span>`;
-        
-        // [V7] Solo permitir abrir formulario si es mío
+        const cardStyle = esMio ? '' : 'opacity:0.6;border-left:3px solid var(--muted);';
+        const tagOtro = esMio ? '' : `<span style="font-size:9px;color:var(--muted);margin-left:6px;font-style:italic">(${p.Voluntario_Responsavel || 'não designado'})</span>`;
         const onclickAction = esMio 
           ? `onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')"`
           : `onclick="toast('ℹ️ Este ponto pertence a outro voluntário.')"`;
@@ -7757,7 +7787,7 @@ function renderizarPingsVol() {
           <div class="ping-card-inner">
             <div class="ping-status-bar" style="background:${cor}"></div>
             <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+_esc(p.ID_Ping)}${tagOtro}</div>
+              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+(_esc(p.Codigo)||'')}${tagOtro}</div>
               <div class="ping-meta">
                 <span>${_esc(p.Codigo)||_esc(p.ID_Area)||'—'}</span>
                 <span>${_esc(p.Tipo_Unidade)||'—'}</span>
@@ -7781,31 +7811,35 @@ function renderizarPingsVol() {
   _txt('syncEnviados',  feitos);
   _txt('syncPendentes', pend);
 
-  // [V7] BUG-004: Renderizar marcadores en mapa con diferenciación visual
+  // [V8.3] BUG-4 FIX: LIMPIAR marcadores anteriores antes de agregar nuevos
+  _markersVol.forEach(m => {
+    if (mapVol) mapVol.removeLayer(m);
+  });
+  _markersVol = [];
+
+  // Agregar marcadores al mapa
   lista.forEach(p => {
     if (!p.Latitude || !p.Longitude) return;
+    
     const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
     const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
     const esMio = p._esMio;
-    
-    // [V7] Marcador diferente para pings propios vs de otros
-    const size = esMio ? 14 : 10;
+    const size = esMio ? 16 : 12;
     const border = esMio ? 'white' : 'rgba(255,255,255,0.4)';
-    const opacity = esMio ? 1 : 0.5;
+    const opacity = esMio ? 1 : 0.6;
     
-    L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
+    const marker = L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
       icon: L.divIcon({
         className:'',
-        html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${cor};border:2px solid ${border};box-shadow:0 0 8px ${cor};opacity:${opacity}"></div>`,
+        html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${cor};border:2px solid ${border};box-shadow:0 0 10px ${cor};opacity:${opacity}"></div>`,
         iconSize:[size,size], iconAnchor:[size/2,size/2],
       })
     }).addTo(mapVol)
       .bindPopup(`
-        <strong>${_esc(p.Endereco)||'Ponto'}</strong><br>
+        <strong>${_esc(p.Codigo) || _esc(p.Endereco) || 'Ponto'}</strong><br>
         <span style="color:${cor};font-size:11px">${lbl}</span>
         ${esMio ? '' : `<br><span style="font-size:10px;color:#888">👤 ${p.Voluntario_Responsavel || 'Não designado'}</span>`}
       `)
-      // [F8] Click abre bottom sheet solo para pings propios
       .on('click', () => { 
         if (esMio) {
           setTimeout(() => abrirBottomSheetPin(p), 80); 
@@ -7813,7 +7847,77 @@ function renderizarPingsVol() {
           toast('👁 Ponto de outro voluntário: ' + (p.Voluntario_Responsavel || 'não designado'));
         }
       });
+    
+    _markersVol.push(marker);
   });
+  
+  console.log('[V8.3] Marcadores agregados al mapa:', _markersVol.length);
+}
+
+// [V8.3] Función para inicializar mapa de nuevo ping
+function initNewPingMap() {
+  if (newPingMapVol) { 
+    newPingMapVol.invalidateSize(); 
+    return; 
+  }
+  const M = CONFIG.MAPA;
+  // Usar coordenadas del área si están disponibles, sino las por defecto
+  let lat = parseFloat(document.getElementById('npLat').value) || M.LAT_PADRAO;
+  let lng = parseFloat(document.getElementById('npLng').value) || M.LNG_PADRAO;
+  
+  // Si tenemos el área del voluntario, centrar en ella
+  if (_areaVolObj && _areaVolObj.Pontos_Poligono) {
+    try {
+      const pts = JSON.parse(_areaVolObj.Pontos_Poligono);
+      if (pts && pts.length > 0) {
+        // Calcular centroide del polígono
+        let sumLat = 0, sumLng = 0;
+        pts.forEach(p => { sumLat += p[0]; sumLng += p[1]; });
+        lat = sumLat / pts.length;
+        lng = sumLng / pts.length;
+      }
+    } catch(e) {}
+  }
+  
+  newPingMapVol = L.map('new-ping-map', {
+    center: [lat, lng], 
+    zoom: M.ZOOM_NOVO,
+  });
+  L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR }).addTo(newPingMapVol);
+  
+  // [V8.3] Dibujar polígono del área en el mapa de nuevo ping
+  if (_areaVolObj && _areaVolObj.Pontos_Poligono) {
+    try {
+      const pts = JSON.parse(_areaVolObj.Pontos_Poligono);
+      L.polygon(pts, {
+        color: '#F59E0B',
+        fillColor: '#F59E0B',
+        fillOpacity: 0.1,
+        weight: 2,
+        dashArray: '5,5',
+      }).addTo(newPingMapVol);
+    } catch(e) {}
+  }
+}
+
+// [V8.3] BUG-6 FIX: Función para verificar si un punto está dentro de un polígono
+// Algoritmo Ray-Casting
+function puntoEnPoligono(lat, lng, poligono) {
+  if (!poligono || poligono.length < 3) return false;
+  
+  let inside = false;
+  const x = lat, y = lng;
+  
+  for (let i = 0, j = poligono.length - 1; i < poligono.length; j = i++) {
+    const xi = poligono[i][0], yi = poligono[i][1];
+    const xj = poligono[j][0], yj = poligono[j][1];
+    
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  
+  return inside;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -8341,9 +8445,25 @@ async function createNewPing() {
   const addr = document.getElementById('npEndereco').value;
   const comp = document.getElementById('npComplemento').value;
   if (!lat || !lng) { toast('⚠️ Capture as coordenadas GPS primeiro'); return; }
+  
   const s = ESTADO.sessao;
   const areaVol = s ? (s.Areas_Permitidas || '') : '';
-  const areaObj = ESTADO.areas.find(a => a.Nome === areaVol) || null;
+  const areaObj = ESTADO.areas.find(a => a.Nome === areaVol) || _areaVolObj || null;
+
+  // [V8.3] BUG-6 FIX: Validar que el punto esté dentro del área asignada
+  if (areaObj && areaObj.Pontos_Poligono) {
+    try {
+      const poligono = JSON.parse(areaObj.Pontos_Poligono);
+      const dentroDelArea = puntoEnPoligono(parseFloat(lat), parseFloat(lng), poligono);
+      
+      if (!dentroDelArea) {
+        toast('⚠️ O ponto deve estar dentro da sua área designada');
+        return;
+      }
+    } catch(e) {
+      console.warn('[V8.3] Error validando polígono:', e);
+    }
+  }
 
   const dados = {
     acao:        CONFIG.ACOES.SALVAR_PING,
