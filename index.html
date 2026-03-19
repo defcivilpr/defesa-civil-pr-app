@@ -4182,12 +4182,29 @@ function limparToken() {
 // SESSÃO
 // ════════════════════════════════════════════════════════════════
 function salvarSessao(dadosUsuario) {
-  // F-02: normalizar casing — backend retorna 'nome' (minúscula),
-  //       garantir 'Nome' sempre presente
+  // F-02: normalizar casing — backend retorna campos em camelCase,
+  //       garantir campos em snake_case sempre presentes
   const normalizado = { ...dadosUsuario };
-  if (!normalizado.Nome && normalizado.nome) normalizado.Nome = normalizado.nome;
+  
+  // Normalizar nome
+  if (!normalizado.Nome && normalizado.nome) {
+    normalizado.Nome = normalizado.nome;
+  }
+  
+  // [V8.4] FIX: Normalizar areasPermitidas → Areas_Permitidas
+  if (!normalizado.Areas_Permitidas && normalizado.areasPermitidas) {
+    normalizado.Areas_Permitidas = normalizado.areasPermitidas;
+  }
+  
+  // [V8.4] FIX: Normalizar mapasPermitidos → Mapas_Permitidos
+  if (!normalizado.Mapas_Permitidos && normalizado.mapasPermitidos) {
+    normalizado.Mapas_Permitidos = normalizado.mapasPermitidos;
+  }
+  
   const sessao = { ...normalizado, timestamp: Date.now() };
-  try { sessionStorage.setItem(CONFIG.SESSAO.CHAVE, JSON.stringify(sessao)); } catch(e){}
+  try { 
+    sessionStorage.setItem(CONFIG.SESSAO.CHAVE, JSON.stringify(sessao)); 
+  } catch(e) {}
   ESTADO.sessao = sessao;
 }
 
