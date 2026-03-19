@@ -452,7 +452,7 @@ const CONFIG = {
     DUP_AVISO:          "Use o campo <strong>Complemento</strong> para diferenciar unidades no mesmo local.",
 
     // Versão
-    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v7.0 · PWA",
+    VERSAO_RODAPE:      "DEFESA CIVIL PARANÁ · v7.1 · PWA",
 
     // Sprint 3 — Voluntário
     FORM_CAMPO_OBRIG:   "⚠️ Preencha o endereço e as coordenadas GPS.",
@@ -765,6 +765,37 @@ const CONFIG = {
     TOAST_OK:         "✅ Voluntário designado com sucesso.",
     TOAST_ERR:        "⚠️ Erro ao designar voluntário.",
     TOAST_SEM_VOL:    "⚠️ Selecione um voluntário.",
+  },
+
+  // ── [V7] UI_EDITAR_VOL — Modal completo de edición de voluntario ──
+  UI_EDITAR_VOL: {
+    TITULO:              "✏️ Editar Voluntário",
+    // Sección credenciales
+    SEC_CREDENCIAIS:     "🔐 Credenciais",
+    LABEL_NOME:          "Nome Completo",
+    LABEL_USUARIO:       "Usuário (login)",
+    LABEL_SENHA:         "Nova Senha",
+    PLACEHOLDER_SENHA:   "Deixe em branco para manter atual",
+    // Sección área
+    SEC_AREA:            "📍 Área Designada",
+    LABEL_AREA:          "Área de Trabalho",
+    SEM_AREA:            "— Sem área designada —",
+    AREA_HINT:           "Ao trocar de área, os pings atribuídos serão removidos",
+    // Sección pings
+    SEC_PINGS:           "📌 Pings Atribuídos",
+    PINGS_DISPONIVEIS:   "Disponíveis na área",
+    PINGS_ATRIBUIDOS:    "Atribuídos a este voluntário",
+    PING_DE_OUTRO:       "Atribuído a:",
+    SEM_PINGS_AREA:      "Nenhum ping nesta área",
+    SEM_AREA_SELECIONADA:"Selecione uma área primeiro",
+    // Botones
+    BTN_CANCELAR:        "Cancelar",
+    BTN_SALVAR:          "💾 Salvar Alterações",
+    // Mensajes
+    TOAST_OK:            "✅ Voluntário atualizado com sucesso.",
+    TOAST_ERR:           "⚠️ Erro ao atualizar voluntário.",
+    TOAST_CAMPOS:        "⚠️ Nome e usuário são obrigatórios.",
+    TOAST_SENHA_CURTA:   "⚠️ Senha deve ter ao menos 4 caracteres.",
   },
 
   // ── Duração do toast (ms) ────────────────────────────────────
@@ -2280,6 +2311,34 @@ textarea{resize:vertical;min-height:65px;}
   background:var(--card);border:1px solid rgba(255,255,255,.05);
   border-radius:10px;overflow:hidden;margin-bottom:12px;
 }
+/* V7: Ping item en modal editar voluntario */
+.ev-ping-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .15s;
+}
+.ev-ping-item:last-child{border-bottom:none;}
+.ev-ping-item:hover{background:rgba(255,255,255,.02);}
+.ev-ping-item.disabled{opacity:0.5;pointer-events:none;}
+.ev-ping-item.assigned-other{background:rgba(239,68,68,.05);}
+.ev-ping-item.assigned-me{background:rgba(34,197,94,.08);}
+.ev-ping-check{
+  width:18px;height:18px;border-radius:4px;
+  border:2px solid var(--border);background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;
+}
+.ev-ping-check.checked{background:var(--orange);border-color:var(--orange);}
+.ev-ping-check.checked::after{content:'✓';color:white;font-size:12px;font-weight:700;}
+.ev-ping-check.locked{background:var(--muted);border-color:var(--muted);cursor:not-allowed;}
+.ev-ping-info{flex:1;min-width:0;}
+.ev-ping-addr{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ev-ping-meta{font-size:10px;color:var(--muted);display:flex;gap:8px;margin-top:2px;}
+.ev-ping-status{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;}
+.ev-ping-status.s-pending{background:rgba(245,158,11,.15);color:#F59E0B;}
+.ev-ping-status.s-critical{background:rgba(239,68,68,.15);color:#EF4444;}
+.ev-ping-status.s-done{background:rgba(34,197,94,.15);color:#22C55E;}
+.ev-ping-status.s-process{background:rgba(249,115,22,.15);color:#F97316;}
 .field-section-header{
   padding:10px 14px;background:var(--navy-mid);
   border-bottom:1px solid rgba(255,255,255,.05);
@@ -2839,6 +2898,60 @@ textarea{resize:vertical;min-height:65px;}
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
         <button class="btn btn-primary" id="euBtnSalvar" onclick="confirmarEditarUsuario()"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR VOLUNTÁRIO COMPLETO — [V7] -->
+  <div class="modal-overlay" id="modalEditarVoluntario">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-hdr">
+        <div class="modal-title" id="evTitulo">✏️ Editar Voluntário</div>
+        <div class="modal-close" onclick="closeModal('modalEditarVoluntario')">✕</div>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <input type="hidden" id="evId">
+        <input type="hidden" id="evNomeOriginal">
+        
+        <!-- Sección: Credenciales -->
+        <div class="field-section" style="margin-bottom:16px">
+          <div class="field-section-header">🔐 CREDENCIAIS</div>
+          <div class="field-body">
+            <div class="mgrid">
+              <div class="field"><label>Nome Completo *</label><input type="text" id="evNome" placeholder="Nome do voluntário"></div>
+              <div class="field"><label>Usuário (login) *</label><input type="text" id="evUsuario" placeholder="usuario123"></div>
+              <div class="field full"><label>Nova Senha <span style="color:var(--muted);font-size:10px">(deixe em branco para manter)</span></label><input type="password" id="evSenha" placeholder=""></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección: Área -->
+        <div class="field-section" style="margin-bottom:16px">
+          <div class="field-section-header">📍 ÁREA DESIGNADA</div>
+          <div class="field-body">
+            <select id="evArea" onchange="onEvAreaChange()" style="width:100%"></select>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">⚠️ Ao trocar de área, os pings atribuídos a este voluntário serão removidos automaticamente.</div>
+          </div>
+        </div>
+
+        <!-- Sección: Pings -->
+        <div class="field-section">
+          <div class="field-section-header">📌 PINGS DA ÁREA</div>
+          <div class="field-body">
+            <div id="evPingsContainer" style="max-height:200px;overflow-y:auto">
+              <!-- Lista de pings se renderiza dinámicamente -->
+            </div>
+            <div id="evPingsVazio" style="text-align:center;color:var(--muted);font-size:12px;padding:16px;display:none">
+              Selecione uma área para ver os pings disponíveis.
+            </div>
+          </div>
+        </div>
+
+        <div id="evErro" style="color:var(--red);font-size:12px;margin-top:12px;display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modalEditarVoluntario')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarVoluntarioCompleto()">💾 Salvar Alterações</button>
       </div>
     </div>
   </div>
@@ -5444,13 +5557,17 @@ function renderizarVoluntarios() {
       (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm).length;
     const pingsCrit      = ESTADO.pings.filter(p =>
       (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CRITICO).length;
+    
+    // V7: Escapar datos para pasar al onclick
+    const volJson = JSON.stringify(v).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    
     return `
     <div class="vol-card">
       <div class="vc-top">
         <div class="vc-ava ${pingsFeitosVol>0?'av':''}">${ini}</div>
         <div>
           <div class="vc-name">${_esc(v.Nome)||'—'}</div>
-          <div class="vc-area">${_esc(v.Areas_Permitidas)||'—'}</div>
+          <div class="vc-area">${_esc(v.Areas_Permitidas)||'Sem área'}</div>
           <span class="tag tag-done" style="margin-top:3px">${CONFIG.VOL_STATUS_ATIVO_LABEL}</span>
         </div>
       </div>
@@ -5460,10 +5577,262 @@ function renderizarVoluntarios() {
         <div class="vcs"><div class="vcs-v" style="color:${pingsCrit>0?'var(--red)':'var(--muted)'}">${pingsCrit}</div><div class="vcs-l">Críticos</div></div>
       </div>
       <div class="vc-acts">
-        <button class="btn btn-ghost" onclick="openModal('modalDesignar')">📐 Redesignar</button>
+        <button class="btn btn-ghost" onclick="abrirEditarVoluntario('${_esc(v.ID_Usuario || v.id)}')">✏️ Editar</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V7] EDITAR VOLUNTÁRIO COMPLETO — Modal con asignación de pings
+// ════════════════════════════════════════════════════════════════
+
+// Estado temporal del modal
+let _evVoluntarioActual = null;
+let _evPingsSeleccionados = [];
+
+// Abre el modal de editar voluntario
+function abrirEditarVoluntario(idUsuario) {
+  // Buscar voluntario por ID
+  const vol = ESTADO.voluntarios.find(v => 
+    (v.ID_Usuario || v.id) === idUsuario
+  );
+  
+  if (!vol) {
+    toast('⚠️ Voluntário não encontrado.');
+    return;
+  }
+  
+  _evVoluntarioActual = vol;
+  const EV = CONFIG.UI_EDITAR_VOL;
+  
+  // Llenar campos
+  document.getElementById('evId').value = idUsuario;
+  document.getElementById('evNomeOriginal').value = vol.Nome || '';
+  document.getElementById('evNome').value = vol.Nome || '';
+  document.getElementById('evUsuario').value = vol.Usuario || vol.usuario || '';
+  document.getElementById('evSenha').value = '';
+  document.getElementById('evTitulo').textContent = EV.TITULO + ': ' + (vol.Nome || '');
+  document.getElementById('evErro').style.display = 'none';
+  
+  // Llenar select de áreas
+  const areaSelect = document.getElementById('evArea');
+  areaSelect.innerHTML = `<option value="">${EV.SEM_AREA}</option>`;
+  ESTADO.areas.forEach(a => {
+    const codigo = a.Codigo ? a.Codigo + ' · ' : '';
+    const selected = (vol.Areas_Permitidas || '') === a.Nome ? 'selected' : '';
+    areaSelect.innerHTML += `<option value="${_esc(a.Nome)}" ${selected}>${codigo}${_esc(a.Nome)}</option>`;
+  });
+  
+  // Renderizar pings del área actual
+  renderizarPingsEditarVol();
+  
+  openModal('modalEditarVoluntario');
+}
+
+// Cuando cambia el área seleccionada
+function onEvAreaChange() {
+  // Limpiar selección de pings
+  _evPingsSeleccionados = [];
+  renderizarPingsEditarVol();
+}
+
+// Renderiza la lista de pings en el modal
+function renderizarPingsEditarVol() {
+  const container = document.getElementById('evPingsContainer');
+  const vazio = document.getElementById('evPingsVazio');
+  const areaNome = document.getElementById('evArea').value;
+  const EV = CONFIG.UI_EDITAR_VOL;
+  const nomeVol = _evVoluntarioActual?.Nome || '';
+  
+  if (!areaNome) {
+    container.innerHTML = '';
+    vazio.textContent = EV.SEM_AREA_SELECIONADA;
+    vazio.style.display = 'block';
+    return;
+  }
+  
+  // Buscar el área por nombre para obtener ID
+  const areaObj = ESTADO.areas.find(a => a.Nome === areaNome);
+  if (!areaObj) {
+    container.innerHTML = '';
+    vazio.textContent = EV.SEM_PINGS_AREA;
+    vazio.style.display = 'block';
+    return;
+  }
+  
+  // Filtrar pings de esta área
+  const pingsArea = ESTADO.pings.filter(p => p.ID_Area === areaObj.ID_Area);
+  
+  if (pingsArea.length === 0) {
+    container.innerHTML = '';
+    vazio.textContent = EV.SEM_PINGS_AREA;
+    vazio.style.display = 'block';
+    return;
+  }
+  
+  vazio.style.display = 'none';
+  
+  // Inicializar selección con pings ya asignados a este voluntario
+  if (_evPingsSeleccionados.length === 0) {
+    _evPingsSeleccionados = pingsArea
+      .filter(p => (p.Voluntario_Responsavel || '').trim().toLowerCase() === nomeVol.trim().toLowerCase())
+      .map(p => p.ID_Ping);
+  }
+  
+  container.innerHTML = pingsArea.map(p => {
+    const codigo = p.Codigo || p.ID_Ping.substring(0, 8);
+    const endereco = p.Endereco || 'Ponto sem endereço';
+    const status = p.Status || CONFIG.STATUS_PING.PENDENTE;
+    const statusCss = CONFIG.STATUS_CSS[status] || 's-pending';
+    const statusLabel = CONFIG.STATUS_LABEL[status] || status;
+    
+    // Verificar estado del ping
+    const volResponsavel = (p.Voluntario_Responsavel || '').trim();
+    const esMio = volResponsavel.toLowerCase() === nomeVol.trim().toLowerCase();
+    const tieneOtro = volResponsavel && !esMio;
+    const estaCompleto = status === CONFIG.STATUS_PING.CONCLUIDO;
+    
+    // Determinar si está bloqueado
+    const bloqueado = tieneOtro || estaCompleto;
+    const seleccionado = _evPingsSeleccionados.includes(p.ID_Ping);
+    
+    // Clases CSS
+    let itemClass = 'ev-ping-item';
+    if (bloqueado) itemClass += ' disabled';
+    if (esMio) itemClass += ' assigned-me';
+    if (tieneOtro) itemClass += ' assigned-other';
+    
+    // Texto de bloqueo
+    let lockReason = '';
+    if (tieneOtro) lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
+    if (estaCompleto) lockReason = '🔒 Formulário já enviado';
+    
+    return `
+    <div class="${itemClass}" onclick="${bloqueado ? '' : `togglePingEv('${p.ID_Ping}')`}">
+      <div class="ev-ping-check ${seleccionado ? 'checked' : ''} ${bloqueado ? 'locked' : ''}" id="evCheck-${p.ID_Ping}"></div>
+      <div class="ev-ping-info">
+        <div class="ev-ping-addr">${_esc(codigo)} · ${_esc(endereco)}</div>
+        <div class="ev-ping-meta">
+          ${lockReason ? `<span style="color:var(--red)">${lockReason}</span>` : `<span>${_esc(p.Tipo_Unidade || '—')}</span>`}
+        </div>
+      </div>
+      <div class="ev-ping-status ${statusCss}">${statusLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+// Toggle selección de ping
+function togglePingEv(idPing) {
+  const idx = _evPingsSeleccionados.indexOf(idPing);
+  if (idx >= 0) {
+    _evPingsSeleccionados.splice(idx, 1);
+  } else {
+    _evPingsSeleccionados.push(idPing);
+  }
+  
+  // Actualizar visual del checkbox
+  const check = document.getElementById('evCheck-' + idPing);
+  if (check) {
+    check.classList.toggle('checked', _evPingsSeleccionados.includes(idPing));
+  }
+}
+
+// Guardar cambios del voluntario
+async function salvarVoluntarioCompleto() {
+  const EV = CONFIG.UI_EDITAR_VOL;
+  const idUsuario = document.getElementById('evId').value;
+  const nomeOriginal = document.getElementById('evNomeOriginal').value;
+  const nome = document.getElementById('evNome').value.trim();
+  const usuario = document.getElementById('evUsuario').value.trim();
+  const senha = document.getElementById('evSenha').value;
+  const area = document.getElementById('evArea').value;
+  
+  // Validaciones
+  if (!nome || !usuario) {
+    document.getElementById('evErro').textContent = EV.TOAST_CAMPOS;
+    document.getElementById('evErro').style.display = 'block';
+    return;
+  }
+  
+  if (senha && senha.length < 4) {
+    document.getElementById('evErro').textContent = EV.TOAST_SENHA_CURTA;
+    document.getElementById('evErro').style.display = 'block';
+    return;
+  }
+  
+  try {
+    // 1. Actualizar datos del usuario
+    const payload = {
+      acao: CONFIG.ACOES.EDITAR_USUARIO,
+      id: idUsuario,
+      nome,
+      usuario,
+      areasPermitidas: area,
+    };
+    if (senha) payload.senha = senha;
+    
+    const r = await chamarBackend(payload);
+    
+    if (!r.sucesso) {
+      document.getElementById('evErro').textContent = EV.TOAST_ERR + ' ' + (r.mensagem || '');
+      document.getElementById('evErro').style.display = 'block';
+      return;
+    }
+    
+    // 2. Actualizar asignaciones de pings
+    // Primero, desasignar pings que ya no están seleccionados
+    const areaObj = ESTADO.areas.find(a => a.Nome === area);
+    if (areaObj) {
+      const pingsArea = ESTADO.pings.filter(p => p.ID_Area === areaObj.ID_Area);
+      
+      for (const ping of pingsArea) {
+        const volActual = (ping.Voluntario_Responsavel || '').trim().toLowerCase();
+        const eraMio = volActual === nomeOriginal.trim().toLowerCase();
+        const estaSeleccionado = _evPingsSeleccionados.includes(ping.ID_Ping);
+        const estaCompleto = ping.Status === CONFIG.STATUS_PING.CONCLUIDO;
+        
+        // Si era mío y ya no está seleccionado y no está completo → desasignar
+        if (eraMio && !estaSeleccionado && !estaCompleto) {
+          await chamarBackend({
+            acao: CONFIG.ACOES.DESIGNAR_VOLUNTARIO,
+            idPing: ping.ID_Ping,
+            voluntario: '', // Desasignar
+          });
+        }
+        
+        // Si no era mío y ahora está seleccionado → asignar
+        if (!eraMio && estaSeleccionado) {
+          await chamarBackend({
+            acao: CONFIG.ACOES.DESIGNAR_VOLUNTARIO,
+            idPing: ping.ID_Ping,
+            voluntario: nome,
+          });
+        }
+        
+        // Si era mío pero el nombre cambió → actualizar con nuevo nombre
+        if (eraMio && estaSeleccionado && nome !== nomeOriginal) {
+          await chamarBackend({
+            acao: CONFIG.ACOES.DESIGNAR_VOLUNTARIO,
+            idPing: ping.ID_Ping,
+            voluntario: nome,
+          });
+        }
+      }
+    }
+    
+    toast(EV.TOAST_OK);
+    closeModal('modalEditarVoluntario');
+    _evVoluntarioActual = null;
+    _evPingsSeleccionados = [];
+    
+    // Recargar datos
+    await carregarDadosCoord();
+    
+  } catch (e) {
+    document.getElementById('evErro').textContent = EV.TOAST_ERR;
+    document.getElementById('evErro').style.display = 'block';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
