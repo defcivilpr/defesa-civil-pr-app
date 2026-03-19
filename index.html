@@ -5741,22 +5741,37 @@ function renderizarPingsEditarVol() {
     // Verificar estado del ping
     const volResponsavel = (p.Voluntario_Responsavel || '').trim();
     const esMio = volResponsavel.toLowerCase() === nomeVol.trim().toLowerCase();
-    const tieneOtro = volResponsavel && !esMio;
+    
+    // [V8] FIX: Verificar si el voluntario responsable sigue activo
+    // Si el ping está Pendiente y su voluntario fue eliminado → tratarlo como disponible
+    const volResponsavelActivo = volResponsavel 
+      ? ESTADO.voluntarios.some(v => (v.Nome || '').trim().toLowerCase() === volResponsavel.toLowerCase())
+      : false;
+    
+    // tieneOtro = tiene voluntario asignado, no soy yo, Y ese voluntario sigue activo
+    // Si el voluntario fue eliminado Y el ping está pendiente → NO está bloqueado
+    const esPendiente = status === CONFIG.STATUS_PING.PENDENTE;
+    const tieneOtroActivo = volResponsavel && !esMio && volResponsavelActivo;
+    const tieneOtroEliminado = volResponsavel && !esMio && !volResponsavelActivo;
+    
     const estaCompleto = status === CONFIG.STATUS_PING.CONCLUIDO;
     
-    // Determinar si está bloqueado
-    const bloqueado = tieneOtro || estaCompleto;
+    // [V8] Regla: PIN de voluntario eliminado + Pendiente = disponible para reasignar
+    // PIN de voluntario eliminado + Concluido = preservar historial (bloqueado)
+    const bloqueado = tieneOtroActivo || estaCompleto;
     const seleccionado = _evPingsSeleccionados.includes(p.ID_Ping);
     
     // Clases CSS
     let itemClass = 'ev-ping-item';
     if (bloqueado) itemClass += ' disabled';
     if (esMio) itemClass += ' assigned-me';
-    if (tieneOtro) itemClass += ' assigned-other';
+    if (tieneOtroActivo) itemClass += ' assigned-other';
+    // [V8] Ping de voluntario eliminado pero pendiente: mostrar como disponible
+    if (tieneOtroEliminado && esPendiente) itemClass += ' available-reassign';
     
     // Texto de bloqueo
     let lockReason = '';
-    if (tieneOtro) lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
+    if (tieneOtroActivo) lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
     if (estaCompleto) lockReason = '🔒 Formulário já enviado';
     
     return `
