@@ -3695,38 +3695,23 @@ window.addEventListener('load', () => {
 // V5: Incluye token automáticamente en cada request autenticado.
 // ════════════════════════════════════════════════════════════════
 async function chamarBackend(params) {
+  // V5: Agregar token si existe
   const token = obterToken();
+  const paramsConToken = { ...params };
+  if (token) {
+    paramsConToken.token = token;
+  }
   
-  // LOGS FUERTES PARA VER EXACTAMENTE QUÉ SE ENVÍA
-  console.log("🔑 [chamarBackend] Token leído de sessionStorage:", 
-    token ? token.substring(0, 25) + "..." : "❌ NO HAY TOKEN");
-  
-  const paramsConToken = { 
-    ...params, 
-    token: token || null   // ← FORZAMOS EL TOKEN SIEMPRE
-  };
-  
-  console.log("📤 [chamarBackend] Payload completo que se envía:", 
-    JSON.stringify(paramsConToken, null, 2));
-
   const res = await fetch(CONFIG.BACKEND_URL, {
-    method: CONFIG.HTTP_METHOD,
+    method:   CONFIG.HTTP_METHOD,
     redirect: 'follow',
-    headers: { 
-      'Content-Type': CONFIG.HTTP_CONTENT_TYPE   // ← CAMBIO CLAVE (mejor para Apps Script)
-    },
-    body: JSON.stringify(paramsConToken),
+    headers:  { 'Content-Type': CONFIG.HTTP_CONTENT_TYPE },
+    body:     JSON.stringify(paramsConToken),
   });
-
   const text = await res.text();
-  console.log("📥 [chamarBackend] Respuesta cruda del servidor:", text);
-
   try {
-    const json = JSON.parse(text);
-    console.log("✅ [chamarBackend] Respuesta parseada:", json);
-    return json;
+    return JSON.parse(text);
   } catch(e) {
-    console.error("❌ [chamarBackend] Error al parsear JSON:", e);
     return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
   }
 }
