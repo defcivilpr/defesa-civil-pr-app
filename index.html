@@ -537,7 +537,7 @@ const CONFIG = {
   SW: {
     // [V8.2] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v10",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v11",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -2667,6 +2667,8 @@ textarea{resize:vertical;min-height:65px;}
 .add-resident-btn:hover{background:var(--orange-glow);}
 /* Photos */
 .photo-grid{display:flex;flex-wrap:wrap;gap:8px;}
+/* [V8.4] Contenedor de foto + descripción */
+.photo-item{display:flex;flex-direction:column;gap:4px;width:100px;}
 .photo-thumb{
   width:72px;height:72px;border-radius:8px;overflow:hidden;position:relative;
   border:1px solid var(--border-soft);
@@ -2677,6 +2679,14 @@ textarea{resize:vertical;min-height:65px;}
   display:flex;align-items:center;justify-content:center;
   font-size:8px;cursor:pointer;color:white;
 }
+/* [V8.4] Input de descripción de foto */
+.photo-desc-input{
+  width:72px;padding:4px 6px;font-size:10px;
+  border:1px solid var(--border);border-radius:4px;
+  background:var(--navy-mid);color:var(--text);
+}
+.photo-desc-input::placeholder{color:var(--muted);font-size:9px;}
+.photo-desc-input:focus{outline:none;border-color:var(--orange);}
 .photo-add{
   width:72px;height:72px;border-radius:8px;
   border:1px dashed var(--border);background:var(--navy-light);
@@ -7765,6 +7775,20 @@ function iniciarTrackingGPS() {
     maximumAge:         G.MAX_AGE_MS,
   };
   
+  // [V8.4 FIX] Obtener posición inmediata primero (más confiable en móviles)
+  console.log('[V8.4] Solicitando GPS inmediato...');
+  navigator.geolocation.getCurrentPosition(
+    posicion => {
+      console.log('[V8.4] GPS inmediato OK');
+      onPosicionGPS(posicion);
+    },
+    err => {
+      console.warn('[V8.4] GPS inmediato falló:', err.code, err.message);
+      actualizarUIGps('error');
+    },
+    opciones
+  );
+  
   // Iniciar tracking continuo
   _gpsWatchId = navigator.geolocation.watchPosition(
     posicion => onPosicionGPS(posicion),
@@ -9031,29 +9055,45 @@ function _comprimirFoto(file) {
 function _renderizarFotoThumb(fotoObj, idx) {
   const grid   = document.getElementById('photoGrid');
   const addBtn = grid.querySelector('.photo-add');
-  const thumb  = document.createElement('div');
-  thumb.className    = 'photo-thumb';
-  thumb.dataset.idx  = idx;
-  thumb.dataset.uid  = fotoObj._uid; // BUG-21: armazenar uid único no DOM
-  thumb.innerHTML = `
-    <img src="${fotoObj._local_url}" alt="${fotoObj.nome}"
-      style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
-    <div class="photo-del" onclick="removePhoto(this)">✕</div>`;
-  grid.insertBefore(thumb, addBtn);
+  // [V8.4] Contenedor de foto + descripción
+  const item   = document.createElement('div');
+  item.className = 'photo-item';
+  item.dataset.idx = idx;
+  item.dataset.uid = fotoObj._uid;
+  item.innerHTML = `
+    <div class="photo-thumb">
+      <img src="${fotoObj._local_url}" alt="${fotoObj.nome}"
+        style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
+      <div class="photo-del" onclick="removePhoto(this)">✕</div>
+    </div>
+    <input type="text" class="photo-desc-input" 
+           placeholder="Descrição..." 
+           value="${fotoObj.descricao || ''}"
+           onchange="atualizarDescricaoFoto('${fotoObj._uid}', this.value)">`;
+  grid.insertBefore(item, addBtn);
+}
+
+// [V8.4] Actualizar descripción de foto por _uid
+function atualizarDescricaoFoto(uid, texto) {
+  const foto = _fotosBase64.find(f => f._uid === uid);
+  if (foto) {
+    foto.descricao = texto;
+    console.log('[V8.4] Descripción actualizada:', uid, texto);
+  }
 }
 
 function removePhoto(btn) {
-  const thumb = btn.closest('.photo-thumb');
+  const item = btn.closest('.photo-item') || btn.closest('.photo-thumb');
   // BUG-21: remover por _uid único, não por índice posicional
-  const uid = thumb.dataset.uid;
+  const uid = item.dataset.uid;
   if (uid) {
     _fotosBase64 = _fotosBase64.filter(f => f._uid !== uid);
   } else {
-    const idx = parseInt(thumb.dataset.idx);
+    const idx = parseInt(item.dataset.idx);
     if (!isNaN(idx)) _fotosBase64.splice(idx, 1);
   }
-  thumb.remove();
-  document.querySelectorAll('#photoGrid .photo-thumb').forEach((t,i) => t.dataset.idx = i);
+  item.remove();
+  document.querySelectorAll('#photoGrid .photo-item').forEach((t,i) => t.dataset.idx = i);
   toast(CONFIG.UI.TOAST_FOTO_DEL);
 }
 
