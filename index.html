@@ -537,7 +537,7 @@ const CONFIG = {
   SW: {
     // [V8.2] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v9",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v10",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -958,7 +958,8 @@ const CONFIG = {
   // Referenciado por: navegarAlPin() — Fase 8
   // Com sinal  → OSRM calcula rota em tempo real
   // Sem sinal  → rota pré-calculada cacheada no IndexedDB
-  OSRM_URL: "https://router.project-osrm.org/route/v1/foot/{lat1},{lng1};{lat2},{lng2}?overview=full&geometries=geojson",
+  // IMPORTANTE: OSRM usa formato longitude,latitude (lng,lat) NO (lat,lng)
+  OSRM_URL: "https://router.project-osrm.org/route/v1/foot/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson",
 
   // ── [F0] Formato do código legível de ping (M01-A02-P003) ─────
   // Referenciado por: generarCodigoPing() — Fase 4
@@ -9188,30 +9189,54 @@ async function navegarAlPin(lat, lng) {
   // Limpiar ruta anterior
   if (_rutaLayer && mapVol) { _rutaLayer.remove(); _rutaLayer = null; }
 
-  // [V8.4] Usar _ultimaPosicion del tracking GPS en lugar de getCurrentPosition
-  let posAtual = _ultimaPosicion;
+  // [V8.4 FIX] Obtener posición GPS - múltiples intentos
+  let posAtual = null;
   
-  // Fallback si no hay posición del tracking
-  if (!posAtual) {
-    try {
-      posAtual = await new Promise((res, rej) =>
-        navigator.geolocation.getCurrentPosition(
-          p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-          () => rej(new Error('gps')),
-          { timeout: 5000, maximumAge: 10000 }
-        )
-      );
-    } catch(e) { /* GPS não disponível — continuar sem posição */ }
+  // Intento 1: usar _ultimaPosicion del tracking
+  if (_ultimaPosicion && _ultimaPosicion.lat && _ultimaPosicion.lng) {
+    posAtual = _ultimaPosicion;
+    console.log('[V8.4] Usando posición del tracking:', posAtual.lat, posAtual.lng);
   }
+  
+  // Intento 2: getCurrentPosition si no hay tracking
+  if (!posAtual) {
+    console.log('[V8.4] Sin tracking, intentando getCurrentPosition...');
+    try {
+      posAtual = await new Promise((res, rej) => {
+        const timeoutId = setTimeout(() => rej(new Error('timeout')), 10000);
+        navigator.geolocation.getCurrentPosition(
+          p => {
+            clearTimeout(timeoutId);
+            res({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy });
+          },
+          err => {
+            clearTimeout(timeoutId);
+            rej(err);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
+      });
+      console.log('[V8.4] getCurrentPosition OK:', posAtual.lat, posAtual.lng);
+      // Actualizar marcador del voluntario
+      actualizarMarcadorVoluntario(posAtual.lat, posAtual.lng, posAtual.precision || 50);
+      _ultimaPosicion = posAtual;
+    } catch(e) {
+      console.warn('[V8.4] getCurrentPosition falló:', e.message);
+    }
+  }
+
+  console.log('[V8.4] navegarAlPin - offlineVol:', offlineVol, 'posAtual:', !!posAtual);
 
   // Tentar rota online via OSRM
   if (!offlineVol && posAtual) {
     try {
       const url = CONFIG.OSRM_URL
-        .replace('{lat1}', posAtual.lat).replace('{lng1}', posAtual.lng)
-        .replace('{lat2}', lat).replace('{lng2}', lng);
-      const r    = await fetch(url);
+        .replace('{lng1}', posAtual.lng).replace('{lat1}', posAtual.lat)
+        .replace('{lng2}', lng).replace('{lat2}', lat);
+      console.log('[V8.4] OSRM URL:', url);
+      const r = await fetch(url);
       const data = await r.json();
+      console.log('[V8.4] OSRM respuesta:', data.code);
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
         const coords = data.routes[0].geometry.coordinates
           .map(c => [c[1], c[0]]);   // OSRM retorna [lng,lat] → Leaflet [lat,lng]
@@ -9227,16 +9252,21 @@ async function navegarAlPin(lat, lng) {
         const distLabel = formatearDistancia(dist);
         if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_ONLINE;
         if (navDist) navDist.textContent = distLabel;
+        toast('🧭 ' + distLabel + ' ' + BS.NAV_ONLINE);
         return;
       }
-    } catch(e) { /* fallback offline */ }
+    } catch(e) {
+      console.warn('[V8.4] OSRM error:', e.message);
+    }
   }
 
   // Fallback: ruta cacheada en IndexedDB
   try {
-    const key     = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
-    const cached  = await idbGetRuta(key);
+    const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
+    console.log('[V8.4] Buscando ruta en cache:', key);
+    const cached = await idbGetRuta(key);
     if (cached && cached.coords) {
+      console.log('[V8.4] Ruta encontrada en cache');
       _rutaLayer = L.polyline(cached.coords, {
         color: CONFIG.COR_PINES.Pendente,
         weight: 5, opacity: 0.8, dashArray: '10,6',
@@ -9245,25 +9275,33 @@ async function navegarAlPin(lat, lng) {
       const distLabel = formatearDistancia(cached.dist);
       if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_OFFLINE;
       if (navDist) navDist.textContent = distLabel + ' 📶';
+      toast('🧭 ' + distLabel + ' (offline)');
       return;
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[V8.4] Error buscando cache:', e);
+  }
 
-  // Sin ruta disponible — dibujar línea recta y mostrar distancia directa
+  // [V8.4 FIX] Fallback final: línea recta con distancia directa
+  console.log('[V8.4] Sin ruta OSRM ni cache, usando línea recta');
   if (posAtual) {
     const distDirecta = calcularDistanciaGPS(posAtual.lat, posAtual.lng, lat, lng);
     _rutaLayer = L.polyline([[posAtual.lat, posAtual.lng], [lat, lng]], {
-      color: '#888888',
-      weight: 3, opacity: 0.6, dashArray: '5,10',
+      color: '#3B82F6',
+      weight: 3, opacity: 0.7, dashArray: '8,8',
     }).addTo(mapVol);
     mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
     const distLabel = formatearDistancia(distDirecta);
-    if (distEl) distEl.textContent = '📏 ' + distLabel + ' (línea recta)';
+    if (distEl) distEl.textContent = '📏 ~' + distLabel + ' (linha reta)';
     if (navDist) navDist.textContent = '~' + distLabel;
+    toast('📏 ~' + distLabel + ' (linha reta)');
   } else {
-    if (distEl) distEl.textContent = BS.NAV_SEM_ROTA;
+    // Sin GPS — al menos centrar en el destino
+    console.warn('[V8.4] Sin GPS disponible');
+    if (distEl) distEl.textContent = '⚠️ GPS não disponível';
     if (navDist) navDist.textContent = '---';
     if (mapVol) mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
+    toast('⚠️ Ative o GPS para navegar');
   }
 }
 
@@ -9307,8 +9345,8 @@ async function precalcularRutas() {
     const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
     try {
       const url = CONFIG.OSRM_URL
-        .replace('{lat1}', posAtual.lat).replace('{lng1}', posAtual.lng)
-        .replace('{lat2}', lat).replace('{lng2}', lng);
+        .replace('{lng1}', posAtual.lng).replace('{lat1}', posAtual.lat)
+        .replace('{lng2}', lng).replace('{lat2}', lat);
       const r    = await fetch(url);
       const data = await r.json();
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
