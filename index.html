@@ -9837,6 +9837,7 @@ function renderizarFormularioCompleto(dados) {
                   <img src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" 
                        alt="${_esc(f.Nome_Foto || 'Foto ' + (i+1))}"
                        onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📷</text></svg>'">
+                  <div style="font-size:11px;color:var(--muted);margin-top:4px;text-align:center">${_esc(f.Descricao || '')}</div>
                 </div>
               `).join('')}
             </div>`
@@ -9938,7 +9939,7 @@ function baixarPdfFormulario() {
       ${fotos.length === 0 
         ? '<p style="color:#999">Nenhuma foto anexada.</p>'
         : `<div class="foto-grid">
-            ${fotos.map(f => `<img class="foto" src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" alt="Foto">`).join('')}
+            ${fotos.map(f => `<div style="text-align:center"><img class="foto" src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" alt="Foto"><div style="font-size:10px;color:#666;margin-top:2px">${_esc(f.Descricao || '')}</div></div>`).join('')}
           </div>`
       }
       
