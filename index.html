@@ -537,7 +537,7 @@ const CONFIG = {
   SW: {
     // [V8.2] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v12",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v11",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -4738,20 +4738,29 @@ function renderizarAreas() {
   }
   const CC = CONFIG.UI_CICLO;
   const MA = CONFIG.UI_MODAL_AREA;
+  const SEP = CONFIG.UI_AREA_FORMATO.SEPARADOR;
   el.innerHTML = lista.map(a => {
     const pingsDaArea = ESTADO.pings.filter(p => p.ID_Area === a.ID_Area);
     const feitos  = pingsDaArea.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
     const total   = pingsDaArea.length;
     const pct     = total > 0 ? Math.round(feitos/total*100) : 0;
-    const codigo  = a.Codigo
-      ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:11px;letter-spacing:.5px;margin-right:5px">${_esc(a.Codigo)}</span>`
-      : '';
+    
+    // [V8.5] FIX: Mostrar código del mapa padre + código del área
+    const mapa = ESTADO.mapas.find(m => m.ID_Mapa === a.ID_Mapa);
+    const codigoMapa = mapa && mapa.Codigo ? mapa.Codigo : '';
+    const codigoArea = a.Codigo || '';
+    const codigoCompleto = codigoMapa && codigoArea 
+      ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:11px;letter-spacing:.5px;margin-right:5px">${_esc(codigoMapa)}${SEP}${_esc(codigoArea)}</span>`
+      : codigoArea 
+        ? `<span style="font-family:'Rajdhani',sans-serif;font-weight:700;color:var(--orange);font-size:11px;letter-spacing:.5px;margin-right:5px">${_esc(codigoArea)}</span>`
+        : '';
+    
     return `
     <div class="area-card">
-      <div class="area-thumb"><span style="opacity:.5">📐 ${codigo}${_esc(a.Nome)}</span></div>
+      <div class="area-thumb"><span style="opacity:.5">📐 ${codigoCompleto}${_esc(a.Nome)}</span></div>
       <div class="area-card-body">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-          <div class="area-name">${codigo}${_esc(a.Nome)}</div>
+          <div class="area-name">${codigoCompleto}${_esc(a.Nome)}</div>
           <span class="tag ${pct===100?'tag-done':pct>60?'tag-active':'tag-pending'}">${pct}%</span>
         </div>
         <div class="area-stats">
@@ -4961,6 +4970,8 @@ function carregarPoligonosAreas() {
         weight:      2,
         opacity:     0.6,
       });
+      // [V8.5] FIX: Guardar ID_Area además del nombre para identificación única
+      poly._areaId      = area.ID_Area;
       poly._areaName    = area.Nome;
       poly._fromBackend = true;
       poly.bindTooltip(_esc(area.Nome), {
@@ -5689,18 +5700,32 @@ function descartarTarjetaConfirmPing() {
 
 // Detecta se o ponto (lat,lng) está dentro de alguma área desenhada no mapa
 function detectarAreaPorPonto(lat, lng) {
+  // [V8.5] FIX: Solo buscar en áreas del mapa actual
+  const areasDelMapa = ESTADO.mapaAtual 
+    ? ESTADO.areas.filter(a => a.ID_Mapa === ESTADO.mapaAtual.ID_Mapa)
+    : ESTADO.areas;
+  
   // Tenta via polígonos visuais do Leaflet
   for (let i = 0; i < ESTADO.drawnPolygons.length; i++) {
     const poly = ESTADO.drawnPolygons[i];
-    if (poly._areaName) {
-      const area = ESTADO.areas.find(a => a.Nome === poly._areaName);
-      // Bounding box simples
-      const bounds = poly.getBounds();
-      if (bounds.contains([lat, lng])) return area || null;
+    // [V8.5] FIX: Usar _areaId para identificación única (no nombre)
+    if (poly._areaId) {
+      const area = areasDelMapa.find(a => a.ID_Area === poly._areaId);
+      if (area) {
+        const bounds = poly.getBounds();
+        if (bounds.contains([lat, lng])) return area;
+      }
+    } else if (poly._areaName) {
+      // Compatibilidad con polígonos dibujados manualmente (sin _areaId aún)
+      const area = areasDelMapa.find(a => a.Nome === poly._areaName);
+      if (area) {
+        const bounds = poly.getBounds();
+        if (bounds.contains([lat, lng])) return area;
+      }
     }
   }
-  // Fallback: tentar via coordenadas salvas nas áreas
-  for (const area of ESTADO.areas) {
+  // Fallback: tentar via coordenadas salvas nas áreas del mapa actual
+  for (const area of areasDelMapa) {
     if (!area[CONFIG.CAMPO_POLIGONO]) continue;
     try {
       const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
