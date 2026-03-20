@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v8.4",
+    VERSAO:     "v8.5",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -903,6 +903,17 @@ const CONFIG = {
     CONFIRM_ELIMINAR:    "¿Deseja realmente eliminar o voluntário {nome}?\n\n⚠️ Esta ação remove o acesso ao sistema.\n✅ Os formulários já enviados permanecerão visíveis.",
     TOAST_ELIMINADO:     "✅ Voluntário removido com sucesso.",
     TOAST_ELIMINAR_ERR:  "⚠️ Erro ao remover voluntário.",
+  },
+
+  // ── [V8.5] Formato de área con contexto de mapa ────────────────
+  // Soluciona problema de áreas con nombres duplicados en mapas diferentes
+  UI_AREA_FORMATO: {
+    // Separador entre Código Mapa, Código Área y Nombre
+    SEPARADOR:            " · ",
+    // Texto cuando no hay área asignada
+    SEM_AREA:             "Sem área",
+    // Texto cuando el área no se encuentra (ID inválido)
+    AREA_NAO_ENCONTRADA:  "Área não encontrada",
   },
 
   // ── Duração do toast (ms) ────────────────────────────────────
@@ -3912,6 +3923,57 @@ function formatarData(valor) {
   } catch(e) { return valor; }
 }
 
+// ════════════════════════════════════════════════════════════════
+// [V8.5] HELPER: Obtener nombre completo de área con contexto
+// Convierte ID_Area → "M01 · A01 · NombreArea"
+// Si recibe nombre en vez de ID, intenta buscar por nombre (compatibilidad)
+// ════════════════════════════════════════════════════════════════
+function _getNomeAreaCompleto(idOuNome) {
+  if (!idOuNome) return CONFIG.UI_AREA_FORMATO.SEM_AREA;
+  
+  const SEP = CONFIG.UI_AREA_FORMATO.SEPARADOR;
+  
+  // Buscar área por ID primero
+  let area = ESTADO.areas.find(a => a.ID_Area === idOuNome);
+  
+  // Si no encuentra, buscar por nombre (compatibilidad con datos viejos)
+  if (!area) {
+    area = ESTADO.areas.find(a => (a.Nome || '').trim() === idOuNome.trim());
+  }
+  
+  if (!area) return CONFIG.UI_AREA_FORMATO.AREA_NAO_ENCONTRADA;
+  
+  // Buscar mapa padre
+  const mapa = ESTADO.mapas.find(m => m.ID_Mapa === area.ID_Mapa);
+  const codigoMapa = mapa && mapa.Codigo ? mapa.Codigo : '';
+  const codigoArea = area.Codigo || '';
+  const nomeArea = area.Nome || '';
+  
+  // Construir string completo
+  if (codigoMapa && codigoArea) {
+    return codigoMapa + SEP + codigoArea + SEP + nomeArea;
+  } else if (codigoArea) {
+    return codigoArea + SEP + nomeArea;
+  } else {
+    return nomeArea;
+  }
+}
+
+// [V8.5] HELPER: Obtener solo el nombre del área (sin códigos)
+function _getNomeAreaSimples(idOuNome) {
+  if (!idOuNome) return CONFIG.UI_AREA_FORMATO.SEM_AREA;
+  
+  // Buscar área por ID primero
+  let area = ESTADO.areas.find(a => a.ID_Area === idOuNome);
+  
+  // Si no encuentra, buscar por nombre (compatibilidad)
+  if (!area) {
+    area = ESTADO.areas.find(a => (a.Nome || '').trim() === idOuNome.trim());
+  }
+  
+  return area ? (area.Nome || CONFIG.UI_AREA_FORMATO.SEM_AREA) : idOuNome;
+}
+
 
 // ════════════════════════════════════════════════════════════════
 // RENDERIZAÇÃO DE TEXTOS (CONFIG → DOM)
@@ -5930,10 +5992,9 @@ function renderizarVoluntarios() {
   }
   const statusLabel = CONFIG.STATUS_VOL_LABEL;
   const statusTag   = CONFIG.STATUS_VOL_CSS;
-  const EV = CONFIG.UI_EDITAR_VOL; // [V8] Textos de voluntario
+  const EV = CONFIG.UI_EDITAR_VOL;
   el.innerHTML = ESTADO.voluntarios.map(v => {
     const ini = (v.Nome||'?').split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
-    // F-13: normalizar nomes (trim+lowercase) para evitar divergência de casing
     const nomeVNorm = (v.Nome || '').trim().toLowerCase();
     const pingsFeitosVol = ESTADO.pings.filter(p =>
       (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
@@ -5942,8 +6003,10 @@ function renderizarVoluntarios() {
     const pingsCrit      = ESTADO.pings.filter(p =>
       (p.Voluntario_Responsavel||'').trim().toLowerCase() === nomeVNorm && p.Status === CONFIG.STATUS_PING.CRITICO).length;
     
-    // V7: Escapar datos para pasar al onclick
     const volJson = JSON.stringify(v).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    
+    // [V8.5] FIX: Usar helper para mostrar área con contexto de mapa
+    const areaDisplay = _getNomeAreaCompleto(v.Areas_Permitidas);
     
     return `
     <div class="vol-card">
@@ -5951,7 +6014,7 @@ function renderizarVoluntarios() {
         <div class="vc-ava ${pingsFeitosVol>0?'av':''}">${ini}</div>
         <div>
           <div class="vc-name">${_esc(v.Nome)||'—'}</div>
-          <div class="vc-area">${_esc(v.Areas_Permitidas)||'Sem área'}</div>
+          <div class="vc-area">${_esc(areaDisplay)}</div>
           <span class="tag tag-done" style="margin-top:3px">${CONFIG.VOL_STATUS_ATIVO_LABEL}</span>
         </div>
       </div>
@@ -6021,7 +6084,6 @@ let _evPingsSeleccionados = [];
 
 // Abre el modal de editar voluntario
 function abrirEditarVoluntario(idUsuario) {
-  // Buscar voluntario por ID (campo correcto del backend)
   const vol = ESTADO.voluntarios.find(v => v.ID === idUsuario);
   
   if (!vol) {
@@ -6032,6 +6094,7 @@ function abrirEditarVoluntario(idUsuario) {
   
   _evVoluntarioActual = vol;
   const EV = CONFIG.UI_EDITAR_VOL;
+  const SEP = CONFIG.UI_AREA_FORMATO.SEPARADOR;
   
   // Llenar campos
   document.getElementById('evId').value = idUsuario;
@@ -6042,13 +6105,22 @@ function abrirEditarVoluntario(idUsuario) {
   document.getElementById('evTitulo').textContent = EV.TITULO + ': ' + (vol.Nome || '');
   document.getElementById('evErro').style.display = 'none';
   
-  // Llenar select de áreas
+  // [V8.5] FIX: Llenar select de áreas con ID como value y nombre completo como display
   const areaSelect = document.getElementById('evArea');
   areaSelect.innerHTML = `<option value="">${EV.SEM_AREA}</option>`;
   ESTADO.areas.forEach(a => {
-    const codigo = a.Codigo ? a.Codigo + ' · ' : '';
-    const selected = (vol.Areas_Permitidas || '') === a.Nome ? 'selected' : '';
-    areaSelect.innerHTML += `<option value="${_esc(a.Nome)}" ${selected}>${codigo}${_esc(a.Nome)}</option>`;
+    // Buscar mapa padre para mostrar contexto completo
+    const mapa = ESTADO.mapas.find(m => m.ID_Mapa === a.ID_Mapa);
+    const codigoMapa = mapa && mapa.Codigo ? mapa.Codigo + SEP : '';
+    const codigoArea = a.Codigo ? a.Codigo + SEP : '';
+    const displayText = codigoMapa + codigoArea + (a.Nome || '');
+    
+    // [V8.5] FIX: Comparar por ID_Area (soporta datos viejos comparando también por nombre)
+    const volAreaId = vol.Areas_Permitidas || '';
+    const selected = (volAreaId === a.ID_Area || volAreaId === a.Nome) ? 'selected' : '';
+    
+    // [V8.5] FIX: value usa ID_Area para identificación única
+    areaSelect.innerHTML += `<option value="${_esc(a.ID_Area)}" ${selected}>${_esc(displayText)}</option>`;
   });
   
   // Renderizar pings del área actual
@@ -6068,19 +6140,22 @@ function onEvAreaChange() {
 function renderizarPingsEditarVol() {
   const container = document.getElementById('evPingsContainer');
   const vazio = document.getElementById('evPingsVazio');
-  const areaNome = document.getElementById('evArea').value;
+  const areaIdOuNome = document.getElementById('evArea').value;
   const EV = CONFIG.UI_EDITAR_VOL;
   const nomeVol = _evVoluntarioActual?.Nome || '';
   
-  if (!areaNome) {
+  if (!areaIdOuNome) {
     container.innerHTML = '';
     vazio.textContent = EV.SEM_AREA_SELECIONADA;
     vazio.style.display = 'block';
     return;
   }
   
-  // Buscar el área por nombre para obtener ID
-  const areaObj = ESTADO.areas.find(a => a.Nome === areaNome);
+  // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
+  let areaObj = ESTADO.areas.find(a => a.ID_Area === areaIdOuNome);
+  if (!areaObj) {
+    areaObj = ESTADO.areas.find(a => a.Nome === areaIdOuNome);
+  }
   if (!areaObj) {
     container.innerHTML = '';
     vazio.textContent = EV.SEM_PINGS_AREA;
@@ -6235,7 +6310,11 @@ async function salvarVoluntarioCompleto() {
     
     // 2. Actualizar asignaciones de pings
     // Primero, desasignar pings que ya no están seleccionados
-    const areaObj = ESTADO.areas.find(a => a.Nome === area);
+    // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
+    let areaObj = ESTADO.areas.find(a => a.ID_Area === area);
+    if (!areaObj) {
+      areaObj = ESTADO.areas.find(a => a.Nome === area);
+    }
     if (areaObj) {
       const pingsArea = ESTADO.pings.filter(p => p.ID_Area === areaObj.ID_Area);
       
@@ -8075,43 +8154,46 @@ function cancelarNavegacion() {
 async function carregarAreaVol() {
   const s = ESTADO.sessao;
   if (!s || !mapVol) {
-    console.warn('[V8.3] carregarAreaVol: sin sesión o mapa');
+    console.warn('[V8.5] carregarAreaVol: sin sesión o mapa');
     return;
   }
   
-  const areaNome = (s.Areas_Permitidas || '').trim();
-  console.log('[V8.3] Buscando área:', areaNome);
+  const areaIdOuNome = (s.Areas_Permitidas || '').trim();
+  console.log('[V8.5] Buscando área:', areaIdOuNome);
   
-  if (!areaNome || areaNome === '—' || areaNome === '') {
-    console.warn('[V8.3] Voluntario sin área asignada');
+  if (!areaIdOuNome || areaIdOuNome === '—' || areaIdOuNome === '') {
+    console.warn('[V8.5] Voluntario sin área asignada');
     return;
   }
 
-  // [V8.3] Buscar área en ESTADO.areas (ya cargado)
-  const areaObj = ESTADO.areas.find(a => {
-    const nombreArea = (a.Nome || '').trim();
-    return nombreArea === areaNome;
-  });
+  // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
+  let areaObj = ESTADO.areas.find(a => a.ID_Area === areaIdOuNome);
+  if (!areaObj) {
+    areaObj = ESTADO.areas.find(a => {
+      const nombreArea = (a.Nome || '').trim();
+      return nombreArea === areaIdOuNome;
+    });
+  }
   
   if (!areaObj) {
-    console.warn('[V8.3] Área no encontrada:', areaNome, 'en', ESTADO.areas.map(a => a.Nome));
+    console.warn('[V8.5] Área no encontrada:', areaIdOuNome, 'en', ESTADO.areas.map(a => a.ID_Area + ':' + a.Nome));
     toast(CONFIG.UI.TOAST_AREA_NAO_ENCONTRADA);
     return;
   }
   
-  console.log('[V8.3] Área encontrada:', areaObj.Nome, areaObj.ID_Area);
+  console.log('[V8.5] Área encontrada:', areaObj.Nome, areaObj.ID_Area);
   _areaVolObj = areaObj; // Guardar para validación en nuevo ping
   
   // Parsear polígono
   if (!areaObj.Pontos_Poligono) {
-    console.warn('[V8.3] Área sin polígono');
+    console.warn('[V8.5] Área sin polígono');
     return;
   }
   
   try {
     const pts = JSON.parse(areaObj.Pontos_Poligono);
     if (!pts || pts.length < 3) {
-      console.warn('[V8.3] Polígono inválido');
+      console.warn('[V8.5] Polígono inválido');
       return;
     }
     
@@ -8165,17 +8247,17 @@ async function carregarPingsVol() {
     const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
     if (r.sucesso && Array.isArray(r.dados)) {
       const nomeVol = (s.Nome || s.nome || s.usuario || '').trim();
-      const areaVol = (s.Areas_Permitidas || '').trim();
+      const areaIdOuNome = (s.Areas_Permitidas || '').trim();
       
-      console.log('[V8.3] Filtrando pings para:', nomeVol, 'área:', areaVol);
+      console.log('[V8.5] Filtrando pings para:', nomeVol, 'área:', areaIdOuNome);
       
-      // [V8.3] Buscar ID_Area del voluntario
-      const areaObj = ESTADO.areas.find(a => 
-        (a.Nome || '').trim() === areaVol || 
-        (a.ID_Area || '') === areaVol
-      );
+      // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
+      let areaObj = ESTADO.areas.find(a => a.ID_Area === areaIdOuNome);
+      if (!areaObj) {
+        areaObj = ESTADO.areas.find(a => (a.Nome || '').trim() === areaIdOuNome);
+      }
       const idAreaVol = areaObj ? areaObj.ID_Area : null;
-      console.log('[V8.3] ID_Area encontrado:', idAreaVol);
+      console.log('[V8.5] ID_Area encontrado:', idAreaVol);
       
       // Filtrar pings: asignados a mí O en mi área
       ESTADO.pingsVol = r.dados.filter(p => {
@@ -8185,7 +8267,7 @@ async function carregarPingsVol() {
         return esMio || enMiArea;
       });
       
-      console.log('[V8.3] Pings encontrados:', ESTADO.pingsVol.length);
+      console.log('[V8.5] Pings encontrados:', ESTADO.pingsVol.length);
       
       // Marcar pings propios vs de otros
       ESTADO.pingsVol = ESTADO.pingsVol.map(p => ({
