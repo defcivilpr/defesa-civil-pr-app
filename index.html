@@ -34,7 +34,7 @@ const CONFIG = {
   APP: {
     NOME:       "DEFESA CIVIL",
     SUB:        "Estado do Paraná",
-    VERSAO:     "v8.3",
+    VERSAO:     "v8.4",
     LOCALE:     "pt-BR",
     FUSO:       "America/Sao_Paulo",
   },
@@ -246,6 +246,36 @@ const CONFIG = {
     OSM_URL:     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     OSM_ATTR:    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     NOMINATIM:   "https://nominatim.openstreetmap.org/search",
+  },
+
+  // ── [V8.4] GPS: configuración de tracking en tiempo real ──────
+  GPS: {
+    // Opciones de geolocalización
+    ALTA_PRECISION:     true,
+    TIMEOUT_MS:         15000,
+    MAX_AGE_MS:         3000,
+    // Marcador del voluntario
+    MARCADOR_RADIO:     12,
+    MARCADOR_COLOR:     '#3B82F6',
+    MARCADOR_BORDE:     '#FFFFFF',
+    PRECISION_COLOR:    'rgba(59, 130, 246, 0.15)',
+    PRECISION_BORDE:    'rgba(59, 130, 246, 0.4)',
+    // Navegación
+    DISTANCIA_LLEGADA_M: 25,
+    RECALCULAR_RUTA_M:   50,
+    // Textos UI
+    TEXTOS: {
+      BUSCANDO:       '📡 Buscando GPS...',
+      ACTIVO:         '📍 GPS Activo',
+      SIN_SENAL:      '⚠️ Sin señal GPS',
+      ERROR:          '⚠️ GPS no disponible',
+      LLEGASTE:       '🎯 ¡Llegaste al destino!',
+      RECALCULANDO:   '🔄 Recalculando ruta...',
+      PRECISION:      'Precisión: ',
+      METROS:         ' m',
+      BTN_CENTRAR:    '◎',
+      BTN_CENTRAR_TITLE: 'Centrar en mi ubicación',
+    },
   },
 
   // ── Páginas do coordenador (sidebar) ────────────────────────
@@ -492,10 +522,11 @@ const CONFIG = {
   // ── IndexedDB — B-15 ─────────────────────────────────────────
   IDB: {
     NOME:           "dcpr_idb",
-    VERSAO:         1,
+    VERSAO:         2,  // [V8.4] Incrementado para agregar store de rutas
     STORE_FILA:     "fila_offline",
     STORE_FOTOS:    "fotos_offline",
     STORE_CACHE:    "cache_dados",
+    STORE_RUTAS:    "rutas_cache",  // [V8.4] Cache de rutas para navegación offline
     // V6: Límite de reintentos para evitar loops infinitos
     MAX_REINTENTOS: 5,
     // Campo donde se guarda el contador de intentos
@@ -506,7 +537,7 @@ const CONFIG = {
   SW: {
     // [V8.2] Cache versionado — usa APP.VERSAO para invalidar cache antiguo
     CACHE_PREFIX:   "dcpr-",
-    CACHE_NOME:     "dcpr-cache-v8",  // Legacy — mantido para compatibilidade
+    CACHE_NOME:     "dcpr-cache-v9",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
     // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
     PATH: null,
@@ -2298,6 +2329,44 @@ textarea{resize:vertical;min-height:65px;}
 }
 .map-tag.online{color:var(--green);}
 .map-tag.offline{color:var(--yellow);}
+/* [V8.4] Estado GPS en el mapa */
+.map-tag.gps-activo{color:var(--green);animation:pulse-gps 2s infinite;}
+.map-tag.gps-buscando{color:var(--yellow);animation:pulse-gps 1s infinite;}
+.map-tag.gps-error{color:var(--red);}
+@keyframes pulse-gps{
+  0%,100%{opacity:1;}
+  50%{opacity:0.6;}
+}
+/* [V8.4] Botón flotante para centrar en GPS */
+.btn-centrar-gps{
+  position:absolute;bottom:70px;right:10px;z-index:400;
+  width:44px;height:44px;border-radius:50%;
+  background:var(--navy-mid);border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:22px;color:var(--text);
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+  transition:all 0.2s ease;
+}
+.btn-centrar-gps:hover{background:var(--navy-light);border-color:var(--orange);}
+.btn-centrar-gps:active{transform:scale(0.95);}
+.btn-centrar-gps.activo{border-color:var(--green);color:var(--green);}
+.btn-centrar-gps.buscando{border-color:var(--yellow);color:var(--yellow);animation:pulse-gps 1s infinite;}
+/* [V8.4] Info de navegación activa */
+.nav-info-bar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:400;
+  background:rgba(11,22,40,0.95);border:1px solid var(--orange);
+  border-radius:20px;padding:6px 16px;
+  display:none;align-items:center;gap:10px;
+  font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;
+  color:var(--text);white-space:nowrap;
+  box-shadow:0 2px 12px rgba(0,0,0,0.4);
+}
+.nav-info-bar.visible{display:flex;}
+.nav-info-bar .nav-dist{color:var(--orange);}
+.nav-info-bar .nav-cancel{
+  background:var(--red);color:white;border:none;border-radius:12px;
+  padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;
+}
 .map-coords{
   position:absolute;bottom:8px;left:8px;z-index:10;
   background:rgba(11,22,40,.85);border:1px solid var(--border);
@@ -3375,9 +3444,18 @@ textarea{resize:vertical;min-height:65px;}
       <div style="position:relative">
         <div id="map-vol"></div>
         <div class="map-overlay-top">
+          <div class="map-tag gps-buscando" id="gpsTagVol">📡 GPS</div>
           <div class="map-tag online" id="modeTagVol" onclick="toggleOfflineVol()">🌐 ONLINE</div>
         </div>
         <div class="map-coords" id="mapCoordsVol">—</div>
+        <!-- [V8.4] Botón flotante para centrar en GPS -->
+        <button class="btn-centrar-gps buscando" id="btnCentrarGps" onclick="centrarEnMiUbicacion()" title="">◎</button>
+        <!-- [V8.4] Barra de navegación activa -->
+        <div class="nav-info-bar" id="navInfoBar">
+          <span>🧭</span>
+          <span class="nav-dist" id="navDistancia">---</span>
+          <button class="nav-cancel" onclick="cancelarNavegacion()">✕ Cancelar</button>
+        </div>
       </div>
       <div class="section-header">
         <span class="section-title" id="lblMeusPontos"></span>
@@ -3723,6 +3801,13 @@ let offlineVol   = false;
 let _pingBspAtual  = null;    // ping actualmente mostrado en la bottom sheet
 let _rutaLayer     = null;    // L.polyline de la ruta activa en mapVol
 let viewAtual    = 'mapa';
+// [V8.4] GPS Tracking en tiempo real
+let _gpsWatchId        = null;    // ID del watchPosition
+let _voluntarioMarker  = null;    // Marcador del voluntario (se actualiza)
+let _precisionCircle   = null;    // Círculo de precisión GPS
+let _ultimaPosicion    = null;    // {lat, lng, precision, timestamp}
+let _destinoNavegacion = null;    // {lat, lng} del ping destino actual
+let _navegandoActivo   = false;   // Flag de navegación activa
 // [B4] Variables del ping pendiente en la tarjeta flotante del coordinador
 let _pingPendenteLat  = null;
 let _pingPendenteLng  = null;
@@ -7251,6 +7336,10 @@ function abrirIDB() {
       if (!db.objectStoreNames.contains(CONFIG.IDB.STORE_CACHE)) {
         db.createObjectStore(CONFIG.IDB.STORE_CACHE, { keyPath:'chave' });
       }
+      // [V8.4] Store para cache de rutas (navegación offline)
+      if (!db.objectStoreNames.contains(CONFIG.IDB.STORE_RUTAS)) {
+        db.createObjectStore(CONFIG.IDB.STORE_RUTAS, { keyPath:'key' });
+      }
     };
     req.onsuccess  = e => { _idb = e.target.result; resolve(_idb); };
     req.onerror    = e => reject(e.target.error);
@@ -7303,6 +7392,27 @@ async function idbGet(store, chave) {
     const tx  = db.transaction(store, 'readonly');
     const req = tx.objectStore(store).get(chave);
     req.onsuccess = e => resolve(e.target.result ? e.target.result.valor : null);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+// [V8.4] Funciones específicas para cache de rutas
+async function idbAddRuta(ruta) {
+  const db  = await abrirIDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(CONFIG.IDB.STORE_RUTAS, 'readwrite');
+    const req = tx.objectStore(CONFIG.IDB.STORE_RUTAS).put(ruta);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+async function idbGetRuta(key) {
+  const db  = await abrirIDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(CONFIG.IDB.STORE_RUTAS, 'readonly');
+    const req = tx.objectStore(CONFIG.IDB.STORE_RUTAS).get(key);
+    req.onsuccess = e => resolve(e.target.result || null);
     req.onerror   = e => reject(e.target.error);
   });
 }
@@ -7601,6 +7711,8 @@ async function _carregarAreasParaVoluntario() {
 
 function inicializarMapaVol() {
   const M = CONFIG.MAPA;
+  const G = CONFIG.GPS;
+  
   mapVol = L.map('map-vol', {
     center: [M.LAT_PADRAO, M.LNG_PADRAO],
     zoom:   M.ZOOM_PADRAO,
@@ -7614,14 +7726,324 @@ function inicializarMapaVol() {
     );
   });
 
-  // [V8.3] GPS propio — marcador azul pero NO centrar aquí (se centra en área)
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      L.circleMarker([lat, lng], { radius:8, color:'#3B82F6', fillColor:'#3B82F6', fillOpacity:0.8 })
-        .addTo(mapVol).bindPopup(CONFIG.UI.GPS_VOCE_AQUI);
-    }, () => {}, { enableHighAccuracy: true, timeout: 5000 });
+  // [V8.4] Inicializar UI del botón GPS
+  const btnGps = document.getElementById('btnCentrarGps');
+  if (btnGps) btnGps.title = G.TEXTOS.BTN_CENTRAR_TITLE;
+  
+  // [V8.4] Iniciar tracking GPS en tiempo real
+  iniciarTrackingGPS();
+}
+
+// ════════════════════════════════════════════════════════════════
+// [V8.4] SISTEMA GPS EN TIEMPO REAL
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Inicia el tracking GPS continuo usando watchPosition
+ * El voluntario siempre ve su posición en el mapa
+ */
+function iniciarTrackingGPS() {
+  if (!navigator.geolocation) {
+    console.warn('[V8.4] Geolocalización no soportada');
+    actualizarUIGps('error');
+    return;
   }
+  
+  // Limpiar watch anterior si existe
+  if (_gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+  }
+  
+  const G = CONFIG.GPS;
+  actualizarUIGps('buscando');
+  
+  // Opciones de geolocalización
+  const opciones = {
+    enableHighAccuracy: G.ALTA_PRECISION,
+    timeout:            G.TIMEOUT_MS,
+    maximumAge:         G.MAX_AGE_MS,
+  };
+  
+  // Iniciar tracking continuo
+  _gpsWatchId = navigator.geolocation.watchPosition(
+    posicion => onPosicionGPS(posicion),
+    error    => onErrorGPS(error),
+    opciones
+  );
+  
+  console.log('[V8.4] GPS tracking iniciado, watchId:', _gpsWatchId);
+}
+
+/**
+ * Detiene el tracking GPS
+ */
+function detenerTrackingGPS() {
+  if (_gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
+    console.log('[V8.4] GPS tracking detenido');
+  }
+}
+
+/**
+ * Callback cuando se recibe una nueva posición GPS
+ */
+function onPosicionGPS(posicion) {
+  const { latitude: lat, longitude: lng, accuracy: precision } = posicion.coords;
+  const G = CONFIG.GPS;
+  
+  // Guardar última posición
+  _ultimaPosicion = {
+    lat,
+    lng,
+    precision,
+    timestamp: Date.now()
+  };
+  
+  // Actualizar UI
+  actualizarUIGps('activo', precision);
+  
+  // Actualizar marcador del voluntario en el mapa
+  actualizarMarcadorVoluntario(lat, lng, precision);
+  
+  // Si está navegando, actualizar info de navegación
+  if (_navegandoActivo && _destinoNavegacion) {
+    actualizarNavegacionEnCurso(lat, lng);
+  }
+  
+  console.log('[V8.4] GPS actualizado:', lat.toFixed(5), lng.toFixed(5), '±', Math.round(precision), 'm');
+}
+
+/**
+ * Callback cuando hay error de GPS
+ */
+function onErrorGPS(error) {
+  console.warn('[V8.4] Error GPS:', error.code, error.message);
+  
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      actualizarUIGps('error');
+      toast(CONFIG.GPS.TEXTOS.ERROR);
+      break;
+    case error.POSITION_UNAVAILABLE:
+      actualizarUIGps('sin_senal');
+      break;
+    case error.TIMEOUT:
+      actualizarUIGps('buscando');
+      break;
+  }
+}
+
+/**
+ * Actualiza el marcador del voluntario en el mapa
+ */
+function actualizarMarcadorVoluntario(lat, lng, precision) {
+  if (!mapVol) return;
+  
+  const G = CONFIG.GPS;
+  
+  // Remover marcador anterior si existe
+  if (_voluntarioMarker) {
+    mapVol.removeLayer(_voluntarioMarker);
+  }
+  if (_precisionCircle) {
+    mapVol.removeLayer(_precisionCircle);
+  }
+  
+  // Crear círculo de precisión (área donde puede estar)
+  _precisionCircle = L.circle([lat, lng], {
+    radius: precision,
+    color: G.PRECISION_BORDE,
+    fillColor: G.PRECISION_COLOR,
+    fillOpacity: 0.3,
+    weight: 1,
+  }).addTo(mapVol);
+  
+  // Crear marcador del voluntario (punto azul con borde blanco)
+  _voluntarioMarker = L.circleMarker([lat, lng], {
+    radius: G.MARCADOR_RADIO,
+    color: G.MARCADOR_BORDE,
+    weight: 3,
+    fillColor: G.MARCADOR_COLOR,
+    fillOpacity: 1,
+  }).addTo(mapVol);
+  
+  // Popup con info
+  _voluntarioMarker.bindPopup(
+    `<strong>${CONFIG.UI.GPS_VOCE_AQUI}</strong><br>` +
+    `${G.TEXTOS.PRECISION}${Math.round(precision)}${G.TEXTOS.METROS}`
+  );
+}
+
+/**
+ * Actualiza la UI del estado GPS (tag y botón)
+ */
+function actualizarUIGps(estado, precision) {
+  const G = CONFIG.GPS;
+  const tag = document.getElementById('gpsTagVol');
+  const btn = document.getElementById('btnCentrarGps');
+  
+  if (tag) {
+    tag.className = 'map-tag';
+    switch (estado) {
+      case 'activo':
+        tag.className += ' gps-activo';
+        tag.textContent = '📍 GPS';
+        break;
+      case 'buscando':
+        tag.className += ' gps-buscando';
+        tag.textContent = '📡 GPS...';
+        break;
+      case 'sin_senal':
+        tag.className += ' gps-error';
+        tag.textContent = '📡 ⚠️';
+        break;
+      case 'error':
+        tag.className += ' gps-error';
+        tag.textContent = '📍 ✕';
+        break;
+    }
+  }
+  
+  if (btn) {
+    btn.className = 'btn-centrar-gps';
+    switch (estado) {
+      case 'activo':
+        btn.className += ' activo';
+        break;
+      case 'buscando':
+        btn.className += ' buscando';
+        break;
+    }
+  }
+}
+
+/**
+ * Centra el mapa en la ubicación actual del voluntario
+ * Llamado por el botón flotante ◎
+ */
+function centrarEnMiUbicacion() {
+  if (!_ultimaPosicion) {
+    toast(CONFIG.GPS.TEXTOS.BUSCANDO);
+    return;
+  }
+  
+  if (mapVol) {
+    mapVol.setView([_ultimaPosicion.lat, _ultimaPosicion.lng], CONFIG.MAPA.ZOOM_PING, {
+      animate: true,
+      duration: 0.5
+    });
+    
+    // Abrir popup del marcador
+    if (_voluntarioMarker) {
+      _voluntarioMarker.openPopup();
+    }
+  }
+}
+
+/**
+ * Calcula la distancia entre dos puntos (fórmula Haversine)
+ * Retorna distancia en metros
+ */
+function calcularDistanciaGPS(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Radio de la Tierra en metros
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Formatea distancia para mostrar (m o km)
+ */
+function formatearDistancia(metros) {
+  const BS = CONFIG.UI_BOTTOM_SHEET;
+  if (metros >= 1000) {
+    return (metros / 1000).toFixed(1) + BS.DIST_KM;
+  }
+  return Math.round(metros) + BS.DIST_M;
+}
+
+/**
+ * Actualiza la información de navegación en curso
+ * Llamado cada vez que se actualiza el GPS mientras se navega
+ */
+function actualizarNavegacionEnCurso(latActual, lngActual) {
+  if (!_destinoNavegacion) return;
+  
+  const G = CONFIG.GPS;
+  const distancia = calcularDistanciaGPS(
+    latActual, lngActual,
+    _destinoNavegacion.lat, _destinoNavegacion.lng
+  );
+  
+  // Actualizar UI de navegación
+  const navBar = document.getElementById('navInfoBar');
+  const navDist = document.getElementById('navDistancia');
+  
+  if (navDist) {
+    navDist.textContent = formatearDistancia(distancia);
+  }
+  
+  // Verificar si llegó al destino
+  if (distancia <= G.DISTANCIA_LLEGADA_M) {
+    toast(G.TEXTOS.LLEGASTE);
+    cancelarNavegacion();
+    
+    // Abrir automáticamente el bottom sheet del ping
+    if (_pingBspAtual) {
+      abrirBottomSheet(_pingBspAtual);
+    }
+  }
+}
+
+/**
+ * Inicia la navegación hacia un ping específico
+ */
+async function iniciarNavegacion(lat, lng) {
+  const G = CONFIG.GPS;
+  
+  // Guardar destino
+  _destinoNavegacion = { lat, lng };
+  _navegandoActivo = true;
+  
+  // Mostrar barra de navegación
+  const navBar = document.getElementById('navInfoBar');
+  if (navBar) navBar.classList.add('visible');
+  
+  // Calcular y mostrar ruta
+  await navegarAlPin(lat, lng);
+  
+  // Si tenemos posición actual, mostrar distancia inicial
+  if (_ultimaPosicion) {
+    actualizarNavegacionEnCurso(_ultimaPosicion.lat, _ultimaPosicion.lng);
+  }
+  
+  console.log('[V8.4] Navegación iniciada hacia:', lat, lng);
+}
+
+/**
+ * Cancela la navegación activa
+ */
+function cancelarNavegacion() {
+  _destinoNavegacion = null;
+  _navegandoActivo = false;
+  
+  // Ocultar barra de navegación
+  const navBar = document.getElementById('navInfoBar');
+  if (navBar) navBar.classList.remove('visible');
+  
+  // Limpiar ruta del mapa
+  if (_rutaLayer && mapVol) {
+    mapVol.removeLayer(_rutaLayer);
+    _rutaLayer = null;
+  }
+  
+  console.log('[V8.4] Navegación cancelada');
 }
 
 // [V8.3] BUG-3 FIX: Cargar y dibujar área del voluntario
@@ -8741,7 +9163,8 @@ function _onBspNav() {
   const lat = parseFloat(_pingBspAtual.Latitude);
   const lng = parseFloat(_pingBspAtual.Longitude);
   if (!lat || !lng) { toast(CONFIG.UI_BOTTOM_SHEET.NAV_GPS_ERR); return; }
-  navegarAlPin(lat, lng);
+  // [V8.4] Usar nuevo sistema de navegación activa
+  iniciarNavegacion(lat, lng);
 }
 
 // Llamado por el botón "▶ Iniciar Relevamento" de la bottom sheet
@@ -8751,28 +9174,35 @@ function _onBspForm() {
 }
 
 // ── navegarAlPin ─────────────────────────────────────────────
+// [V8.4] Actualizado para usar _ultimaPosicion del tracking GPS
 // Con señal  → OSRM calcula la ruta (CONFIG.OSRM_URL)
 // Sin señal  → usa ruta cacheada en IndexedDB
 // GPS activo → voluntario se ve en tiempo real sobre el mapa
 async function navegarAlPin(lat, lng) {
   const BS = CONFIG.UI_BOTTOM_SHEET;
   const distEl = document.getElementById('bspDist');
+  const navDist = document.getElementById('navDistancia');
   if (distEl) distEl.textContent = BS.NAV_CALCULANDO;
+  if (navDist) navDist.textContent = '...';
 
   // Limpiar ruta anterior
   if (_rutaLayer && mapVol) { _rutaLayer.remove(); _rutaLayer = null; }
 
-  // Obtener posición GPS actual del voluntario
-  let posAtual = null;
-  try {
-    posAtual = await new Promise((res, rej) =>
-      navigator.geolocation.getCurrentPosition(
-        p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => rej(new Error('gps')),
-        { timeout: 5000, maximumAge: 10000 }
-      )
-    );
-  } catch(e) { /* GPS não disponível — continuar sem posição */ }
+  // [V8.4] Usar _ultimaPosicion del tracking GPS en lugar de getCurrentPosition
+  let posAtual = _ultimaPosicion;
+  
+  // Fallback si no hay posición del tracking
+  if (!posAtual) {
+    try {
+      posAtual = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+          () => rej(new Error('gps')),
+          { timeout: 5000, maximumAge: 10000 }
+        )
+      );
+    } catch(e) { /* GPS não disponível — continuar sem posição */ }
+  }
 
   // Tentar rota online via OSRM
   if (!offlineVol && posAtual) {
@@ -8788,17 +9218,15 @@ async function navegarAlPin(lat, lng) {
         const dist   = data.routes[0].distance;
         _rutaLayer   = L.polyline(coords, {
           color: CONFIG.COR_PINES['Em Curso'],
-          weight: 4, opacity: 0.85, dashArray: '8,4',
+          weight: 5, opacity: 0.9, dashArray: '10,6',
         }).addTo(mapVol);
-        mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [40, 40] });
+        mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
         // Guardar en IndexedDB para uso offline
         const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
-        try { await idbAdd('rutas', { key, coords, dist, ts: Date.now() }); } catch(e){}
-        const distLabel = dist >= 1000
-          ? (dist / 1000).toFixed(1) + BS.DIST_KM
-          : Math.round(dist) + BS.DIST_M;
-        if (distEl) distEl.textContent = BS.DIST_APROX + distLabel;
-        if (distEl) distEl.textContent += ' · ' + BS.NAV_ONLINE;
+        try { await idbAddRuta({ key, coords, dist, ts: Date.now() }); } catch(e){}
+        const distLabel = formatearDistancia(dist);
+        if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_ONLINE;
+        if (navDist) navDist.textContent = distLabel;
         return;
       }
     } catch(e) { /* fallback offline */ }
@@ -8807,44 +9235,61 @@ async function navegarAlPin(lat, lng) {
   // Fallback: ruta cacheada en IndexedDB
   try {
     const key     = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
-    const cached  = await idbGet('rutas', key);
+    const cached  = await idbGetRuta(key);
     if (cached && cached.coords) {
       _rutaLayer = L.polyline(cached.coords, {
         color: CONFIG.COR_PINES.Pendente,
-        weight: 4, opacity: 0.7, dashArray: '8,4',
+        weight: 5, opacity: 0.8, dashArray: '10,6',
       }).addTo(mapVol);
-      mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [40, 40] });
-      const distLabel = cached.dist >= 1000
-        ? (cached.dist / 1000).toFixed(1) + BS.DIST_KM
-        : Math.round(cached.dist) + BS.DIST_M;
+      mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
+      const distLabel = formatearDistancia(cached.dist);
       if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_OFFLINE;
+      if (navDist) navDist.textContent = distLabel + ' 📶';
       return;
     }
   } catch(e) {}
 
-  // Sin ruta disponible — navegar al punto directamente
-  if (distEl) distEl.textContent = BS.NAV_SEM_ROTA;
-  if (mapVol) mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
+  // Sin ruta disponible — dibujar línea recta y mostrar distancia directa
+  if (posAtual) {
+    const distDirecta = calcularDistanciaGPS(posAtual.lat, posAtual.lng, lat, lng);
+    _rutaLayer = L.polyline([[posAtual.lat, posAtual.lng], [lat, lng]], {
+      color: '#888888',
+      weight: 3, opacity: 0.6, dashArray: '5,10',
+    }).addTo(mapVol);
+    mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
+    const distLabel = formatearDistancia(distDirecta);
+    if (distEl) distEl.textContent = '📏 ' + distLabel + ' (línea recta)';
+    if (navDist) navDist.textContent = '~' + distLabel;
+  } else {
+    if (distEl) distEl.textContent = BS.NAV_SEM_ROTA;
+    if (navDist) navDist.textContent = '---';
+    if (mapVol) mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
+  }
 }
 
 // ── precalcularRutas ─────────────────────────────────────────
+// [V8.4] Actualizado para usar _ultimaPosicion del tracking GPS
 // Cuando hay señal, calcula y guarda en IndexedDB las rutas
 // a todos los pines asignados al voluntario.
 // Llamada silenciosamente al cargar los pings con señal.
 async function precalcularRutas() {
   if (offlineVol || !ESTADO.pingsVol || !ESTADO.pingsVol.length) return;
 
-  // Obtener posición GPS actual
-  let posAtual = null;
-  try {
-    posAtual = await new Promise((res, rej) =>
-      navigator.geolocation.getCurrentPosition(
-        p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => rej(new Error('gps')),
-        { timeout: 8000, maximumAge: 30000 }
-      )
-    );
-  } catch(e) { return; }  // Sin GPS — no pre-calcular
+  // [V8.4] Usar _ultimaPosicion del tracking GPS
+  let posAtual = _ultimaPosicion;
+  
+  // Fallback si no hay posición del tracking
+  if (!posAtual) {
+    try {
+      posAtual = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(
+          p => res({ lat: p.coords.latitude, lng: p.coords.longitude }),
+          () => rej(new Error('gps')),
+          { timeout: 8000, maximumAge: 30000 }
+        )
+      );
+    } catch(e) { return; }  // Sin GPS — no pre-calcular
+  }
 
   // Pre-calcular solo pines pendientes/en curso
   const pendientes = ESTADO.pingsVol.filter(p =>
@@ -8852,6 +9297,8 @@ async function precalcularRutas() {
     p.Status === CONFIG.STATUS_PING.EM_CURSO ||
     p.Status === CONFIG.STATUS_PING.CRITICO
   );
+
+  console.log('[V8.4] Pre-calculando rutas para', pendientes.length, 'pings');
 
   for (const ping of pendientes) {
     if (!ping.Latitude || !ping.Longitude) continue;
@@ -8867,10 +9314,12 @@ async function precalcularRutas() {
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
         const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
         const dist   = data.routes[0].distance;
-        await idbAdd('rutas', { key, coords, dist, ts: Date.now() });
+        await idbAddRuta({ key, coords, dist, ts: Date.now() });
       }
     } catch(e) { /* silencioso — continuar con el siguiente */ }
   }
+  
+  console.log('[V8.4] Rutas pre-calculadas');
 }
 // ── FIM [FASE 8] ─────────────────────────────────────────────
 
