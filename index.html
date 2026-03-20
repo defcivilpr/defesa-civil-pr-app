@@ -2262,9 +2262,12 @@ textarea{resize:vertical;min-height:65px;}
   margin-top:8px;
 }
 .form-view-foto{
-  aspect-ratio:1;border-radius:8px;overflow:hidden;
+  border-radius:8px;overflow:visible;
   border:1px solid var(--border-soft);cursor:pointer;
   transition:transform .15s;
+}
+.form-view-foto img{
+  aspect-ratio:1;border-radius:8px;width:100%;object-fit:cover;display:block;
 }
 .form-view-foto:hover{transform:scale(1.02);}
 .form-view-foto img{width:100%;height:100%;object-fit:cover;}
