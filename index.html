@@ -48,7 +48,7 @@ const CONFIG = {
   },
 
   // ── Backend ──────────────────────────────────────────────────
-  BACKEND_URL: "https://script.google.com/macros/s/AKfycbwFP2xrCDIbk0pC8UUTZT9UBfDtt1ynuEx34vl2lxWOUwU6drvBEEq5fu9z1j-1Uv4QIw/exec",
+  BACKEND_URL: "https://script.google.com/macros/s/AKfycbxCzTCnARjygcjOd5Xb7LKRc80U1WuPuLeIX-nlXKGUKm-t2OnT7Cl9c03m8sWEjsfr/exec",
   HTTP_METHOD: 'POST',
   HTTP_CONTENT_TYPE: 'text/plain;charset=utf-8',
 
@@ -2724,12 +2724,6 @@ textarea{resize:vertical;min-height:65px;}
 .critico-toggle-input:checked + .critico-toggle-slider{background:var(--red);}
 .critico-toggle-input:checked + .critico-toggle-slider::after{transform:translateX(20px);background:#fff;}
 .critico-toggle-hint{font-size:11px;color:var(--muted);margin-top:6px;}
-/* V9: Fotos existentes badge */
-.foto-existente{position:relative;}
-.photo-thumb-badge{
-  position:absolute;top:4px;right:4px;font-size:10px;
-  background:rgba(0,0,0,.6);border-radius:4px;padding:1px 4px;
-}
 /* Dup warning */
 .dup-warning{
   margin:12px;background:rgba(245,158,11,.08);
@@ -8720,23 +8714,24 @@ function closeForm() {
   ESTADO.residentCount = 0;
 }
 
-// V9: Mostrar fotos existentes del backend como miniaturas (sin re-subir)
+// V9: Mostrar fotos existentes del backend — reutiliza _renderizarFotoThumb
 function _renderizarFotosExistentes(fotos) {
-  const grid = document.getElementById('photoGrid');
-  if (!grid || !fotos || fotos.length === 0) return;
-  const addBtn = grid.querySelector('.photo-add');
-  fotos.forEach(f => {
-    const thumb = document.createElement('div');
-    thumb.className = 'photo-thumb foto-existente';
-    thumb.dataset.idFoto = f.ID_Foto || '';
+  if (!fotos || fotos.length === 0) return;
+  fotos.forEach((f, idx) => {
     const src = f.Dados_Base64
       ? (f.Dados_Base64.startsWith('data:') ? f.Dados_Base64 : 'data:' + (f.Mime_Type || 'image/jpeg') + ';base64,' + f.Dados_Base64)
       : '';
-    thumb.innerHTML = `
-      <img src="${src}" alt="${f.Nome_Foto || ''}">
-      <div class="photo-thumb-label">${f.Nome_Foto || 'Foto'}</div>
-      <div class="photo-thumb-badge">✅</div>`;
-    grid.insertBefore(thumb, addBtn);
+    const fotoObj = {
+      nome:       f.Nome_Foto || 'Foto ' + (idx + 1),
+      tipo:       f.Mime_Type || 'image/jpeg',
+      base64:     f.Dados_Base64 || '',
+      descricao:  f.Descricao || '',
+      _local_url: src,
+      _uid:       'exist_' + (f.ID_Foto || idx) + '_' + Date.now().toString(36),
+      _existente: true,
+    };
+    _fotosBase64.push(fotoObj);
+    _renderizarFotoThumb(fotoObj, _fotosBase64.length - 1);
   });
 }
 
@@ -9293,6 +9288,7 @@ function removePhoto(btn) {
 }
 
 async function enviarFotosBackend(idPing, voluntario) {
+  // V9: Enviar TODAS las fotos (existentes + nuevas). Backend borra las viejas y re-inserta.
   if (!_fotosBase64.length) return { sucesso:true, quantidade:0 };
   const payload = {
     acao:       CONFIG.ACOES.SALVAR_FOTOS,
