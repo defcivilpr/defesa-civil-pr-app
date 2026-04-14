@@ -48,14 +48,13 @@ const CONFIG = {
   },
 
   // ── Backend ──────────────────────────────────────────────────
-  BACKEND_URL: "https://script.google.com/macros/s/AKfycbw5iC3KX8MuuwjCGS31P-EHVJGnJLxcNTPg7aN7RXLliLl-yO5Z2QcfGT7Gc_JcNGn_/exec",
+  BACKEND_URL: "https://script.google.com/macros/s/AKfycbwFP2xrCDIbk0pC8UUTZT9UBfDtt1ynuEx34vl2lxWOUwU6drvBEEq5fu9z1j-1Uv4QIw/exec",
   HTTP_METHOD: 'POST',
   HTTP_CONTENT_TYPE: 'text/plain;charset=utf-8',
 
   // ── Sessão ───────────────────────────────────────────────────
   SESSAO: {
     CHAVE:        "dcpr_session",
-    CHAVE_DRAFT:  "dcpr_draft",
     TTL_HORAS:    8,
   },
 
@@ -112,7 +111,6 @@ const CONFIG = {
     // V5: Vista completa de formulario con fotos
     OBTER_FORMULARIO_COMPLETO: "obterFormularioCompleto",
     HEALTH_CHECK:       "healthCheck",
-    ENVIAR_ALERTA:      "enviarAlerta",
     REATIVAR_USUARIO:   "reativarUsuario",
     LISTAR_FORMULARIOS: "listarFormularios",
     // [F0] Fase 7 — editar usuario sin perder registros
@@ -131,10 +129,9 @@ const CONFIG = {
   // ── Status de ping (valores que chegam do backend) ───────────
   STATUS_PING: {
     PENDENTE:  "Pendente",
-    EM_CURSO:  "Em Curso",
     CONCLUIDO: "Concluido",
     CRITICO:   "Critico",
-    ARQUIVADO: "Arquivado",  // V5: agregado para consistencia con backend
+    ARQUIVADO: "Arquivado",
   },
 
   // ── Status de voluntário (vindo de sistemas externos) ────────
@@ -152,7 +149,6 @@ const CONFIG = {
   // ── Mapeamento status → CSS class ───────────────────────────
   STATUS_CSS: {
     Pendente:  "s-pending",
-    "Em Curso":"s-process",
     Concluido: "s-done",
     Critico:   "s-critical",
   },
@@ -163,7 +159,6 @@ const CONFIG = {
   // Todos os usos já possuem fallback: CONFIG.STATUS_LABEL[x] || x
   STATUS_LABEL: {
     Pendente:  "Pendente",
-    "Em Curso":"Em Curso",
     Concluido: "Concluido",
     Critico:   "Critico",
   },
@@ -360,7 +355,6 @@ const CONFIG = {
 
     // Formulário
     FORM_AUTOSAVE:      "💾 Auto-salvo",
-    FORM_BTN_RASCUNHO:  "💾 Rascunho",
     FORM_BTN_ENVIAR:    "Enviar Formulário →",
     FORM_STEPS: ["1 Unidade", "2 Residentes", "3 Danos", "4 Fotos"],
     FORM_GPS_BTN:       "📡 GPS",
@@ -368,7 +362,6 @@ const CONFIG = {
 
     // Toasts
     TOAST_FORM_ENVIADO: "✅ Formulário enviado e sincronizado!",
-    TOAST_RASCUNHO:     "💾 Rascunho salvo offline",
     TOAST_GPS_CAPTURA:  "📡 Capturando GPS...",
     TOAST_GPS_OK:       "✅ Coordenadas capturadas",
     TOAST_GPS_SIMULADO: "✅ GPS capturado (simulado)",
@@ -450,8 +443,6 @@ const CONFIG = {
     EXP_CSV_FORMS_DESC:      "Dados detalhados de cada unidade vistoriada.",
     EXP_CSV_PINGS_ICO:       "📋",
     EXP_CSV_FORMS_ICO:       "📋",
-    EXP_EMAIL_TITLE:    "Alertas Email",
-    EXP_EMAIL_DESC:     "AppScript notifica automaticamente em situações críticas.",
     EXP_PDF_TITLE:      "Relatório PDF",
     EXP_PDF_DESC:       "Relatório executivo com mapa e listagem de pontos críticos.",
 
@@ -504,7 +495,7 @@ const CONFIG = {
     TOAST_NECESSIDADES:  "⚠️ Marque ao menos uma necessidade ou informe 'Nenhuma'.",
     VOL_SEM_PINGS:       "Nenhum ponto atribuído a você ainda.",
     VOL_PINGS_CARREGANDO:"⏳ Carregando seus pontos...",
-    FORM_CRITICO_ALERTA: "🚨 SITUAÇÃO CRÍTICA detectada — alerta enviado ao coordenador.",
+    FORM_CRITICO_ALERTA: "🚨 SITUAÇÃO CRÍTICA registrada.",
     FORM_STEP_LABELS:    ["Unidade", "Residentes", "Danos", "Fotos"],
     NECESSIDADES_AVISO:  "⚠️ Selecione ao menos uma necessidade.",
     SERVICOS_AVISO:      "⚠️ Selecione ao menos um serviço afetado.",
@@ -702,9 +693,6 @@ const CONFIG = {
 
   // ── Sprint 5 — Alertas e Gestão (B-21, B-23, B-24, B-25) ────
   S5: {
-    // Email do coordenador para alertas críticos (B-21)
-    EMAIL_COORD:      "",   // ex: "coord@defesacivil.pr.gov.br"
-
     // Dashboard auto-refresh (ms) — B-23
     DASHBOARD_REFRESH: 30000,   // 30 segundos
 
@@ -730,7 +718,6 @@ const CONFIG = {
   STATS_LABELS: {
     TOTAL:      "Total Pontos",
     CONCLUIDOS: "Concluídos",
-    EM_CURSO:   "Em Processo",
     CRITICOS:   "Críticos",
     PENDENTES:  "Pendentes",
   },
@@ -742,17 +729,6 @@ const CONFIG = {
   VOL_STATUS_ATIVO_LABEL: "Ativo",
 
   UI_S5: {
-    // B-21 Alertas
-    ALERTA_TITULO:     "🚨 SITUAÇÃO CRÍTICA",
-    ALERTA_PROMPT:     "Email do coordenador para alertas críticos:\n(deixe vazio para desabilitar)",
-    ALERTA_ENVIADO:    "🚨 Alerta crítico enviado ao coordenador.",
-    ALERTA_ERR:        "⚠️ Não foi possível enviar alerta (salvo localmente).",
-    // BUG-13: substituído window.prompt() por modal nativo
-    ALERTA_MODAL_TITULO: "⚙️ Configurar Alertas de Email",
-    ALERTA_MODAL_LABEL:  "Email do coordenador",
-    ALERTA_MODAL_BTN:    "💾 Salvar",
-    ALERTA_OK:           "✅ Alertas configurados para: ",
-    ALERTA_OFF:          "🔕 Alertas de email desabilitados.",
     // BUG-27: BTN_CANCELAR centralizado
     BTN_CANCELAR:        "Cancelar",
 
@@ -825,7 +801,6 @@ const CONFIG = {
     CSV_BTN:           "⬇️ CSV",
     PDF_BTN:           "⬇️ PDF",
     CONFIG_BTN:        "⚙️ Config",
-    ALERTA_BTN:        "🔔 Configurar",
   },
 
   // ── [V7] UI_PINGS_TABLE — Tabla de pings del coordinador ────
@@ -919,6 +894,21 @@ const CONFIG = {
   // ── Duração do toast (ms) ────────────────────────────────────
   TOAST_DURACAO: 2800,
 
+  // ── V9: Toggle CRÍTICO no formulário ───────────────────────
+  UI_CRITICO: {
+    LABEL:          "🚨 Situação Crítica",
+    HINT:           "Marque se a situação exige atenção imediata",
+  },
+
+  // ── V9: Formulário editável — textos ───────────────────────
+  UI_FORM_EDIT: {
+    CARREGANDO:     "⏳ Carregando dados do formulário...",
+    TOAST_CARREGADO:"📋 Formulário carregado para edição",
+    TOAST_ATUALIZADO:"✅ Formulário atualizado com sucesso!",
+    TOAST_REJEITADO: "ℹ️ Versão mais recente já existe no servidor.",
+    TOAST_NAO_AUTORIZADO: "⚠️ Você não é o voluntário responsável por este ponto.",
+  },
+
   // ── Tempo de redirecionamento após login (ms) ────────────────
   REDIR_DELAY: 2200,
 
@@ -928,7 +918,6 @@ const CONFIG = {
   // ── Cor dos marcadores de mapa por status ───────────────────
   COR_STATUS: {
     Pendente:  "#F59E0B",
-    "Em Curso":"#F4521E",
     Concluido: "#22C55E",
     Critico:   "#EF4444",
   },
@@ -947,7 +936,6 @@ const CONFIG = {
   // Referenciado por: pingIcon · carregarMarcadoresPings · renderizarLeyendaMapa
   COR_PINES: {
     Pendente:  "#F59E0B",   // 🟡 Amarelo
-    "Em Curso":"#F97316",   // 🟠 Laranja
     Concluido: "#22C55E",   // 🟢 Verde
     Critico:   "#EF4444",   // 🔴 Vermelho
     DEFAULT:   "#94A3B8",   // ⚪ Cinza (sem status definido)
@@ -988,7 +976,6 @@ const CONFIG = {
   // Referenciado por: renderizarLeyendaMapa() — Fase 5
   LEYENDA_MAPA: [
     { status: "Pendente",  label: "Pendente",  cor: "#F59E0B" },
-    { status: "Em Curso",  label: "Em Curso",  cor: "#F97316" },
     { status: "Concluido", label: "Concluído", cor: "#22C55E" },
     { status: "Critico",   label: "Crítico",   cor: "#EF4444" },
   ],
@@ -2431,7 +2418,6 @@ textarea{resize:vertical;min-height:65px;}
 .s-critical{background:rgba(239,68,68,.12);color:var(--red);}
 .s-done{background:rgba(34,197,94,.12);color:var(--green);}
 .s-new{background:rgba(59,130,246,.12);color:var(--blue);}
-.s-process{background:rgba(244,82,30,.12);color:var(--orange);}
 .dist-label{font-size:11px;color:var(--muted);font-family:'Rajdhani',sans-serif;}
 .arrow-icon{font-size:16px;color:var(--muted);}
 
@@ -2626,7 +2612,6 @@ textarea{resize:vertical;min-height:65px;}
 .ev-ping-status.s-pending{background:rgba(245,158,11,.15);color:#F59E0B;}
 .ev-ping-status.s-critical{background:rgba(239,68,68,.15);color:#EF4444;}
 .ev-ping-status.s-done{background:rgba(34,197,94,.15);color:#22C55E;}
-.ev-ping-status.s-process{background:rgba(249,115,22,.15);color:#F97316;}
 .field-section-header{
   padding:10px 14px;background:var(--navy-mid);
   border-bottom:1px solid rgba(255,255,255,.05);
@@ -2716,6 +2701,35 @@ textarea{resize:vertical;min-height:65px;}
   background:var(--navy-mid);flex-shrink:0;
 }
 .form-actions .btn{flex:1;}
+/* V9: Toggle CRÍTICO */
+.critico-toggle-wrap{
+  margin-top:16px;padding:12px;
+  background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);
+  border-radius:8px;
+}
+.critico-toggle-label{
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;font-size:14px;font-weight:600;color:var(--text);
+}
+.critico-toggle-input{display:none;}
+.critico-toggle-slider{
+  width:44px;height:24px;background:var(--border-soft);
+  border-radius:12px;position:relative;transition:background .2s;flex-shrink:0;
+}
+.critico-toggle-slider::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:20px;height:20px;background:var(--text);
+  border-radius:50%;transition:transform .2s;
+}
+.critico-toggle-input:checked + .critico-toggle-slider{background:var(--red);}
+.critico-toggle-input:checked + .critico-toggle-slider::after{transform:translateX(20px);background:#fff;}
+.critico-toggle-hint{font-size:11px;color:var(--muted);margin-top:6px;}
+/* V9: Fotos existentes badge */
+.foto-existente{position:relative;}
+.photo-thumb-badge{
+  position:absolute;top:4px;right:4px;font-size:10px;
+  background:rgba(0,0,0,.6);border-radius:4px;padding:1px 4px;
+}
 /* Dup warning */
 .dup-warning{
   margin:12px;background:rgba(245,158,11,.08);
@@ -3378,26 +3392,6 @@ textarea{resize:vertical;min-height:65px;}
     </div>
   </div>
 
-  <!-- MODAL: CONFIGURAR ALERTAS — BUG-13: substitui window.prompt() -->
-  <div class="modal-overlay" id="modalConfAlerta">
-    <div class="modal">
-      <div class="modal-hdr">
-        <div class="modal-title" id="modalConfAlertaTitulo">⚙️ Configurar Alertas de Email</div>
-        <div class="modal-close" onclick="closeModal('modalConfAlerta')">✕</div>
-      </div>
-      <div class="modal-body">
-        <div class="field full">
-          <label id="lblAlertaEmail">Email do coordenador</label>
-          <input type="email" id="alertaEmailInput" placeholder="coord@defesacivil.pr.gov.br">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="btnCancelarAlerta" class="btn btn-ghost" onclick="closeModal('modalConfAlerta')">Cancelar</button>
-        <button class="btn btn-primary" onclick="salvarConfAlerta()">💾 Salvar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- [V8.2] MODAL: VER FORMULÁRIO COMPLETO -->
   <div class="modal-overlay" id="modalVerFormulario">
     <div class="modal" style="max-width:600px">
@@ -3547,7 +3541,6 @@ textarea{resize:vertical;min-height:65px;}
       </div>
       <div class="sync-card" style="margin:0 12px 8px">
         <div class="sync-card-title">📱 Armazenamento Local</div>
-        <div class="sync-row"><span>Rascunhos salvos</span><span id="syncRascunhos" style="color:var(--orange)">0</span></div>
         <div class="sync-row"><span>Fotos em cache</span><span id="syncFotosCache" style="color:var(--muted)">—</span></div>
         <div class="sync-row"><span>Tiles de mapa (offline)</span><span style="color:var(--green)">✓ Baixados</span></div>
       </div>
@@ -3659,6 +3652,15 @@ textarea{resize:vertical;min-height:65px;}
           </div>
           <div class="field"><label>Necessita Evacuação</label><select id="fEvacuacao"></select></div>
           <div class="field"><label>Observações</label><textarea id="fObservacoes" placeholder="Situações especiais, contexto do local..."></textarea></div>
+          <!-- V9: Toggle CRÍTICO manual -->
+          <div class="critico-toggle-wrap">
+            <label class="critico-toggle-label" for="toggleCritico">
+              <span id="lblCriticoLabel">🚨 Situação Crítica</span>
+              <input type="checkbox" id="toggleCritico" class="critico-toggle-input">
+              <span class="critico-toggle-slider"></span>
+            </label>
+            <div class="critico-toggle-hint" id="lblCriticoHint">Marque se a situação exige atenção imediata</div>
+          </div>
         </div>
       </div>
       <!-- Seção Fotos -->
@@ -3679,8 +3681,7 @@ textarea{resize:vertical;min-height:65px;}
       </div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost" style="flex:.6" id="btnRascunho" onclick="saveDraft()"></button>
-      <button class="btn btn-primary" id="btnEnviarForm" onclick="submitForm()"></button>
+      <button class="btn btn-primary" style="flex:1" id="btnEnviarForm" onclick="submitForm()"></button>
     </div>
   </div>
 
@@ -3850,6 +3851,7 @@ let _toastRunning = false;
 
 // ── Variables globales — Fotos ───────────────────────────────────
 let _fotosBase64 = []; // array de { nome, tipo, base64, descricao }
+let _fotosExistentes = []; // V9: fotos ya guardadas en backend (no re-subir)
 
 // ── Variables globales — IndexedDB ──────────────────────────────
 let _idb = null;
@@ -4076,7 +4078,6 @@ function renderizarTextos() {
   _html('secDanos',      U.SEC_DANOS);
   _html('secFotos',      U.SEC_FOTOS);
   _txt('autosavePill',   U.FORM_AUTOSAVE);
-  _txt('btnRascunho',    U.FORM_BTN_RASCUNHO);
   _txt('btnEnviarForm',  U.FORM_BTN_ENVIAR);
   _txt('btnGpsForm',     U.FORM_GPS_BTN);
   _txt('btnAddResidente',U.FORM_ADD_RESIDENTE);
@@ -4169,7 +4170,6 @@ function renderizarTextos() {
     { ico:U.EXP_CSV_PINGS_ICO,  title:U.EXP_CSV_TITLE,        desc:U.EXP_CSV_DESC,        btn:'btn-ghost', label:S5U.CSV_BTN, action:"exportarCSV('pings')" },
     { ico:U.EXP_CSV_FORMS_ICO,  title:U.EXP_CSV_FORMS_TITULO,  desc:U.EXP_CSV_FORMS_DESC,  btn:'btn-ghost', label:S5U.CSV_BTN, action:"exportarCSV('formularios')" },
     { ico:'📄', title:U.EXP_PDF_TITLE,    desc:U.EXP_PDF_DESC,    btn:'btn-ghost',   label:S5U.PDF_BTN,    action:"exportarPDF()" },
-    { ico:'✉️', title:U.EXP_EMAIL_TITLE,  desc:U.EXP_EMAIL_DESC,  btn:'btn-ghost',   label:S5U.CONFIG_BTN, action:"configurarAlertas()" },
   ];
   document.getElementById('exportGrid').innerHTML = exports.map(e =>
     `<div class="export-card" onclick="${e.action}">
@@ -4190,11 +4190,6 @@ function renderizarTextos() {
   _txt('btnCancelarPing',      CONFIG.UI_S5.BTN_CANCELAR);
   _txt('btnCancelarForm',      CONFIG.UI_S5.BTN_CANCELAR);
   _txt('btnCancelarUsuario',   CONFIG.UI_S5.BTN_CANCELAR);
-  _txt('btnCancelarAlerta',    CONFIG.UI_S5.BTN_CANCELAR);  // modal novo BUG-13
-
-  // BUG-13: Textos do modal de configurar alertas
-  _txt('modalConfAlertaTitulo', CONFIG.UI_S5.ALERTA_MODAL_TITULO);
-  _txt('lblAlertaEmail',        CONFIG.UI_S5.ALERTA_MODAL_LABEL);
 
   // Sync texts
   _txt('syncStatusTxt', U.SYNC_OK);
@@ -4805,11 +4800,9 @@ function renderizarPings(lista) {
     const areaObj = ESTADO.areas.find(a => a.ID_Area === p.ID_Area);
     const areaNome = areaObj ? (areaObj.Codigo ? areaObj.Codigo + ' · ' + areaObj.Nome : areaObj.Nome) : PT.SEM_AREA;
     
-    // V5: Mostrar botón "Ver Formulário" si el ping tiene status concluido
-    // [V8.2] Ahora aparece siempre pero con estilo diferente si no hay datos
+    // V9: Mostrar botón "Ver Formulário" si el ping tiene formulario enviado
     const tieneForm = p.Status === CONFIG.STATUS_PING.CONCLUIDO || 
-                      p.Status === CONFIG.STATUS_PING.CRITICO ||
-                      p.Status === CONFIG.STATUS_PING.EM_CURSO;
+                      p.Status === CONFIG.STATUS_PING.CRITICO;
     
     // [V7] Voluntario — mostrar "Não designado" si está vacío
     const volNome = p.Voluntario_Responsavel || '';
@@ -4827,7 +4820,7 @@ function renderizarPings(lista) {
       <td><div style="font-weight:500;color:var(--text)">${_esc(p.Endereco)||'—'}</div></td>
       <td style="font-size:11px;color:var(--muted)">${_esc(mapaNome)}</td>
       <td style="font-size:11px;color:var(--text)">${_esc(areaNome)}</td>
-      <td><span class="tag ${css==='s-done'?'tag-done':css==='s-critical'?'tag-critical':css==='s-process'?'tag-active':'tag-pending'}">${label}</span></td>
+      <td><span class="tag ${css==='s-done'?'tag-done':css==='s-critical'?'tag-critical':'tag-pending'}">${label}</span></td>
       <td>${volDisplay}</td>
       <td style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700">${_esc(p.num_residentes)||'—'}</td>
       <td style="color:var(--muted)">${_esc(p.Tipo_Unidade)||'—'}</td>
@@ -5657,7 +5650,7 @@ function mostrarTarjetaConfirmPing(lat, lng, area) {
   const codigoEl = document.getElementById('tcpCodigo');
   if (codigoEl) {
     codigoEl.textContent = codigoPreview;
-    codigoEl.style.color = CONFIG.COR_PINES['Em Curso'];
+    codigoEl.style.color = CONFIG.COR_PINES.Pendente;
   }
   _txt('tcpArea',   '📐 ' + _esc(area.Nome || '—'));
   _txt('tcpCoords', lat.toFixed(5) + ', ' + lng.toFixed(5));
@@ -5673,8 +5666,8 @@ function mostrarTarjetaConfirmPing(lat, lng, area) {
   if (mapCoord) {
     if (window._pingTempMarker) { window._pingTempMarker.remove(); }
     window._pingTempMarker = L.circleMarker([lat, lng], {
-      radius: 8, color: CONFIG.COR_PINES['Em Curso'],
-      fillColor: CONFIG.COR_PINES['Em Curso'], fillOpacity: 0.7,
+      radius: 8, color: CONFIG.COR_PINES.Pendente,
+      fillColor: CONFIG.COR_PINES.Pendente, fillOpacity: 0.7,
     }).addTo(mapCoord);
   }
 }
@@ -6235,11 +6228,8 @@ function renderizarPingsEditarVol() {
     const tieneOtroActivo = volResponsavel && !esMio && volResponsavelActivo;
     const tieneOtroEliminado = volResponsavel && !esMio && !volResponsavelActivo;
     
-    const estaCompleto = status === CONFIG.STATUS_PING.CONCLUIDO;
-    
-    // [V8] Regla: PIN de voluntario eliminado + Pendiente = disponible para reasignar
-    // PIN de voluntario eliminado + Concluido = preservar historial (bloqueado)
-    const bloqueado = tieneOtroActivo || estaCompleto;
+    // V9: Formularios siempre editables — solo bloquear si tiene otro voluntario activo
+    const bloqueado = tieneOtroActivo;
     const seleccionado = _evPingsSeleccionados.includes(p.ID_Ping);
     
     // Clases CSS
@@ -6250,14 +6240,11 @@ function renderizarPingsEditarVol() {
     // [V8] Ping de voluntario eliminado pero pendiente: mostrar como disponible (visual naranja)
     if (tieneOtroEliminado && esPendiente) itemClass += ' available-reassign';
     
-    // [V8] Texto de estado - ahora incluye caso de voluntario eliminado
+    // Texto de estado
     let lockReason = '';
     if (tieneOtroActivo) {
       lockReason = `🔒 ${EV.PING_DE_OUTRO} ${volResponsavel}`;
-    } else if (estaCompleto) {
-      lockReason = '🔒 Formulário já enviado';
     } else if (tieneOtroEliminado && esPendiente) {
-      // [V8] Mostrar que estaba asignado pero ahora está libre
       lockReason = `🔓 Ex: ${volResponsavel} (disponível)`;
     }
     
@@ -6462,32 +6449,26 @@ function pararDashboardAutoRefresh() {
 // DASHBOARD AVANÇADO — B-23
 // CORRECCIÓN aplicada: strings literales reemplazados por CONFIG.STATUS_PING.*
 // 'Pendente'  → CONFIG.STATUS_PING.PENDENTE
-// 'Em Curso'  → CONFIG.STATUS_PING.EM_CURSO
-// 'Concluido' → CONFIG.STATUS_PING.CONCLUIDO
-// 'Critico'   → CONFIG.STATUS_PING.CRITICO
-// 'Inativo'   → CONFIG.STATUS_VOL_LABEL.inactive
+// V9: Solo 3 estados: Pendente, Concluido, Critico (+ Arquivado)
 // ════════════════════════════════════════════════════════════════
 async function renderizarDashboardAvancado() {
   const pings  = ESTADO.pings  || [];
   const vols   = ESTADO.voluntarios || [];
 
-  // Calcular métricas — CORRECCIÓN: usando CONFIG.STATUS_PING.* en lugar de strings
+  // Calcular métricas
   const total     = pings.length;
   const pendentes = pings.filter(p => p.Status === CONFIG.STATUS_PING.PENDENTE).length;
-  const emCurso   = pings.filter(p => p.Status === CONFIG.STATUS_PING.EM_CURSO).length;
   const concluidos= pings.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
   const criticos  = pings.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
   const pct       = total > 0 ? Math.round((concluidos / total) * 100) : 0;
-  // CORRECCIÓN: usando CONFIG.STATUS_VOL_LABEL.inactive en lugar de 'Inativo'
   const volsAtivos= vols.filter(v => v.Status !== CONFIG.STATUS_VOL_LABEL.inactive).length;
 
-  // Cards de estatísticas expandidos
+  // Cards de estatísticas
   const statsEl = document.getElementById('statsGrid');
   if (statsEl) {
     statsEl.innerHTML = [
       { num: total,      label: CONFIG.STATS_LABELS.TOTAL,      delta: '',                                ico: '📍', cor: 'var(--text)' },
       { num: pendentes,  label: CONFIG.STATS_LABELS.PENDENTES,  delta: '',                                ico: '⏳', cor: 'var(--yellow)' },
-      { num: emCurso,    label: CONFIG.STATS_LABELS.EM_CURSO,   delta: '',                                ico: '🔄', cor: 'var(--orange)' },
       { num: concluidos, label: CONFIG.STATS_LABELS.CONCLUIDOS, delta: pct + '% do total',               ico: '✅', cor: 'var(--green)' },
       { num: criticos,   label: CONFIG.STATS_LABELS.CRITICOS,   delta: criticos > 0 ? '⚠️ Atenção' : '', ico: '🚨', cor: criticos > 0 ? 'var(--red)' : 'var(--muted)' },
     ].map(s => `
@@ -6554,13 +6535,11 @@ async function renderizarDashboardAvancado() {
       </div>`;
   }
 
-  // Alertas críticos — F-15: usar p.Grau_Dano (snake_case, nome real da coluna)
+  // V9: Alertas críticos — filtrar solo por Status CRITICO (tag manual del voluntario)
   const alertasEl = document.getElementById('alertasList');
   if (alertasEl) {
     const criticosList = pings.filter(p =>
-      p.Status === CONFIG.STATUS_PING.CRITICO ||
-      p.Grau_Dano === CONFIG.GRAUS_DANO[3] ||   // 'Total'
-      p.Grau_Dano === CONFIG.GRAUS_DANO[2]       // 'Grave'
+      p.Status === CONFIG.STATUS_PING.CRITICO
     );
     if (criticosList.length === 0) {
       alertasEl.innerHTML = `<div style="padding:12px;text-align:center;color:var(--muted);font-size:12px">✅ Nenhuma situação crítica ativa.</div>`;
@@ -6570,8 +6549,8 @@ async function renderizarDashboardAvancado() {
           <div class="alerta-item-ico">🚨</div>
           <div class="alerta-item-body">
             <div class="alerta-item-titulo">${_esc(p.Endereco) || '—'}</div>
-            <div class="alerta-item-desc">Grau: ${_esc(p.Grau_Dano) || '—'} · Voluntário: ${_esc(p.Voluntario_Responsavel) || '—'}</div>
-            <div class="alerta-item-ts">${p.Atualizado ? formatarData(p.Atualizado) : '—'}</div>
+            <div class="alerta-item-desc">Voluntário: ${_esc(p.Voluntario_Responsavel) || '—'}</div>
+            <div class="alerta-item-ts">${p.Atualizado_Em ? formatarData(p.Atualizado_Em) : '—'}</div>
           </div>
         </div>`).join('');
     }
@@ -6612,12 +6591,12 @@ function colorearAreasPorAvance() {
       const criticos    = pingsArea.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
       const pct         = total > 0 ? concluidos / total : 0;
 
-      // Derivar cor de CONFIG.COR_PINES según estado dominante
+      // V9: Derivar cor según estado dominante (sin Em Curso)
       let cor;
       if (criticos > 0)       cor = CONFIG.COR_PINES.Critico;
       else if (pct >= 1)      cor = CONFIG.COR_PINES.Concluido;
-      else if (concluidos > 0)cor = CONFIG.COR_PINES['Em Curso'];
-      else                    cor = CONFIG.COR_PINES.Pendente;
+      else if (concluidos > 0)cor = CONFIG.COR_PINES.Pendente;
+      else                    cor = CONFIG.COR_PINES.DEFAULT;
 
       const opacity = total > 0 ? 0.28 : 0.1;
 
@@ -7046,22 +7025,6 @@ function exportarPDF() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ALERTAS EMAIL — B-21 (BUG-13: modal nativo en lugar de window.prompt)
-// ════════════════════════════════════════════════════════════════
-function configurarAlertas() {
-  const input = document.getElementById('alertaEmailInput');
-  if (input) input.value = CONFIG.S5.EMAIL_COORD || '';
-  openModal('modalConfAlerta');
-}
-
-function salvarConfAlerta() {
-  const email = (document.getElementById('alertaEmailInput')?.value || '').trim();
-  CONFIG.S5.EMAIL_COORD = email;
-  closeModal('modalConfAlerta');
-  toast(email ? CONFIG.UI_S5.ALERTA_OK + email : CONFIG.UI_S5.ALERTA_OFF);
-}
-
-// ════════════════════════════════════════════════════════════════
 // LINKS EXTERNOS — Sheets / Drive / Looker
 // ════════════════════════════════════════════════════════════════
 function abrirLink(tipo) {
@@ -7166,44 +7129,10 @@ async function confirmarEditarUsuario() {
 <!-- ============================================================
      SECCIÓN 8 — COORD: Sistema
      PWA (manifest + service worker), IndexedDB, fila offline,
-     sincronización automática, alertas críticas e instalación PWA.
+     sincronización automática e instalación PWA.
      Posición: octava — depende de S1, S2, S3, S7.
-     NOTA: enviarAlertaCritico movida AQUÍ desde S7 (auditoría ③)
-           depende de guardarFilaOffline que vive en esta sección.
      ============================================================ -->
 <script id="s8-coord-sistema">
-
-// ════════════════════════════════════════════════════════════════
-// ALERTAS CRÍTICOS — B-21
-// MOVIDA desde S7 (auditoría ③): depende de guardarFilaOffline [S8]
-// ════════════════════════════════════════════════════════════════
-async function enviarAlertaCritico(dadosPing, dadosForm) {
-  const s    = ESTADO.sessao;
-  const vol  = s ? (s.Nome || s.nome || s.usuario) : '—';
-  const end  = dadosPing ? (dadosPing.Endereco || dadosPing.endereco || '—') : '—';
-  const grau = dadosForm  ? (dadosForm.fGrauDano || '—') : '—';
-  const risco= dadosForm  ? (dadosForm.fRiscos   || '—') : '—';
-
-  const payload = {
-    acao:         CONFIG.ACOES.ENVIAR_ALERTA,
-    tipo:         CONFIG.UI_S5.ALERTA_TITULO,
-    voluntario:   vol,
-    endereco:     end,
-    grauDano:     grau,
-    riscos:       risco,
-    emailDestino: CONFIG.S5.EMAIL_COORD,
-    timestamp:    new Date().toISOString(),
-  };
-
-  try {
-    await chamarBackend(payload);
-    toast(CONFIG.UI_S5.ALERTA_ENVIADO);
-  } catch(e) {
-    // Falhou — guardar para sincronizar
-    await guardarFilaOffline(payload);
-    toast(CONFIG.UI_S5.ALERTA_ERR);
-  }
-}
 
 // ════════════════════════════════════════════════════════════════
 // PWA MANIFEST — B-22
@@ -7545,7 +7474,6 @@ async function guardarFilaOffline(dados) {
     const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
     ESTADO.syncInfo.pendentes = fila.length;
     _txt('syncPendentes', fila.length);
-    _txt('syncRascunhos',  fila.length);
   } catch(e) {
     // Fallback para sessionStorage se IndexedDB falhar
     try {
@@ -7698,7 +7626,6 @@ async function _sincronizarFila() {
     ESTADO.syncInfo.enviados += enviados;
     _txt('syncEnviados',  ESTADO.syncInfo.enviados);
     _txt('syncPendentes', filaRestante.length);
-    _txt('syncRascunhos', filaRestante.length);
     _txt('syncUltima', new Date().toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA));
   } catch(e) {}
 
@@ -8608,10 +8535,8 @@ function toggleOfflineVol() {
 // FORMULARIO
 // ════════════════════════════════════════════════════════════════
 // [F8] abrirFormulario acepta idPing (string) O ping completo (objeto)
-// — llamado desde botón "▶ Iniciar Relevamento" de la bottom sheet
-// — mantiene compatibilidad con llamadas existentes que pasan idPing + nomeEndereco
-function abrirFormulario(idPingOuObj, nomeEndereco) {
-  // [F8] Si recibe objeto ping desde bottom sheet, extraer campos
+// V9: Precarga datos existentes: cola offline > caché IDB > backend > vacío
+async function abrirFormulario(idPingOuObj, nomeEndereco) {
   let idPing = idPingOuObj;
   if (idPingOuObj && typeof idPingOuObj === 'object') {
     idPing      = idPingOuObj.ID_Ping;
@@ -8623,7 +8548,78 @@ function abrirFormulario(idPingOuObj, nomeEndereco) {
 
   _txt('formTitle', nomeEndereco || 'Formulário');
 
-  if (pingAtualDados) {
+  // Cerrar bottom sheet si estaba abierta
+  _fecharBottomSheet();
+
+  document.getElementById('formOverlay').classList.add('open');
+  document.getElementById('formScroll').scrollTop = 0;
+  goStep(1);
+
+  // V9: Resetear toggle crítico
+  const toggleCrit = document.getElementById('toggleCritico');
+  if (toggleCrit) toggleCrit.checked = false;
+
+  // V9: Resetear fotos
+  _fotosBase64 = [];
+  _fotosExistentes = [];
+
+  // V9: Precarga de datos — prioridad: cola offline > caché local > backend
+  let dadosPrecarga = null;
+
+  // 1. Buscar en cola offline (envío pendiente)
+  try {
+    const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
+    const pendente = fila.find(item => item.idPing === idPing && item.acao === CONFIG.ACOES.SALVAR_FORMULARIO);
+    if (pendente) {
+      dadosPrecarga = pendente;
+      dadosPrecarga._fonte = 'cola';
+    }
+  } catch(e) {}
+
+  // 2. Si no hay en cola, buscar en caché local
+  if (!dadosPrecarga) {
+    try {
+      const cached = await idbGet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing);
+      if (cached) {
+        dadosPrecarga = cached;
+        dadosPrecarga._fonte = 'cache';
+      }
+    } catch(e) {}
+  }
+
+  // 3. Si no hay caché, consultar backend
+  if (!dadosPrecarga && pingAtualDados &&
+      (pingAtualDados.Status === CONFIG.STATUS_PING.CONCLUIDO ||
+       pingAtualDados.Status === CONFIG.STATUS_PING.CRITICO)) {
+    try {
+      toast(CONFIG.UI_FORM_EDIT.CARREGANDO);
+      const r = await chamarBackend({
+        acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO,
+        idPing: idPing
+      });
+      if (r.sucesso && r.dados && r.dados.unidade) {
+        dadosPrecarga = _mapearUnidadeParaForm(r.dados.unidade);
+        dadosPrecarga._fonte = 'backend';
+        dadosPrecarga._residentes = r.dados.residentes || [];
+        dadosPrecarga._fotos = r.dados.fotos || [];
+        // Guardar en caché local para uso offline futuro
+        try {
+          await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing, dadosPrecarga);
+        } catch(e) {}
+      }
+    } catch(e) {
+      // Sin conexión y sin caché — formulario vacío
+    }
+  }
+
+  // 4. Prellenar campos si hay datos
+  if (dadosPrecarga) {
+    _precarregarFormulario(dadosPrecarga);
+    if (dadosPrecarga._fonte !== 'cola') {
+      toast(CONFIG.UI_FORM_EDIT.TOAST_CARREGADO);
+    }
+  } else if (pingAtualDados) {
+    // Formulario nuevo — solo prellenar endereço y coords del ping
     const endEl = document.getElementById('fEndereco');
     if (endEl && !endEl.value) endEl.value = pingAtualDados.Endereco || '';
     const latEl = document.getElementById('fLat');
@@ -8631,21 +8627,68 @@ function abrirFormulario(idPingOuObj, nomeEndereco) {
     if (latEl && !latEl.value && pingAtualDados.Latitude)  latEl.value = pingAtualDados.Latitude;
     if (lngEl && !lngEl.value && pingAtualDados.Longitude) lngEl.value = pingAtualDados.Longitude;
   }
+}
 
-  // [F8] Cerrar bottom sheet si estaba abierta
-  _fecharBottomSheet();
+// V9: Mapear columnas de unidade (snake_case backend) a campos del formulario
+function _mapearUnidadeParaForm(u) {
+  const FC = CONFIG.FORM_CAMPOS;
+  return {
+    tipoUnidade:      u.Tipo_Unidade || '',
+    tipoConstrucao:   u.Tipo_Construcao || '',
+    endereco:         u.Endereco || '',
+    complemento:      u.Complemento || '',
+    referencia:       u.Referencia || '',
+    latitude:         u.Latitude || '',
+    longitude:        u.Longitude || '',
+    numPessoas:       u.Num_Pessoas || '0',
+    numFeridos:       u.Num_Feridos || '0',
+    numDesaparecidos: u.Num_Desaparecidos || '0',
+    numObitos:        u.Num_Obitos || '0',
+    animaisDomesticos:u.Animais_Domesticos || '',
+    necessidadesGerais:u.Necessidades_Gerais || '',
+    tipoDano:         u.Tipo_Dano || '',
+    grauDano:         u.Grau_Dano || '',
+    servicosAfetados: u.Servicos_Afetados || '',
+    riscosImediatos:  u.Riscos_Imediatos || '',
+    unidadeHabitavel: u.Unidade_Habitavel || '',
+    necessitaEvacuacao:u.Necessita_Evacuacao || '',
+    observacoes:      u.Observacoes || '',
+    critico:          u._critico || false,
+  };
+}
 
-  document.getElementById('formOverlay').classList.add('open');
-  document.getElementById('formScroll').scrollTop = 0;
-  goStep(1);
+// V9: Prellenar todos los campos del formulario con datos existentes
+function _precarregarFormulario(dados) {
+  const FC = CONFIG.FORM_CAMPOS;
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
 
-  // Marcar ping como Em Curso ao abrir (se ainda Pendente)
-  if (pingAtualDados && pingAtualDados.Status === CONFIG.STATUS_PING.PENDENTE) {
-    chamarBackend({
-      acao:   CONFIG.ACOES.ATUALIZAR_PING,
-      id:     idPing,
-      Status: CONFIG.STATUS_PING.EM_CURSO,
-    }).catch(() => {});
+  setVal(FC.tipoUnidade,      dados.tipoUnidade);
+  setVal(FC.tipoConstrucao,    dados.tipoConstrucao);
+  setVal(FC.endereco,          dados.endereco);
+  setVal(FC.complemento,       dados.complemento);
+  setVal(FC.referencia,        dados.referencia);
+  setVal(FC.latitude,          dados.latitude);
+  setVal(FC.longitude,         dados.longitude);
+  setVal(FC.numPessoas,        dados.numPessoas);
+  setVal(FC.numFeridos,        dados.numFeridos);
+  setVal(FC.numDesaparecidos,  dados.numDesaparecidos);
+  setVal(FC.numObitos,         dados.numObitos);
+  setVal(FC.animaisDomesticos, dados.animaisDomesticos);
+  setVal(FC.tipoDano,          dados.tipoDano);
+  setVal(FC.grauDano,          dados.grauDano);
+  setVal(FC.riscosImediatos,   dados.riscosImediatos);
+  setVal(FC.unidadeHabitavel,  dados.unidadeHabitavel);
+  setVal(FC.necessitaEvacuacao,dados.necessitaEvacuacao);
+  setVal(FC.observacoes,       dados.observacoes);
+
+  // Toggle crítico
+  const toggleCrit = document.getElementById('toggleCritico');
+  if (toggleCrit) toggleCrit.checked = (dados.critico === true || dados.critico === 'true');
+
+  // Fotos existentes (del backend) — mostrar miniaturas sin re-subir
+  if (dados._fotos && dados._fotos.length > 0) {
+    _fotosExistentes = dados._fotos;
+    _renderizarFotosExistentes(dados._fotos);
   }
 }
 
@@ -8654,6 +8697,47 @@ function closeForm() {
   pingAtualForm  = null;
   pingAtualDados = null;
   _fotosBase64 = [];
+  _fotosExistentes = [];
+  // V9: Limpiar grid de fotos
+  const grid = document.getElementById('photoGrid');
+  if (grid) {
+    grid.innerHTML = `<div class="photo-add" onclick="addPhoto()">
+      <span class="photo-add-icon">📷</span>
+      <span>Adicionar</span>
+    </div>`;
+  }
+  // V9: Resetar campos del formulario
+  const FC = CONFIG.FORM_CAMPOS;
+  Object.values(FC).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const toggleCrit = document.getElementById('toggleCritico');
+  if (toggleCrit) toggleCrit.checked = false;
+  // Limpiar residentes
+  const resList = document.getElementById('residentList');
+  if (resList) resList.innerHTML = '';
+  ESTADO.residentCount = 0;
+}
+
+// V9: Mostrar fotos existentes del backend como miniaturas (sin re-subir)
+function _renderizarFotosExistentes(fotos) {
+  const grid = document.getElementById('photoGrid');
+  if (!grid || !fotos || fotos.length === 0) return;
+  const addBtn = grid.querySelector('.photo-add');
+  fotos.forEach(f => {
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb foto-existente';
+    thumb.dataset.idFoto = f.ID_Foto || '';
+    const src = f.Dados_Base64
+      ? (f.Dados_Base64.startsWith('data:') ? f.Dados_Base64 : 'data:' + (f.Mime_Type || 'image/jpeg') + ';base64,' + f.Dados_Base64)
+      : '';
+    thumb.innerHTML = `
+      <img src="${src}" alt="${f.Nome_Foto || ''}">
+      <div class="photo-thumb-label">${f.Nome_Foto || 'Foto'}</div>
+      <div class="photo-thumb-badge">✅</div>`;
+    grid.insertBefore(thumb, addBtn);
+  });
 }
 
 function goStep(n) {
@@ -8683,22 +8767,6 @@ function captureGPS() {
       }
     );
   }
-}
-
-function saveDraft() {
-  const FC = CONFIG.FORM_CAMPOS;
-  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
-  const draft = {
-    idPing:    pingAtualForm,
-    idArea:    pingAtualDados ? (pingAtualDados.ID_Area || '') : '',
-    idMapa:    pingAtualDados ? (pingAtualDados.ID_Mapa || '') : '',
-    lat:       val(FC.latitude),
-    lng:       val(FC.longitude),
-    endereco:  val(FC.endereco),
-    timestamp: Date.now(),
-  };
-  try { sessionStorage.setItem(CONFIG.SESSAO.CHAVE_DRAFT, JSON.stringify(draft)); } catch(e){}
-  toast(CONFIG.UI.TOAST_RASCUNHO);
 }
 
 function coletarChipsSelecionados(containerId) {
@@ -8734,14 +8802,10 @@ async function submitForm() {
   const lng = document.getElementById('fLng').value;
   const end = document.getElementById('fEndereco').value.trim();
   
-  // ════════════════════════════════════════════════════════════════
-  // V5 — PUNTO 2: Validación completa antes de enviar
-  // Usa CONFIG.VALIDACIONES para todas las reglas
-  // ════════════════════════════════════════════════════════════════
   const FC = CONFIG.FORM_CAMPOS;
   const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   
-  // Esquema de validación del formulario
+  // Esquema de validación
   const esquemaValidacion = {
     endereco:    'requerido',
     latitude:    'coordenada',
@@ -8755,7 +8819,6 @@ async function submitForm() {
     unidadeHabitavel: 'requerido',
   };
   
-  // Recolectar datos para validación
   const datosValidar = {
     endereco:    val(FC.endereco),
     latitude:    val(FC.latitude),
@@ -8769,16 +8832,13 @@ async function submitForm() {
     unidadeHabitavel: val(FC.unidadeHabitavel),
   };
   
-  // Validar con funciones V5
   const resultadoValidacion = validarFormulario(datosValidar, esquemaValidacion);
   
   if (!resultadoValidacion.valido) {
-    // Mostrar primer error encontrado
     const camposConError = Object.keys(resultadoValidacion.errores);
     const primerCampo = camposConError[0];
     const mensajeError = resultadoValidacion.errores[primerCampo];
     
-    // Determinar en qué paso está el campo con error
     const camposStep1 = ['endereco', 'latitude', 'longitude'];
     const camposStep3 = ['tipoDano', 'grauDano', 'unidadeHabitavel'];
     
@@ -8792,7 +8852,6 @@ async function submitForm() {
       toast(`⚠️ ${mensajeError}`);
     }
     
-    // Marcar campo con error visualmente
     const elCampo = document.getElementById(FC[primerCampo]);
     if (elCampo) {
       elCampo.style.borderColor = 'var(--red)';
@@ -8802,14 +8861,12 @@ async function submitForm() {
     return;
   }
   
-  // Validación legacy para compatibilidad (GPS o endereço obligatorio)
   if (!end && (!lat || !lng)) {
     toast(CONFIG.UI.FORM_CAMPO_OBRIG);
     goStep(1);
     return;
   }
 
-  // F-23: validar campos críticos de dano (ya cubierto arriba, pero mantenemos por seguridad)
   const grauDanoVal  = document.getElementById('fGrauDano')?.value;
   const tipoDanoVal  = document.getElementById('fTipoDano')?.value;
   const habitavelVal = document.getElementById('fHabitavel')?.value;
@@ -8818,6 +8875,10 @@ async function submitForm() {
     goStep(3);
     return;
   }
+
+  // V9: Tag CRÍTICO manual del voluntario
+  const toggleCrit = document.getElementById('toggleCritico');
+  const ehCritico = toggleCrit ? toggleCrit.checked : false;
 
   const dados = {
     acao:             CONFIG.ACOES.SALVAR_FORMULARIO,
@@ -8846,22 +8907,28 @@ async function submitForm() {
     observacoes:      val(FC.observacoes),
     voluntario:       s ? (s.Nome || s.nome || s.usuario) : '',
     quantidadeFotos:  document.querySelectorAll('#photoGrid .photo-thumb').length,
+    critico:          ehCritico,
+    _ts:              Date.now(),
   };
-
-  const ehCritico = dados.grauDano === CONFIG.GRAUS_DANO[3]  // 'Total'
-                 || dados.grauDano === CONFIG.GRAUS_DANO[2]   // 'Grave'
-                 || dados.riscosImediatos !== CONFIG.RISCOS[0]; // ≠ 'Nenhum'
 
   try {
     let result;
     if (offlineVol) {
-      guardarFilaOffline(dados);
+      // V9: Reemplazar envío pendiente en cola si existe para este ping
+      await _reemplazarEnColaOffline(dados);
       result = { sucesso: true };
     } else {
       result = await chamarBackend(dados);
     }
 
     if (result.sucesso) {
+      // V9: Verificar si backend rechazó por timestamp o voluntario
+      if (result.mensagem === CONFIG.UI_FORM_EDIT.TOAST_REJEITADO ||
+          result.mensagem === CONFIG.UI_FORM_EDIT.TOAST_NAO_AUTORIZADO) {
+        toast(result.mensagem);
+        return;
+      }
+
       const residentes = coletarResidentes();
       if (residentes.length > 0 && !offlineVol) {
         const idUnidade = result.dados ? result.dados.id : null;
@@ -8872,11 +8939,12 @@ async function submitForm() {
           residentes: residentes,
         }).catch(() => {});
       } else if (residentes.length > 0 && offlineVol) {
-        guardarFilaOffline({
+        await _reemplazarEnColaOffline({
           acao:       CONFIG.ACOES.SALVAR_RESIDENTES,
           idPing:     pingAtualForm,
           idUnidade:  '',
           residentes: residentes,
+          _ts:        Date.now(),
         });
       }
 
@@ -8885,9 +8953,8 @@ async function submitForm() {
         await enviarFotosBackend(pingAtualForm, volNome);
       }
 
-      if (ehCritico && CONFIG.S5.EMAIL_COORD) {
-        await enviarAlertaCritico(pingAtualDados, dados); // S8 — runtime call ✅
-      }
+      // V9: Guardar en caché local para edición offline futura
+      try { await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + pingAtualForm, dados); } catch(e) {}
 
       if (ehCritico) toast(CONFIG.UI.FORM_CRITICO_ALERTA);
       else toast(offlineVol ? CONFIG.UI.FORM_OFFLINE_OK : CONFIG.UI.FORM_ENVIADO_OK);
@@ -8898,9 +8965,28 @@ async function submitForm() {
       toast('⚠️ ' + (result.mensagem || 'Erro ao enviar'));
     }
   } catch(e) {
-    guardarFilaOffline(dados);
+    await _reemplazarEnColaOffline(dados);
     toast(CONFIG.UI.FORM_OFFLINE_OK + ' (sem conexão)');
     setTimeout(closeForm, 1500);
+  }
+}
+
+// V9: Reemplazar o agregar envío en cola offline para evitar duplicados
+async function _reemplazarEnColaOffline(dados) {
+  try {
+    const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
+    // Buscar si ya hay un envío para este ping con la misma acción
+    const existente = fila.find(item =>
+      item.idPing === dados.idPing && item.acao === dados.acao
+    );
+    if (existente) {
+      // Eliminar el viejo y agregar el nuevo
+      await idbDelete(CONFIG.IDB.STORE_FILA, existente._id);
+    }
+    await guardarFilaOffline(dados);
+  } catch(e) {
+    // Fallback: simplemente agregar
+    await guardarFilaOffline(dados);
   }
 }
 
@@ -9391,7 +9477,7 @@ async function navegarAlPin(lat, lng) {
           .map(c => [c[1], c[0]]);   // OSRM retorna [lng,lat] → Leaflet [lat,lng]
         const dist   = data.routes[0].distance;
         _rutaLayer   = L.polyline(coords, {
-          color: CONFIG.COR_PINES['Em Curso'],
+          color: CONFIG.GPS.MARCADOR_COLOR,
           weight: 5, opacity: 0.9, dashArray: '10,6',
         }).addTo(mapVol);
         mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
@@ -9478,10 +9564,9 @@ async function precalcularRutas() {
     } catch(e) { return; }  // Sin GPS — no pre-calcular
   }
 
-  // Pre-calcular solo pines pendientes/en curso
+  // V9: Pre-calcular rutas para pings pendientes y críticos
   const pendientes = ESTADO.pingsVol.filter(p =>
     p.Status === CONFIG.STATUS_PING.PENDENTE ||
-    p.Status === CONFIG.STATUS_PING.EM_CURSO ||
     p.Status === CONFIG.STATUS_PING.CRITICO
   );
 
