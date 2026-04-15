@@ -9343,7 +9343,7 @@ function _renderizarFotoThumb(fotoObj, idx) {
   const img = document.createElement('img');
   img.src = fotoObj._local_url;
   img.alt = fotoObj.nome || '';
-  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:8px;';
+  img.style.cssText = 'max-width:100%;height:auto;object-fit:contain;border-radius:8px;';
   item.querySelector('.photo-thumb').prepend(img);
   grid.insertBefore(item, addBtn);
 }
