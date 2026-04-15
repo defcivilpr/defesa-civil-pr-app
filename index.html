@@ -8752,6 +8752,8 @@ function closeForm() {
   });
   const toggleCrit = document.getElementById('toggleCritico');
   if (toggleCrit) toggleCrit.checked = false;
+  // V9.1: Limpiar chips de necessidades y serviços
+  document.querySelectorAll('#chipsNecessidades .chip, #chipsServicos .chip').forEach(c => c.classList.remove('on'));
   // Limpiar residentes
   const resList = document.getElementById('residentList');
   if (resList) resList.innerHTML = '';
