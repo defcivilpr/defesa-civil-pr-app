@@ -8557,10 +8557,10 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
   _fotosBase64 = [];
   _fotosExistentes = [];
 
-  // V9: Precarga de datos — prioridad: cola offline > caché local > backend
+  // V9.1: Precarga — prioridad: cola offline > backend > caché local > vacío
   let dadosPrecarga = null;
 
-  // 1. Buscar en cola offline (envío pendiente)
+  // 1. Buscar en cola offline (envío pendiente aún no sincronizado)
   try {
     const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
     const pendente = fila.find(item => item.idPing === idPing && item.acao === CONFIG.ACOES.SALVAR_FORMULARIO);
@@ -8570,18 +8570,7 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
     }
   } catch(e) {}
 
-  // 2. Si no hay en cola, buscar en caché local
-  if (!dadosPrecarga) {
-    try {
-      const cached = await idbGet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing);
-      if (cached) {
-        dadosPrecarga = cached;
-        dadosPrecarga._fonte = 'cache';
-      }
-    } catch(e) {}
-  }
-
-  // 3. Si no hay caché, consultar backend
+  // 2. Si no hay en cola, consultar backend (fuente de verdad)
   if (!dadosPrecarga && pingAtualDados &&
       (pingAtualDados.Status === CONFIG.STATUS_PING.CONCLUIDO ||
        pingAtualDados.Status === CONFIG.STATUS_PING.CRITICO)) {
@@ -8596,15 +8585,21 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
         dadosPrecarga._fonte = 'backend';
         dadosPrecarga._residentes = r.dados.residentes || [];
         dadosPrecarga._fotos = r.dados.fotos || [];
-        // V9: Leer estado crítico del ping (no de la unidade)
         dadosPrecarga.critico = (r.dados.ping && r.dados.ping.Status === CONFIG.STATUS_PING.CRITICO);
-        // Guardar en caché local para uso offline futuro
+        // Guardar en caché para fallback offline
         try {
           await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing, dadosPrecarga);
         } catch(e) {}
       }
     } catch(e) {
-      // Sin conexión y sin caché — formulario vacío
+      // 3. Sin conexión — fallback a caché local
+      try {
+        const cached = await idbGet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing);
+        if (cached) {
+          dadosPrecarga = cached;
+          dadosPrecarga._fonte = 'cache';
+        }
+      } catch(e2) {}
     }
   }
 
@@ -8625,38 +8620,37 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
   }
 }
 
-// V9: Mapear columnas de unidade (snake_case backend) a campos del formulario
+// V9.1: Mapear columnas de unidade (snake_case backend) a campos del formulario
 function _mapearUnidadeParaForm(u) {
-  const FC = CONFIG.FORM_CAMPOS;
   return {
-    tipoUnidade:      u.Tipo_Unidade || '',
-    tipoConstrucao:   u.Tipo_Construcao || '',
-    endereco:         u.Endereco || '',
-    complemento:      u.Complemento || '',
-    referencia:       u.Referencia || '',
-    latitude:         u.Latitude || '',
-    longitude:        u.Longitude || '',
-    numPessoas:       u.Num_Pessoas || '0',
-    numFeridos:       u.Num_Feridos || '0',
-    numDesaparecidos: u.Num_Desaparecidos || '0',
-    numObitos:        u.Num_Obitos || '0',
-    animaisDomesticos:u.Animais_Domesticos || '',
-    necessidadesGerais:u.Necessidades_Gerais || '',
-    tipoDano:         u.Tipo_Dano || '',
-    grauDano:         u.Grau_Dano || '',
-    servicosAfetados: u.Servicos_Afetados || '',
-    riscosImediatos:  u.Riscos_Imediatos || '',
-    unidadeHabitavel: u.Unidade_Habitavel || '',
+    tipoUnidade:       u.Tipo_Unidade || '',
+    tipoConstrucao:    u.Tipo_Construcao || '',
+    endereco:          u.Endereco || '',
+    complemento:       u.Complemento || '',
+    referencia:        u.Referencia || '',
+    latitude:          u.Latitude || '',
+    longitude:         u.Longitude || '',
+    numPessoas:        u.Num_Pessoas || '0',
+    numFeridos:        u.Num_Feridos || '0',
+    numDesaparecidos:  u.Num_Desaparecidos || '0',
+    numObitos:         u.Num_Obitos || '0',
+    animaisDomesticos: u.Animais_Domesticos || '',
+    necessidadesGerais:String(u.Necessidades_Gerais || ''),
+    tipoDano:          u.Tipo_Dano || '',
+    grauDano:          u.Grau_Dano || '',
+    servicosAfetados:  String(u.Servicos_Afetados || ''),
+    riscosImediatos:   u.Riscos_Imediatos || '',
+    unidadeHabitavel:  u.Unidade_Habitavel || '',
     necessitaEvacuacao:u.Necessita_Evacuacao || '',
-    observacoes:      u.Observacoes || '',
-    critico:          u._critico || false,
+    observacoes:       u.Observacoes || '',
+    critico:           false,
   };
 }
 
-// V9: Prellenar todos los campos del formulario con datos existentes
+// V9.1: Prellenar todos los campos del formulario con datos existentes
 function _precarregarFormulario(dados) {
   const FC = CONFIG.FORM_CAMPOS;
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = String(val); };
 
   setVal(FC.tipoUnidade,      dados.tipoUnidade);
   setVal(FC.tipoConstrucao,    dados.tipoConstrucao);
@@ -8681,6 +8675,21 @@ function _precarregarFormulario(dados) {
   const toggleCrit = document.getElementById('toggleCritico');
   if (toggleCrit) toggleCrit.checked = (dados.critico === true || dados.critico === 'true');
 
+  // V9.1: Activar chips de necessidades
+  if (dados.necessidadesGerais) {
+    _ativarChips('chipsNecessidades', String(dados.necessidadesGerais));
+  }
+
+  // V9.1: Activar chips de serviços afetados
+  if (dados.servicosAfetados) {
+    _ativarChips('chipsServicos', String(dados.servicosAfetados));
+  }
+
+  // V9.1: Precargar residentes existentes
+  if (dados._residentes && dados._residentes.length > 0) {
+    _precarregarResidentes(dados._residentes);
+  }
+
   // Fotos existentes (del backend) — mostrar miniaturas sin re-subir
   if (dados._fotos && dados._fotos.length > 0) {
     _fotosExistentes = dados._fotos;
@@ -8688,6 +8697,39 @@ function _precarregarFormulario(dados) {
   }
 }
 
+// V9.1: Activar chips que coincidan con una string guardada
+function _ativarChips(containerId, valorGuardado) {
+  if (!valorGuardado) return;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const chips = container.querySelectorAll('.chip');
+  chips.forEach(chip => {
+    if (valorGuardado.includes(chip.textContent.trim())) {
+      chip.classList.add('on');
+    }
+  });
+}
+
+// V9.1: Precargar residentes existentes en el formulario
+function _precarregarResidentes(residentes) {
+  if (!residentes || residentes.length === 0) return;
+  residentes.forEach(r => {
+    addResident();
+    const cards = document.querySelectorAll('#residentList .resident-card');
+    const lastCard = cards[cards.length - 1];
+    if (!lastCard) return;
+    const inputs = lastCard.querySelectorAll('input, select, textarea');
+    if (inputs[0]) inputs[0].value = r.Nome || '';
+    if (inputs[1]) inputs[1].value = r.Idade || '';
+    if (inputs[2]) inputs[2].value = r.CPF || '';
+    if (inputs[3]) inputs[3].value = r.Condicao || '';
+    if (inputs[4]) inputs[4].value = r.Vulnerabilidade || '';
+    if (inputs[5]) inputs[5].value = r.Necessidades_Especificas || '';
+    // Actualizar nombre visible en el header
+    const nameEl = lastCard.querySelector('.resident-name');
+    if (nameEl && r.Nome) nameEl.textContent = r.Nome;
+  });
+}
 function closeForm() {
   document.getElementById('formOverlay').classList.remove('open');
   pingAtualForm  = null;
@@ -8950,8 +8992,8 @@ async function submitForm() {
         await enviarFotosBackend(pingAtualForm, volNome);
       }
 
-      // V9: Guardar en caché local para edición offline futura
-      try { await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + pingAtualForm, dados); } catch(e) {}
+      // V9.1: Invalidar caché local — la próxima apertura consultará el backend
+      try { await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + pingAtualForm, null); } catch(e) {}
 
       if (ehCritico) toast(CONFIG.UI.FORM_CRITICO_ALERTA);
       else toast(offlineVol ? CONFIG.UI.FORM_OFFLINE_OK : CONFIG.UI.FORM_ENVIADO_OK);
