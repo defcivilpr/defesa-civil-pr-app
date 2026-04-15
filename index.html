@@ -9259,7 +9259,7 @@ function _renderizarFotoThumb(fotoObj, idx) {
     </div>
     <input type="text" class="photo-desc-input" 
            placeholder="Descrição..." 
-           value="${(fotoObj.descricao || '').replace(/"/g, '&quot;')}"
+           value="${String(fotoObj.descricao || '').replace(/"/g, '&quot;')}"
            onchange="atualizarDescricaoFoto('${fotoObj._uid}', this.value)">`;
   // Crear img programáticamente para evitar que base64 rompa innerHTML
   const img = document.createElement('img');
