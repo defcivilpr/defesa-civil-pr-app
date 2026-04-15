@@ -609,6 +609,14 @@ const CONFIG = {
     LBL_CPF:          "CPF",
     LBL_CONDICAO:     "Condição",
     LBL_VULNERABILIDADE: "Vulnerabilidade",
+    LBL_COMPLEMENTO:     "Complemento",
+    LBL_REFERENCIA:      "Referência",
+    LBL_DESAPARECIDOS:   "Desaparecidos",
+    LBL_ANIMAIS:         "Animais Domésticos",
+    LBL_NECESSIDADES:    "Necessidades Gerais",
+    LBL_SERVICOS:        "Serviços Afetados",
+    LBL_RISCOS:          "Riscos Imediatos",
+    LBL_NECESSIDADES_ESP:"Necessidades Específicas",
   },
 
   // ── [V8.2] Headers de vistas secundarias del voluntario ──────
@@ -9892,6 +9900,14 @@ function renderizarFormularioCompleto(dados) {
           <span class="form-view-value">${_esc(unidade.Tipo_Construcao || '—')}</span>
         </div>
         <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_COMPLEMENTO}</span>
+          <span class="form-view-value">${_esc(unidade.Complemento || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_REFERENCIA}</span>
+          <span class="form-view-value">${_esc(unidade.Referencia || '—')}</span>
+        </div>
+        <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_NUM_PESSOAS}</span>
           <span class="form-view-value">${unidade.Num_Pessoas || '0'}</span>
         </div>
@@ -9900,8 +9916,21 @@ function renderizarFormularioCompleto(dados) {
           <span class="form-view-value">${unidade.Feridos || '0'}</span>
         </div>
         <div class="form-view-row">
+          <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_OBITOS}</span>
           <span class="form-view-value">${unidade.Obitos || '0'}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_DESAPARECIDOS}</span>
+          <span class="form-view-value">${unidade.Num_Desaparecidos || '0'}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_ANIMAIS}</span>
+          <span class="form-view-value">${_esc(unidade.Animais_Domesticos || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_NECESSIDADES}</span>
+          <span class="form-view-value">${_esc(unidade.Necessidades_Gerais || '—')}</span>
         </div>
       </div>
     </div>
@@ -9926,8 +9955,17 @@ function renderizarFormularioCompleto(dados) {
           <span class="form-view-value">${_esc(unidade.Unidade_Habitavel || '—')}</span>
         </div>
         <div class="form-view-row">
+          <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_EVACUACAO}</span>
           <span class="form-view-value">${_esc(unidade.Necessita_Evacuacao || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_SERVICOS}</span>
+          <span class="form-view-value">${_esc(unidade.Servicos_Afetados || '—')}</span>
+        </div>
+        <div class="form-view-row">
+          <span class="form-view-label">${UI.LBL_RISCOS}</span>
+          <span class="form-view-value">${_esc(unidade.Riscos_Imediatos || '—')}</span>
         </div>
         ${unidade.Observacoes ? `<div class="form-view-obs">${_esc(unidade.Observacoes)}</div>` : ''}
       </div>
@@ -9949,6 +9987,8 @@ function renderizarFormularioCompleto(dados) {
                 <span>${UI.LBL_IDADE}: ${r.Idade || '—'}</span>
                 <span>${UI.LBL_CPF}: ${_esc(r.CPF || '—')}</span>
                 <span>${UI.LBL_CONDICAO}: ${_esc(r.Condicao || '—')}</span>
+                <span>${UI.LBL_VULNERABILIDADE}: ${_esc(r.Vulnerabilidade || '—')}</span>
+                <span>${UI.LBL_NECESSIDADES_ESP}: ${_esc(r.Necessidades_Especificas || '—')}</span>
               </div>
             </div>
           `).join('')
@@ -10050,12 +10090,17 @@ function baixarPdfFormulario() {
       <div class="row"><span class="label">Nº Pessoas:</span><span class="value">${unidade.Num_Pessoas || '0'}</span></div>
       <div class="row"><span class="label">Feridos:</span><span class="value">${unidade.Feridos || '0'}</span></div>
       <div class="row"><span class="label">Óbitos:</span><span class="value">${unidade.Obitos || '0'}</span></div>
+      <div class="row"><span class="label">Desaparecidos:</span><span class="value">${unidade.Num_Desaparecidos || '0'}</span></div>
+      <div class="row"><span class="label">Animais Domésticos:</span><span class="value">${_esc(unidade.Animais_Domesticos || '—')}</span></div>
+      <div class="row"><span class="label">Necessidades Gerais:</span><span class="value">${_esc(unidade.Necessidades_Gerais || '—')}</span></div>
       
       <h2>⚠️ Danos</h2>
       <div class="row"><span class="label">Tipo de Dano:</span><span class="value">${_esc(unidade.Tipo_Dano || '—')}</span></div>
       <div class="row"><span class="label">Grau do Dano:</span><span class="value">${_esc(unidade.Grau_Dano || '—')}</span></div>
       <div class="row"><span class="label">Habitável:</span><span class="value">${_esc(unidade.Unidade_Habitavel || '—')}</span></div>
       <div class="row"><span class="label">Necessita Evacuação:</span><span class="value">${_esc(unidade.Necessita_Evacuacao || '—')}</span></div>
+      <div class="row"><span class="label">Serviços Afetados:</span><span class="value">${_esc(unidade.Servicos_Afetados || '—')}</span></div>
+      <div class="row"><span class="label">Riscos Imediatos:</span><span class="value">${_esc(unidade.Riscos_Imediatos || '—')}</span></div>
       ${unidade.Observacoes ? `<div class="obs">${_esc(unidade.Observacoes)}</div>` : ''}
       
       <h2>👥 Residentes (${residentes.length})</h2>
@@ -10064,7 +10109,8 @@ function baixarPdfFormulario() {
         : residentes.map(r => `
           <div class="residente">
             <strong>${_esc(r.Nome || 'Sem nome')}</strong><br>
-            Idade: ${r.Idade || '—'} · CPF: ${_esc(r.CPF || '—')} · Condição: ${_esc(r.Condicao || '—')}
+            Idade: ${r.Idade || '—'} · CPF: ${_esc(r.CPF || '—')} · Condição: ${_esc(r.Condicao || '—')}<br>
+            Vulnerabilidade: ${_esc(r.Vulnerabilidade || '—')} · Necessidades: ${_esc(r.Necessidades_Especificas || '—')}
           </div>
         `).join('')
       }
