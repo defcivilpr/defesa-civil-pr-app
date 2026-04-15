@@ -8596,6 +8596,8 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
         dadosPrecarga._fonte = 'backend';
         dadosPrecarga._residentes = r.dados.residentes || [];
         dadosPrecarga._fotos = r.dados.fotos || [];
+        // V9: Leer estado crítico del ping (no de la unidade)
+        dadosPrecarga.critico = (r.dados.ping && r.dados.ping.Status === CONFIG.STATUS_PING.CRITICO);
         // Guardar en caché local para uso offline futuro
         try {
           await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing, dadosPrecarga);
@@ -9250,16 +9252,21 @@ function _renderizarFotoThumb(fotoObj, idx) {
   item.className = 'photo-item';
   item.dataset.idx = idx;
   item.dataset.uid = fotoObj._uid;
+  // V9: Construir HTML sin inyectar data URI en template (evita romper HTML con base64)
   item.innerHTML = `
     <div class="photo-thumb">
-      <img src="${fotoObj._local_url}" alt="${fotoObj.nome}"
-        style="width:100%;height:100%;object-fit:cover;border-radius:8px;">
       <div class="photo-del" onclick="removePhoto(this)">✕</div>
     </div>
     <input type="text" class="photo-desc-input" 
            placeholder="Descrição..." 
-           value="${fotoObj.descricao || ''}"
+           value="${(fotoObj.descricao || '').replace(/"/g, '&quot;')}"
            onchange="atualizarDescricaoFoto('${fotoObj._uid}', this.value)">`;
+  // Crear img programáticamente para evitar que base64 rompa innerHTML
+  const img = document.createElement('img');
+  img.src = fotoObj._local_url;
+  img.alt = fotoObj.nome || '';
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:8px;';
+  item.querySelector('.photo-thumb').prepend(img);
   grid.insertBefore(item, addBtn);
 }
 
