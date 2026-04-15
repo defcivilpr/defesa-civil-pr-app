@@ -959,6 +959,7 @@ const CONFIG = {
     BTN_CANCELAR_NAV:  "✕ Cancelar navegação",
     BTN_TOGGLE_MAPAS:     "🗺 Mapas",
     MAPAS_SIDEBAR_TITULO: "🗺 Mapas Salvos",
+    BTN_FINALIZAR_AREA:   "✅ Finalizar Área",
   },
 
   // ── [F0] OSRM — endpoint para cálculo de rotas online ────────
@@ -1776,6 +1777,20 @@ textarea{resize:vertical;min-height:65px;}
 #btnGuardarMapa:hover{
   opacity:.92;transform:translateX(-50%) scale(1.04);
 }
+/* ── Botón flotante "Finalizar Área" ── */
+#btnFinalizarArea{
+  display:none;position:absolute;bottom:48px;right:16px;
+  z-index:1010;
+  background:linear-gradient(135deg,var(--green),#16a34a);
+  color:#fff;border:none;border-radius:24px;
+  padding:10px 22px;font-family:'Rajdhani',sans-serif;
+  font-size:13px;font-weight:700;letter-spacing:.8px;
+  cursor:pointer;box-shadow:0 4px 20px rgba(34,197,94,.5);
+  white-space:nowrap;transition:opacity .2s,transform .2s;
+  animation:fabIn .35s cubic-bezier(.34,1.56,.64,1) both;
+}
+#btnFinalizarArea:hover{opacity:.92;transform:scale(1.04);}
+#btnFinalizarArea:disabled{opacity:.35;cursor:not-allowed;transform:none;}
 /* ── FIM [FASE 2] CSS ── */
 
 /* ── [FASE 5] Leyenda del mapa ────────────────────────────────
@@ -2999,6 +3014,7 @@ textarea{resize:vertical;min-height:65px;}
             <div id="leaflet-map"></div>
             <!-- [FASE 2] Botão flutuante — aparece após busca exitosa. Texto via CONFIG -->
             <button id="btnGuardarMapa" onclick="_abrirModalGuardarMapa()"></button>
+            <button id="btnFinalizarArea" onclick="finalizarPoligono()" disabled></button>
             <div class="map-hint" id="hintDraw" style="color:var(--orange)"></div>
             <div class="map-hint" id="hintPing" style="color:var(--red)"></div>
             <!-- [B3] Tarjeta flotante confirmación área — textos asignados en runtime via CONFIG -->
@@ -5048,6 +5064,12 @@ function setTool(t) {
   });
   document.getElementById('hintDraw').style.display = t==='draw' ? 'block' : 'none';
   document.getElementById('hintPing').style.display = t==='ping' ? 'block' : 'none';
+  const btnFin = document.getElementById('btnFinalizarArea');
+  if (btnFin) {
+    btnFin.style.display = t==='draw' ? 'block' : 'none';
+    btnFin.disabled = true;
+    btnFin.textContent = CONFIG.UI_ACOES.BTN_FINALIZAR_AREA;
+  }
   mapCoord && (mapCoord.dragging[t==='nav'?'enable':'disable']());
   if (t !== 'draw') {
     ESTADO.drawPoints = [];
@@ -5066,6 +5088,8 @@ function onMapClick(e) {
     if (ESTADO.drawPoints.length > 1) {
       drawTempLine = L.polyline(ESTADO.drawPoints, { color:'#F4521E', weight:2, dashArray:'5,5' }).addTo(mapCoord);
     }
+    const btnFin = document.getElementById('btnFinalizarArea');
+    if (btnFin) btnFin.disabled = ESTADO.drawPoints.length < 3;
   } else if (ESTADO.currentTool === 'ping') {
     // [B4] Pin solo dentro de un área — imposible crear fuera
     const area = detectarAreaPorPonto(e.latlng.lat, e.latlng.lng);
@@ -5240,6 +5264,8 @@ function clearLastDraw() {
     if (ESTADO.drawPoints.length > 1) {
       drawTempLine = L.polyline(ESTADO.drawPoints, { color:'#F4521E', weight:2, dashArray:'5,5' }).addTo(mapCoord);
     }
+    const btnFin = document.getElementById('btnFinalizarArea');
+    if (btnFin) btnFin.disabled = ESTADO.drawPoints.length < 3;
     toast(CONFIG.UI.TOAST_UNDO_PONTO);
   } else if (ESTADO.drawnPolygons.length > 0) {
     ESTADO.drawnPolygons.pop().remove();
