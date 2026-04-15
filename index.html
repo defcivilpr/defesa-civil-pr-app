@@ -2277,7 +2277,7 @@ textarea{resize:vertical;min-height:65px;}
   transition:transform .15s;
 }
 .form-view-foto img{
-  aspect-ratio:1;border-radius:8px;width:100%;object-fit:cover;display:block;
+  border-radius:8px;width:100%;height:auto;object-fit:contain;display:block;
 }
 .form-view-foto:hover{transform:scale(1.02);}
 /* Lightbox para fotos */
@@ -2691,7 +2691,7 @@ textarea{resize:vertical;min-height:65px;}
 /* [V8.4] Contenedor de foto + descripción */
 .photo-item{display:flex;flex-direction:column;gap:4px;width:100px;}
 .photo-thumb{
-  width:72px;height:72px;border-radius:8px;overflow:hidden;position:relative;
+  width:72px;height:auto;border-radius:8px;overflow:hidden;position:relative;
   border:1px solid var(--border-soft);
 }
 .photo-del{
