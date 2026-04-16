@@ -536,6 +536,11 @@ const CONFIG = {
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
     ],
+    // [V9.1] Dominios de tiles cacheables incluso como opaque (offline)
+    TILE_DOMAINS: [
+      "basemaps.cartocdn.com",
+      "tile.openstreetmap.org",
+    ],
     // [V8.2] Clave para guardar versión en localStorage
     VERSION_KEY: "dcpr_app_version",
     // [V8.2] Habilitar auto-actualización
@@ -7203,6 +7208,7 @@ function registrarServiceWorker() {
 const CACHE = '${CACHE_NAME}';
 const CACHE_PREFIX = '${CONFIG.SW.CACHE_PREFIX}';
 const ASSETS = ${JSON.stringify(ASSETS)};
+const TILE_DOMAINS = ${JSON.stringify(CONFIG.SW.TILE_DOMAINS || [])};
 
 self.addEventListener('install', e => {
   console.log('[SW] Instalando versión:', CACHE);
@@ -7255,12 +7261,13 @@ self.addEventListener('fetch', e => {
     return;
   }
   
-  // Cache-First para assets estáticos (CSS, JS, imágenes)
+  // Cache-First para assets estáticos (CSS, JS, imágenes, tiles)
+  const isTile = TILE_DOMAINS.some(d => url.includes(d));
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(resp => {
-        if (resp && resp.status === 200 && resp.type !== 'opaque') {
+        if (resp && (resp.status === 200 || (isTile && resp.type === 'opaque'))) {
           const clone = resp.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
@@ -8075,6 +8082,15 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
     navDist.textContent = formatearDistancia(distancia);
   }
   
+  // Actualizar línea recta desde posición actual al destino
+  if (_rutaLayer && mapVol) {
+    const latlngs = _rutaLayer.getLatLngs();
+    if (latlngs.length === 2) {
+      latlngs[0] = L.latLng(latActual, lngActual);
+      _rutaLayer.setLatLngs(latlngs);
+    }
+  }
+  
   // Verificar si llegó al destino
   if (distancia <= G.DISTANCIA_LLEGADA_M) {
     toast(G.TEXTOS.LLEGASTE);
@@ -8086,7 +8102,6 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
     }
   }
 }
-
 /**
  * Inicia la navegación hacia un ping específico
  */
@@ -9472,6 +9487,7 @@ function _fecharBottomSheet() {
   document.getElementById('bottomSheetPin')?.classList.remove('aberta');
   document.getElementById('bspOverlay')?.classList.remove('visivel');
   _pingBspAtual = null;
+  cancelarNavegacion();
 }
 
 // Llamado por el botón "🧭 Ir a este ponto" de la bottom sheet
