@@ -280,8 +280,6 @@ const CONFIG = {
     { id:"pings",       icon:"📍",  label:"Pontos (Pings)",  grupo:"Gestão",         badge:"nb-pings" },
     { id:"voluntarios", icon:"👥",  label:"Voluntários",     grupo:"Gestão",         badge:"nb-vols",  badgeClass:"g" },
     { id:"monitoreo",   icon:"📊",  label:"Progresso",       grupo:"Monitoramento",  badge:"nb-mon",   badgeClass:"y" },
-    { id:"exportar",    icon:"📤",  label:"Exportar",        grupo:"Monitoramento" },
-    { id:"usuarios",    icon:"🔑",  label:"Usuários",        grupo:"Administração",  badge:"nb-users" },
   ],
 
   // ── Views do voluntário (bottom nav) ────────────────────────
@@ -376,12 +374,6 @@ const CONFIG = {
     TOAST_FOTO_DEL:     "🗑 Foto removida",
     TOAST_FOTO_AVISO:   "📷 Preencha nome e descrição da foto",
     TOAST_FOTO_NOME:    "⚠️ Informe o nome da foto",
-    TOAST_SHEETS:       "📊 Abrindo Google Sheets...",
-    TOAST_DRIVE:        "📁 Abrindo Google Drive...",
-    TOAST_LOOKER:       "📈 Abrindo Looker Studio...",
-    TOAST_CSV:          "⬇️ Baixando CSV...",
-    TOAST_EMAIL:        "✉️ Configurando alertas...",
-    TOAST_PDF:          "📄 Gerando PDF...",
     TOAST_VOLS_OK:      "✅ Voluntário criado com sucesso!",
     TOAST_DESIGNAR_OK:  "✅ Voluntário designado · histórico preservado",
     TOAST_AREA_CRIADA:  "📐 Área criada e salva com sucesso!",
@@ -424,27 +416,10 @@ const CONFIG = {
     SEC_FOTOS:          "📸 Fotos de Documentação",
 
     // Modais coordenador
-    MOD_SALVAR_MAPA:    "💾 Salvar Mapa",
     MOD_DESIGNAR:       "👤 Designar Voluntário",
     MOD_NOVO_PING:      "📍 Novo Ping",
     MOD_NOVO_VOL:       "👤 Novo Voluntário",
     MOD_DESIGNAR_INFO:  "✅ A reatribuição <strong>não apaga trabalho já realizado</strong>. Formulários concluídos ficam vinculados ao voluntário original.",
-
-    // Exportar
-    EXP_SHEETS_TITLE:   "Google Sheets",
-    EXP_SHEETS_DESC:    "Ver dados em tempo real com links GPS e fotos.",
-    EXP_DRIVE_TITLE:    "Google Drive",
-    EXP_DRIVE_DESC:     "Armazenamento interno de fotos. Acesso via sistema.",
-    EXP_LOOKER_TITLE:   "Looker Studio",
-    EXP_LOOKER_DESC:    "Dashboard com mapas, gráficos e filtros dinâmicos.",
-    EXP_CSV_TITLE:           "Exportar CSV — Pings",
-    EXP_CSV_DESC:            "Pontos levantados com status e coordenadas.",
-    EXP_CSV_FORMS_TITULO:    "Exportar Formulários",
-    EXP_CSV_FORMS_DESC:      "Dados detalhados de cada unidade vistoriada.",
-    EXP_CSV_PINGS_ICO:       "📋",
-    EXP_CSV_FORMS_ICO:       "📋",
-    EXP_PDF_TITLE:      "Relatório PDF",
-    EXP_PDF_DESC:       "Relatório executivo com mapa e listagem de pontos críticos.",
 
     // Paginação / tabela
     TH_ID:              "ID",
@@ -470,9 +445,6 @@ const CONFIG = {
     // Hint mapa
     HINT_DRAW:          "📐 Clique para desenhar — duplo clique para finalizar a área",
     HINT_PING:          "📍 Clique no mapa para posicionar o ping",
-
-    // Notif
-    NOTIF_PLACEHOLDER:  "🔔 Notificações",
 
     // Aviso duplicidade
     DUP_TITULO:         "⚠️ Ponto próximo já registrado",
@@ -686,14 +658,6 @@ const CONFIG = {
     observacoes:    "fObservacoes",
   },
 
-  // ── Links externos (B-25, B-26) ─────────────────────────────
-  // Preencher após configurar o backend
-  LINKS: {
-    SHEETS:  "",   // URL do Google Sheets (preenchida via inicializarSistema)
-    DRIVE:   "",   // URL da pasta raiz no Drive (uso interno — não expor ao usuário)
-    LOOKER:  "",   // URL do dashboard Looker Studio
-  },
-
   // ── Proxy de fotos ───────────────────────────────────────────
   // Constrói a URL para buscar uma foto via AppScript (sem expor Drive).
   // Uso: CONFIG.urlFoto(idArquivo) → BACKEND_URL?acao=getFoto&idArquivo=XXX
@@ -704,21 +668,10 @@ const CONFIG = {
       + '&idArquivo=' + encodeURIComponent(idArquivo);
   },
 
-  // ── Sprint 5 — Alertas e Gestão (B-21, B-23, B-24, B-25) ────
+  // ── Sprint 5 — Dashboard (B-23) ─────────────────────────────
   S5: {
     // Dashboard auto-refresh (ms) — B-23
     DASHBOARD_REFRESH: 30000,   // 30 segundos
-
-    // CSV — B-25
-    CSV_SEPARADOR:    ",",
-    CSV_ENCODING:     "utf-8",
-    CSV_NOME_ARQUIVO: "defesa-civil-dados",
-
-    // PDF — B-25
-    PDF_NOME_ARQUIVO: "defesa-civil-relatorio",
-
-    // Gestão de usuários — B-24
-    SENHA_MINIMA_LEN:  4,
   },
 
   // ── Textos Sprint 5 ──────────────────────────────────────────
@@ -735,9 +688,6 @@ const CONFIG = {
     PENDENTES:  "Pendentes",
   },
 
-  // Texto subtítulo da página de gestão de usuários
-  USERS_PAGE_SUB: "Criar, ativar e desativar acessos ao sistema",
-
   // Label de status Ativo para voluntários
   VOL_STATUS_ATIVO_LABEL: "Ativo",
 
@@ -753,67 +703,6 @@ const CONFIG = {
     // BUG-16: textos dashboard centralizados
     DASH_PROGRESSO_TITULO: "Progresso do Levantamento",
     DASH_PROGRESSO_SUB:    "pontos concluídos · {v} voluntários ativos",
-
-    // B-24 Gestão usuários
-    GESTAO_TITULO:     "👥 Gestão de Usuários",
-    USER_CRIADO:       "✅ Usuário criado com sucesso.",
-    USER_DESATIVADO:   "✅ Usuário desativado.",
-    USER_REATIVADO:    "✅ Usuário reativado.",
-    USER_ERR_CAMPOS:   "⚠️ Preencha todos os campos obrigatórios.",
-    USER_ERR_SENHA:    "⚠️ Senha deve ter ao menos 4 caracteres.",
-    USER_ERR_USUARIO:  "⚠️ Usuário deve conter apenas letras, números e underscore (sem espaços).", // F-12
-    USER_ERR_DUP:      "⚠️ Usuário já existe.",
-    USER_CONF_DESATIV: "Desativar este usuário?",
-    USER_CONF_REATIV:  "Reativar este usuário?",
-    // BUG-15: cabeçalhos da tabela de usuários centralizados
-    TH_USER_AVATAR:    "",
-    TH_USER_NOME:      "Nome",
-    TH_USER_USUARIO:   "Usuário",
-    TH_USER_ROLE:      "Role",
-    TH_USER_AREA:      "Área",
-    TH_USER_STATUS:    "Status",
-    TH_USER_ACOES:     "Ações",
-
-    // [F7] Editar usuário
-    EDITAR_USUARIO_TITULO: "✏️ Editar Usuário",
-    EDITAR_BTN:            "✏️ Editar",
-    EDITAR_SALVAR_BTN:     "💾 Salvar Alterações",
-    EDITAR_SENHA_HINT:     "Senha (deixe em branco para não alterar)",
-    EDITAR_OK:             "✅ Usuário atualizado com sucesso.",
-    EDITAR_ERR_CAMPOS:     "⚠️ Nome e usuário são obrigatórios.",
-    EDITAR_ERR_SENHA:      "⚠️ Nova senha deve ter ao menos 4 caracteres.",
-
-    // B-25 CSV
-    CSV_GERADO:        "⬇️ CSV gerado e baixado.",
-    CSV_VAZIO:         "⚠️ Nenhum dado para exportar.",
-    CSV_COLS_PINGS: ["ID","Endereço","Área","Status","Voluntário","Tipo Unidade","Latitude","Longitude","Atualizado"],
-    CSV_COLS_FORMULARIOS: ["ID Ping","Endereço","Tipo","Construção","Pessoas","Feridos","Dano","Grau","Habitável","Evacuação","Voluntário","Data"],
-
-    // PDF — gerado no frontend sem depender do Drive
-    PDF_GERADO:        "⬇️ Relatório PDF gerado e baixado.",
-    PDF_VAZIO:         "⚠️ Nenhum dado disponível para gerar o relatório.",
-    PDF_TITULO:        "Relatório de Levantamento",
-    PDF_SUBTITULO:     "Defesa Civil — Estado do Paraná",
-    PDF_COL_ID:        "ID",
-    PDF_COL_END:       "Endereço",
-    PDF_COL_AREA:      "Área",
-    PDF_COL_STATUS:    "Status",
-    PDF_COL_VOL:       "Voluntário",
-    PDF_COL_DANO:      "Dano",
-    PDF_COL_PESSOAS:   "Pessoas",
-    PDF_COL_COORDS:    "Coordenadas",  // BUG-17
-    PDF_RODAPE:        "Gerado pelo sistema Defesa Civil PR",
-
-    // B-26 Looker
-    LOOKER_SEM_URL:    "⚠️ URL do Looker Studio não configurada em CONFIG.LINKS.LOOKER",
-    SHEETS_SEM_URL:    "⚠️ URL do Sheets não configurada em CONFIG.LINKS.SHEETS",
-    DRIVE_SEM_URL:     "⚠️ Drive é armazenamento interno. Fotos são acessadas via sistema, sem link direto.",
-
-    // Ações rápidas exportar
-    ABRIR_BTN:         "Abrir →",
-    CSV_BTN:           "⬇️ CSV",
-    PDF_BTN:           "⬇️ PDF",
-    CONFIG_BTN:        "⚙️ Config",
   },
 
   // ── [V7] UI_PINGS_TABLE — Tabla de pings del coordinador ────
@@ -994,10 +883,6 @@ const CONFIG = {
     { status: "Critico",   label: "Crítico",   cor: "#EF4444" },
   ],
 
-  // ── [F0] Ação nova no backend — editar usuário (Fase 7) ───────
-  // Já inserido em CONFIG.ACOES acima. Referenciado por: confirmarEditarUsuario() — Fase 7
-  // CONFIG.ACOES.EDITAR_USUARIO = "editarUsuario"  ← ver bloco ACOES acima
-
   // ── [F0] Textos UI — bottom sheet do voluntário (Fase 8) ─────
   UI_BOTTOM_SHEET: {
     TITULO_PIN:       "Ponto de Relevamento",
@@ -1059,8 +944,6 @@ const CONFIG = {
     BTN_ARQUIVAR:  "🗄 Arquivar",
     BTN_ELIMINAR:  "🗑 Eliminar",
     BTN_EDITAR:    "✏️ Renomear",
-    BTN_VER_AREA:  "🗺 Ver",
-    TOAST_VER_AREA:"🗺 Centralizando em {nome}",
     ARQUIVADO_LABEL: "Arquivado",
     // Mover pin (Bloque 5)
     PING_MOVIDO_OK: "📍 Ponto movido com sucesso.",
@@ -1438,16 +1321,6 @@ textarea{resize:vertical;min-height:65px;padding-left:12px;}
 .pill-gps{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:var(--blue);}
 .dot-blink{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.5s infinite;}
 .tb-right{display:flex;align-items:center;gap:8px;}
-.notif-btn{
-  width:30px;height:30px;border-radius:7px;background:var(--navy-light);
-  border:1px solid var(--border-soft);display:flex;align-items:center;
-  justify-content:center;font-size:13px;cursor:pointer;position:relative;
-}
-.notif-badge{
-  position:absolute;top:-3px;right:-3px;width:13px;height:13px;
-  background:var(--orange);border-radius:50%;font-size:7px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;color:white;
-}
 .role-badge{
   background:var(--orange-glow);border:1px solid var(--border);color:var(--orange);
   font-family:'Rajdhani',sans-serif;font-weight:600;font-size:10px;
@@ -2192,18 +2065,6 @@ textarea{resize:vertical;min-height:65px;}
 .alert-title{font-size:12px;font-weight:500;margin-bottom:2px;}
 .alert-sub{font-size:10px;color:var(--muted);}
 
-/* EXPORTAR */
-.export-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
-.export-card{
-  background:var(--card);border:1px solid var(--border-soft);
-  border-radius:10px;padding:18px;display:flex;flex-direction:column;
-  gap:8px;cursor:pointer;transition:all .2s;
-}
-.export-card:hover{border-color:var(--border);transform:translateY(-1px);}
-.export-ico{font-size:28px;}
-.export-title{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;}
-.export-desc{font-size:11px;color:var(--muted);flex:1;}
-
 /* MODAIS */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.6);
@@ -2780,30 +2641,7 @@ textarea{resize:vertical;min-height:65px;}
 }
 .gps-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
 
-/* ── Sprint 5: Gestão Usuários, Dashboard, Alertas ── */
-.user-avatar{
-  width:32px;height:32px;border-radius:50%;
-  background:linear-gradient(135deg,var(--orange),var(--red));
-  display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:700;font-family:'Rajdhani',sans-serif;
-  color:#fff;flex-shrink:0;
-}
-.user-row-info{display:flex;align-items:center;gap:10px;}
-.user-role-tag{
-  display:inline-block;padding:2px 8px;border-radius:10px;
-  font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
-}
-.role-coord{background:rgba(244,82,30,.15);color:var(--orange);}
-.role-vol{background:rgba(34,197,94,.12);color:var(--green);}
-.role-inativo{background:rgba(148,163,184,.1);color:var(--muted);}
-.user-action-btn{
-  padding:4px 10px;font-size:11px;border-radius:6px;cursor:pointer;
-  border:1px solid var(--border);background:transparent;color:var(--text);
-  transition:all .2s;
-}
-.user-action-btn:hover{background:var(--navy-mid);border-color:var(--orange);}
-.user-action-btn.danger{color:var(--red);border-color:rgba(239,68,68,.3);}
-.user-action-btn.danger:hover{background:rgba(239,68,68,.1);}
+/* ── Sprint 5: Dashboard, Alertas ── */
 
 /* Dashboard avançado */
 .stat-card-big{
@@ -2948,7 +2786,6 @@ textarea{resize:vertical;min-height:65px;}
       <span style="font-size:10px;color:var(--muted)" id="clockCoord">--:--</span>
     </div>
     <div class="tb-right">
-      <div class="notif-btn" id="notifBtn"><span>🔔</span><div class="notif-badge" id="notifBadgeNum">0</div></div>
       <div class="role-badge" id="coordRoleBadge"></div>
       <span style="font-size:12px;color:var(--muted)" id="coordUserName"></span>
       <div class="avatar" id="coordAvatar"></div>
@@ -2990,7 +2827,6 @@ textarea{resize:vertical;min-height:65px;}
             <div class="maps-sidebar-hdr">
               <div class="maps-sidebar-hdr-title" id="mapsSidebarTitulo"></div>
               <div style="display:flex;gap:5px;align-items:center">
-                <button class="btn btn-primary" style="padding:4px 9px;font-size:10px" onclick="openModal('modalSaveMap')">+ Novo</button>
                 <div class="aip-close" onclick="_toggleMapasSidebar()" title="Fechar painel">✕</div>
               </div>
             </div>
@@ -3005,7 +2841,6 @@ textarea{resize:vertical;min-height:65px;}
               <button class="mtb mtb-ping" id="toolPing" onclick="setTool('ping')">📍 Adicionar Ping</button>
               <div class="tb-sep"></div>
               <button class="mtb mtb-nav" onclick="clearLastDraw()">↩ Desfazer</button>
-              <button class="mtb mtb-nav" onclick="openModal('modalSaveMap')">💾 Salvar Mapa</button>
               <div class="map-mode-ind">
                 <div class="dot-blink" style="color:var(--green)"></div>
                 <span id="mapModeLabel">CARTO Dark · Online</span>
@@ -3146,98 +2981,8 @@ textarea{resize:vertical;min-height:65px;}
         </div>
       </div>
 
-      <!-- PAGE: EXPORTAR -->
-      <div class="page" id="page-exportar">
-        <div class="page-header">
-          <div><div class="page-title">📤 Exportar Dados</div><div class="page-sub">Sincronização com Google Sheets, Drive e relatórios</div></div>
-        </div>
-        <div class="content-area">
-          <div class="export-grid" id="exportGrid"></div>
-        </div>
-      </div>
-
-
-      <!-- PAGE: USUÁRIOS — B-24 -->
-      <div class="page" id="page-usuarios">
-        <div class="page-header">
-          <div><div class="page-title" id="pageUsersTitulo"></div><div class="page-sub" id="pageUsersSub"></div></div>
-          <button class="btn btn-primary" onclick="openModal('modalNovoUser')">➕ Novo Usuário</button>
-        </div>
-        <div class="content-area">
-          <!-- Filtros -->
-          <div class="filter-bar" style="margin-bottom:16px">
-            <select id="userFiltroRole" onchange="renderizarUsuarios()" style="font-size:13px;background:var(--navy-mid);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px">
-              <option value="">Todos os roles</option>
-            </select>
-            <select id="userFiltroStatus" onchange="renderizarUsuarios()" style="font-size:13px;background:var(--navy-mid);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px">
-              <option value="">Todos os status</option>
-              <option value="Ativo">Ativos</option>
-              <option value="Inativo">Inativos</option>
-            </select>
-            <input id="userBusca" oninput="renderizarUsuarios()" placeholder="🔍 Buscar nome ou usuário..." style="font-size:13px;background:var(--navy-mid);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;flex:1">
-          </div>
-          <!-- Tabela -->
-          <div class="card" style="overflow:hidden">
-            <table class="data-table" id="usersTable">
-              <thead><tr id="usersTableHead"></tr></thead>
-              <tbody id="usersTableBody"></tbody>
-            </table>
-          </div>
-          <div id="usersVazio" style="display:none;text-align:center;padding:40px;color:var(--muted)">Nenhum usuário encontrado.</div>
-        </div>
-      </div>
-
     </div><!-- /main -->
   </div><!-- /app-body -->
-
-  <!-- MODAL NOVO USUÁRIO — B-24 -->
-  <div class="modal-overlay" id="modalNovoUser">
-    <div class="modal">
-      <div class="modal-hdr">
-        <div class="modal-title">➕ Novo Usuário</div>
-        <div class="modal-close" onclick="closeModal('modalNovoUser')">✕</div>
-      </div>
-      <div class="modal-body">
-        <div class="mgrid">
-          <div class="field"><label>Nome Completo *</label><input type="text" id="nuNome" placeholder="Nome do usuário"></div>
-          <div class="field"><label>Usuário (login) *</label><input type="text" id="nuUsuario" placeholder="usuario123"></div>
-          <div class="field"><label>Senha *</label><input type="password" id="nuSenha" placeholder="Senha inicial"></div>
-          <div class="field"><label>Role</label><select id="nuRole"></select></div>
-          <div class="field full"><label>Área Designada</label><select id="nuArea"></select></div>
-          <div class="field full"><label>Email (para alertas)</label><input type="email" id="nuEmail" placeholder="email@exemplo.com"></div>
-        </div>
-        <div id="nuErro" style="color:var(--critical);font-size:12px;margin-top:8px;display:none"></div>
-      </div>
-      <div class="modal-footer">
-        <button id="btnCancelarUsuario" class="btn btn-ghost" onclick="closeModal('modalNovoUser')">Cancelar</button>
-        <button class="btn btn-primary" onclick="criarNovoUsuario()">Criar Usuário</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL EDITAR USUÁRIO — [FASE 7] -->
-  <div class="modal-overlay" id="modalEditarUsuario">
-    <div class="modal">
-      <div class="modal-hdr">
-        <div class="modal-title" id="modalEditarUserTitulo"></div>
-        <div class="modal-close" onclick="closeModal('modalEditarUsuario')">✕</div>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="euId">
-        <div class="mgrid">
-          <div class="field"><label>Nome Completo *</label><input type="text" id="euNome" placeholder="Nome do usuário"></div>
-          <div class="field"><label>Usuário (login) *</label><input type="text" id="euUsuario" placeholder="usuario123"></div>
-          <div class="field full"><label id="euSenhaLabel"></label><input type="password" id="euSenha" placeholder=""></div>
-          <div class="field full"><label>Área Designada</label><select id="euArea"></select></div>
-        </div>
-        <div id="euErro" style="color:var(--red);font-size:12px;margin-top:8px;display:none"></div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
-        <button class="btn btn-primary" id="euBtnSalvar" onclick="confirmarEditarUsuario()"></button>
-      </div>
-    </div>
-  </div>
 
   <!-- MODAL EDITAR VOLUNTÁRIO COMPLETO — [V7] -->
   <div class="modal-overlay" id="modalEditarVoluntario">
@@ -3828,9 +3573,6 @@ const ESTADO = {
   syncInfo: { enviados:0, fotos:0, pendentes:0, ultima:null },
 };
 
-// ── Estado de usuarios (Admin) ───────────────────────────────────
-let ESTADO_USERS = { lista: [] };
-
 // ── Variables globales — Coordenador ────────────────────────────
 let mapCoord       = null;
 let pingMarkers    = [];
@@ -4122,10 +3864,7 @@ function renderizarTextos() {
   if (document.getElementById('installDesc'))   _txt('installDesc',   S4.INSTALAR_DESC);
   if (document.getElementById('installBtn'))    _txt('installBtn',    S4.INSTALAR_BTN);
 
-  // Sprint 5 — Textos página Usuários
   const S5U = CONFIG.UI_S5;
-  _txt('pageUsersTitulo', S5U.GESTAO_TITULO);
-  _txt('pageUsersSub',    CONFIG.USERS_PAGE_SUB);
 
   // Steps
   document.getElementById('stepsBar').innerHTML = CONFIG.UI.FORM_STEPS.map((s,i) =>
@@ -4187,24 +3926,6 @@ function renderizarTextos() {
     filtroStatus.innerHTML += `<option value="${s}">${s}</option>`;
   });
 
-  // Export grid (usa S5U já declarado acima)
-  const exports = [
-    { ico:'📊', title:U.EXP_SHEETS_TITLE, desc:U.EXP_SHEETS_DESC, btn:'btn-primary', label:S5U.ABRIR_BTN,  action:"abrirLink('sheets')" },
-    { ico:'📁', title:U.EXP_DRIVE_TITLE,  desc:U.EXP_DRIVE_DESC,  btn:'btn-primary', label:S5U.ABRIR_BTN,  action:"abrirLink('drive')" },
-    { ico:'📈', title:U.EXP_LOOKER_TITLE, desc:U.EXP_LOOKER_DESC, btn:'btn-primary', label:S5U.ABRIR_BTN,  action:"abrirLink('looker')" },
-    { ico:U.EXP_CSV_PINGS_ICO,  title:U.EXP_CSV_TITLE,        desc:U.EXP_CSV_DESC,        btn:'btn-ghost', label:S5U.CSV_BTN, action:"exportarCSV('pings')" },
-    { ico:U.EXP_CSV_FORMS_ICO,  title:U.EXP_CSV_FORMS_TITULO,  desc:U.EXP_CSV_FORMS_DESC,  btn:'btn-ghost', label:S5U.CSV_BTN, action:"exportarCSV('formularios')" },
-    { ico:'📄', title:U.EXP_PDF_TITLE,    desc:U.EXP_PDF_DESC,    btn:'btn-ghost',   label:S5U.PDF_BTN,    action:"exportarPDF()" },
-  ];
-  document.getElementById('exportGrid').innerHTML = exports.map(e =>
-    `<div class="export-card" onclick="${e.action}">
-      <div class="export-ico">${e.ico}</div>
-      <div class="export-title">${e.title}</div>
-      <div class="export-desc">${e.desc}</div>
-      <button class="btn ${e.btn}">${e.label}</button>
-    </div>`
-  ).join('');
-
   // Dup warning
   _txt('dupTitulo', U.DUP_TITULO);
   _html('dupAviso', U.DUP_AVISO);
@@ -4214,7 +3935,6 @@ function renderizarTextos() {
   _txt('btnCancelarArea',      CONFIG.UI_S5.BTN_CANCELAR);
   _txt('btnCancelarPing',      CONFIG.UI_S5.BTN_CANCELAR);
   _txt('btnCancelarForm',      CONFIG.UI_S5.BTN_CANCELAR);
-  _txt('btnCancelarUsuario',   CONFIG.UI_S5.BTN_CANCELAR);
 
   // Sync texts
   _txt('syncStatusTxt', U.SYNC_OK);
@@ -4791,7 +4511,7 @@ function renderizarAreas() {
         </div>
         <div class="area-prog"><div class="area-prog-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
         <div class="area-acts">
-          <button class="btn btn-ghost" onclick="focarAreaMapa('${_esc(a.ID_Area)}')">${CC.BTN_VER_AREA}</button>
+          <button class="btn btn-ghost" onclick="navegarCoord('mapas',_navEl('mapas'));toast('🗺 Navegando para ${_esc(a.Nome)}')">🗺 Ver</button>
           <button class="btn btn-ghost" title="${MA.RENOMEAR_PROMPT}" onclick="renomearArea('${_esc(a.ID_Area)}','${_esc(a.Nome).replace(/'/g,"\\'")}')">✏️</button>
           <button class="btn btn-ghost" title="${CC.BTN_ELIMINAR}" onclick="deleteArea('${_esc(a.ID_Area)}')">🗑</button>
         </div>
@@ -5053,31 +4773,6 @@ function focarPingMapa(lat, lng) {
   setTimeout(() => {
     mapCoord && mapCoord.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
   }, 100);
-}
-
-function focarAreaMapa(idArea) {
-  const area = ESTADO.areas.find(a => a.ID_Area === idArea);
-  if (!area) return;
-  navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
-  setTimeout(() => {
-    if (!mapCoord) return;
-    // Buscar polígono ya dibujado en la capa de áreas
-    let bounds = null;
-    if (_capaAreasExistentes) {
-      _capaAreasExistentes.eachLayer(layer => {
-        if (layer._areaId === idArea) bounds = layer.getBounds();
-      });
-    }
-    // Fallback: parsear desde los datos del área
-    if (!bounds && area[CONFIG.CAMPO_POLIGONO]) {
-      try {
-        const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
-        if (pts && pts.length >= 3) bounds = L.latLngBounds(pts);
-      } catch(e) {}
-    }
-    if (bounds) mapCoord.fitBounds(bounds, { padding: [40, 40] });
-  }, 100);
-  toast(CONFIG.UI_CICLO.TOAST_VER_AREA.replace('{nome}', area.Nome));
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -6469,9 +6164,6 @@ function atualizarBadges() {
   _txt('nb-pings', ESTADO.pings.length);
   _txt('nb-vols',  ESTADO.voluntarios.length);
   _txt('nb-mon',   ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length);
-  _txt('nb-users', ESTADO_USERS.lista.length || '');
-  const notifN = ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CRITICO).length;
-  _txt('notifBadgeNum', notifN);
 }
 
 function atualizarProgressoGeral() {
@@ -6731,454 +6423,10 @@ function navegarCoord(pagina, el) {
   if (pagina === 'monitoreo') {
     renderizarMonitoramento();        // S6 — runtime call ✅
     iniciarDashboardAutoRefresh();    // S6 — runtime call ✅
-  } else if (pagina === 'usuarios') {
-    _popularFiltroRole();             // S7 — misma sección ✅
-    _popularSelectRole('nuRole');     // S7 — misma sección ✅
-    carregarUsuarios();               // S7 — misma sección ✅
   } else {
     pararDashboardAutoRefresh();      // S6 — runtime call ✅
   }
 }
-
-// ════════════════════════════════════════════════════════════════
-// GESTÃO DE USUÁRIOS — B-24
-// ════════════════════════════════════════════════════════════════
-async function carregarUsuarios() {
-  try {
-    // BUG-02: LISTAR_VOLUNTARIOS não existe no CONFIG — chave correta é LISTAR_USUARIOS
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_USUARIOS });
-    if (r.sucesso && r.dados) {
-      ESTADO_USERS.lista = r.dados;
-      renderizarUsuarios();
-      // Popular dropdowns de área
-      _popularSelectArea('nuArea', true);
-    }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
-
-function renderizarUsuarios() {
-  const filtroRole   = (document.getElementById('userFiltroRole')?.value   || '').toLowerCase();
-  const filtroStatus = document.getElementById('userFiltroStatus')?.value  || '';
-  const busca        = (document.getElementById('userBusca')?.value        || '').toLowerCase();
-
-  let lista = ESTADO_USERS.lista;
-  if (filtroRole)   lista = lista.filter(u => (u.Tipo || u.tipo || '').toLowerCase() === filtroRole);
-  if (filtroStatus) lista = lista.filter(u => (u.Status || u.status || '') === filtroStatus);
-  if (busca)        lista = lista.filter(u =>
-    (u.Nome || u.nome || '').toLowerCase().includes(busca) ||
-    (u.Usuario || u.usuario || '').toLowerCase().includes(busca)
-  );
-
-  const tbody = document.getElementById('usersTableBody');
-  const vazio = document.getElementById('usersVazio');
-  const thead = document.getElementById('usersTableHead');
-
-  if (!tbody) return;
-
-  // BUG-15: cabeçalho da tabela usa CONFIG — não hardcoded
-  if (thead && !thead.dataset.built) {
-    const S5U = CONFIG.UI_S5;
-    thead.innerHTML = [S5U.TH_USER_AVATAR, S5U.TH_USER_NOME, S5U.TH_USER_USUARIO,
-                       S5U.TH_USER_ROLE, S5U.TH_USER_AREA, S5U.TH_USER_STATUS,
-                       S5U.TH_USER_ACOES]
-      .map(h => `<th style="text-align:left;padding:10px 12px;font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border)">${h}</th>`)
-      .join('');
-    thead.dataset.built = '1';
-  }
-
-  if (lista.length === 0) {
-    tbody.innerHTML = '';
-    if (vazio) vazio.style.display = 'block';
-    return;
-  }
-  if (vazio) vazio.style.display = 'none';
-
-  tbody.innerHTML = lista.map(u => {
-    const nome    = u.Nome    || u.nome    || '—';
-    const usuario = u.Usuario || u.usuario || '—';
-    const tipo    = u.Tipo    || u.tipo    || CONFIG.ROLE_TIPO_BACKEND.voluntario;
-    const area    = u.Areas_Permitidas || u.area || '—';
-    const status  = u.Status  || u.status  || CONFIG.STATUS_LABEL.Ativo || 'Ativo';
-    const iniciais= nome.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase();
-    const roleCss = tipo.toLowerCase().includes('coord') ? 'role-coord' : status === 'Inativo' ? 'role-inativo' : 'role-vol';
-    const isAtivo = status !== 'Inativo' && status !== CONFIG.STATUS_VOL_LABEL.inactive;
-    // F-24-B: extrair userId — backend espera { id } nunca { usuario }
-    const userId = u.ID || u.id || '';
-
-    return `<tr>
-      <td style="padding:10px 12px">
-        <div class="user-avatar">${_esc(iniciais)}</div>
-      </td>
-      <td style="padding:10px 12px;font-size:13px;font-weight:500">${_esc(nome)}</td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--muted)">${_esc(usuario)}</td>
-      <td style="padding:10px 12px"><span class="user-role-tag ${roleCss}">${_esc(tipo)}</span></td>
-      <td style="padding:10px 12px;font-size:12px;color:var(--muted)">${_esc(area)}</td>
-      <td style="padding:10px 12px">
-        <span class="tag ${isAtivo ? 'tag-done' : 'tag-pending'}">${_esc(status)}</span>
-      </td>
-      <td style="padding:10px 12px">
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <!-- [F7] Botón Editar — abre modal con datos pre-cargados -->
-          <button class="user-action-btn"
-            onclick="abrirModalEditarUsuario('${_esc(userId)}')">
-            ${CONFIG.UI_S5.EDITAR_BTN}
-          </button>
-          <button class="user-action-btn ${isAtivo ? 'danger' : ''}"
-            onclick="${isAtivo ? `confirmarDesativarUser('${_esc(userId)}','${_esc(nome)}')` : `confirmarReativarUser('${_esc(userId)}','${_esc(nome)}')`}">
-            ${isAtivo ? '🔒 Desativar' : '🔓 Reativar'}
-          </button>
-        </div>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-async function criarNovoUsuario() {
-  const nome    = document.getElementById('nuNome')?.value?.trim();
-  const usuario = document.getElementById('nuUsuario')?.value?.trim();
-  const senha   = document.getElementById('nuSenha')?.value?.trim();
-  const role    = document.getElementById('nuRole')?.value;
-  const area    = document.getElementById('nuArea')?.value || '';
-  const email   = document.getElementById('nuEmail')?.value?.trim() || '';
-
-  const erroEl = document.getElementById('nuErro');
-
-  if (!nome || !usuario || !senha) {
-    if (erroEl) { erroEl.textContent = CONFIG.UI_S5.USER_ERR_CAMPOS; erroEl.style.display = 'block'; }
-    return;
-  }
-  if (senha.length < CONFIG.S5.SENHA_MINIMA_LEN) {
-    if (erroEl) { erroEl.textContent = CONFIG.UI_S5.USER_ERR_SENHA; erroEl.style.display = 'block'; }
-    return;
-  }
-  // F-12: validar formato do username — apenas alfanumérico e underscore
-  if (!/^[a-zA-Z0-9_]+$/.test(usuario)) {
-    if (erroEl) { erroEl.textContent = CONFIG.UI_S5.USER_ERR_USUARIO; erroEl.style.display = 'block'; }
-    return;
-  }
-  if (erroEl) erroEl.style.display = 'none';
-
-  try {
-    const r = await chamarBackend({
-      // CORRECCIÓN: era CONFIG.ACOES.CRIAR_VOLUNTARIO (no existe en backend)
-      // corregido a CONFIG.ACOES.CRIAR_USUARIO — verificado contra backend V3
-      acao:            CONFIG.ACOES.CRIAR_USUARIO,
-      nome:            nome,
-      usuario:         usuario,
-      senha:           senha,
-      tipo:            role,
-      areasPermitidas: area,   // F-19-B: backend usa areasPermitidas, não area
-      email:           email,
-    });
-    if (r.sucesso) {
-      toast(CONFIG.UI_S5.USER_CRIADO);
-      closeModal('modalNovoUser');
-      // Limpar campos
-      ['nuNome','nuUsuario','nuSenha','nuEmail'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = '';
-      });
-      await carregarUsuarios();
-    } else {
-      if (erroEl) { erroEl.textContent = r.mensagem || CONFIG.UI_S5.USER_ERR_DUP; erroEl.style.display = 'block'; }
-    }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
-
-async function confirmarDesativarUser(userId, nome) {
-  if (!confirm(CONFIG.UI_S5.USER_CONF_DESATIV + '\n' + nome)) return;
-  try {
-    // F-24-B: backend espera { id } — nunca { usuario }
-    const r = await chamarBackend({ acao: CONFIG.ACOES.DESATIVAR_USUARIO, id: userId });
-    if (r.sucesso) { toast(CONFIG.UI_S5.USER_DESATIVADO); await carregarUsuarios(); }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
-
-async function confirmarReativarUser(userId, nome) {
-  if (!confirm(CONFIG.UI_S5.USER_CONF_REATIV + '\n' + nome)) return;
-  try {
-    // F-24-B: backend espera { id } — nunca { usuario }
-    const r = await chamarBackend({ acao: CONFIG.ACOES.REATIVAR_USUARIO, id: userId });
-    if (r.sucesso) { toast(CONFIG.UI_S5.USER_REATIVADO); await carregarUsuarios(); }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
-
-function _popularSelectArea(id, comVazio = false) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const opts = comVazio ? ['<option value="">Sem área específica</option>'] : [];
-  (ESTADO.areas || []).forEach(a => {
-    opts.push(`<option value="${a.Nome||a.nome||a.ID_Area}">${a.Nome||a.nome||a.ID_Area}</option>`);
-  });
-  el.innerHTML = opts.join('');
-}
-
-function _popularSelectRole(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.innerHTML = Object.values(CONFIG.ROLE_TIPO_BACKEND)
-    .map(r => `<option value="${r}">${r}</option>`)
-    .join('');
-}
-
-function _popularFiltroRole() {
-  const el = document.getElementById('userFiltroRole');
-  if (!el) return;
-  el.innerHTML = '<option value="">Todos os roles</option>' +
-    Object.values(CONFIG.ROLE_TIPO_BACKEND)
-      .map(r => `<option value="${r.toLowerCase()}">${r}</option>`)
-      .join('');
-}
-
-// ════════════════════════════════════════════════════════════════
-// EXPORTAR CSV — B-25
-// ════════════════════════════════════════════════════════════════
-function exportarCSV(tipo) {
-  const SEP  = CONFIG.S5.CSV_SEPARADOR;
-  const NOME = CONFIG.S5.CSV_NOME_ARQUIVO;
-  const S5U  = CONFIG.UI_S5;
-  let linhas = [];
-  let nomeArq = NOME;
-
-  if (tipo === 'pings') {
-    const cols = S5U.CSV_COLS_PINGS;
-    linhas.push(cols.join(SEP));
-    // BUG-20: filtrar por mapa ativo se houver um selecionado
-    const pingsFiltrados = ESTADO.mapaAtual
-      ? (ESTADO.pings || []).filter(p => p.ID_Mapa === ESTADO.mapaAtual.ID_Mapa)
-      : (ESTADO.pings || []);
-    pingsFiltrados.forEach(p => {
-      linhas.push([
-        _csvEsc(p.ID_Ping || p.id || ''),
-        _csvEsc(p.Endereco || ''),
-        _csvEsc(p.Nome_Area || p.area || ''),
-        _csvEsc(p.Status || ''),
-        _csvEsc(p.Voluntario_Responsavel || ''),
-        _csvEsc(p.Tipo_Unidade || ''),
-        _csvEsc(p.Latitude || ''),
-        _csvEsc(p.Longitude || ''),
-        _csvEsc(p.Atualizado || ''),
-      ].join(SEP));
-    });
-    nomeArq = NOME + '-pings';
-  } else if (tipo === 'formularios') {
-    const cols = S5U.CSV_COLS_FORMULARIOS;
-    linhas.push(cols.join(SEP));
-    (ESTADO.formularios || []).forEach(f => {
-      linhas.push([
-        _csvEsc(f.ID_Ping || ''),
-        _csvEsc(f.Endereco || ''),
-        _csvEsc(f.Tipo_Unidade || ''),
-        _csvEsc(f.Tipo_Construcao || ''),
-        _csvEsc(f.Num_Pessoas || ''),
-        _csvEsc(f.Feridos || ''),
-        _csvEsc(f.Tipo_Dano || ''),
-        _csvEsc(f.Grau_Dano || ''),
-        _csvEsc(f.Habitavel || ''),
-        _csvEsc(f.Necessita_Evacuacao || ''),
-        _csvEsc(f.Voluntario || ''),
-        _csvEsc(f.Timestamp || ''),
-      ].join(SEP));
-    });
-    nomeArq = NOME + '-formularios';
-  }
-
-  if (linhas.length <= 1) { toast(S5U.CSV_VAZIO); return; }
-
-  const bom  = '﻿'; // BOM para Excel reconhecer UTF-8
-  const blob = new Blob([bom + linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = nomeArq + '-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-  toast(S5U.CSV_GERADO);
-}
-
-function _csvEsc(val) {
-  const s = String(val ?? '').replace(/"/g, '""');
-  return s.includes(CONFIG.S5.CSV_SEPARADOR) || s.includes('"') || s.includes('\n') ? '"' + s + '"' : s;
-}
-
-// ════════════════════════════════════════════════════════════════
-// EXPORTAR PDF — frontend sin depender del Drive
-// ════════════════════════════════════════════════════════════════
-function exportarPDF() {
-  const S5U   = CONFIG.UI_S5;
-  const pings = ESTADO.pings || [];
-  if (!pings.length) { toast(S5U.PDF_VAZIO); return; }
-
-  toast(CONFIG.UI.TOAST_PDF);
-
-  const agora    = new Date();
-  const dataStr  = agora.toLocaleDateString(CONFIG.APP.LOCALE, CONFIG.FMT_DATA);
-  const horaStr  = agora.toLocaleTimeString(CONFIG.APP.LOCALE, CONFIG.FMT_HORA);
-  const mapaAtual = ESTADO.mapaAtual ? ESTADO.mapaAtual.Nome || '' : '';
-
-  const total      = pings.length;
-  const concluidos = pings.filter(p => p.Status === CONFIG.STATUS_PING.CONCLUIDO).length;
-  const criticos   = pings.filter(p => p.Status === CONFIG.STATUS_PING.CRITICO).length;
-  const pendentes  = pings.filter(p => p.Status === CONFIG.STATUS_PING.PENDENTE).length;
-
-  const linhasTabela = pings.map(p => `
-    <tr>
-      <td>${p.ID_Ping || ''}</td>
-      <td>${p.Endereco || ''}</td>
-      <td>${p.ID_Area || ''}</td>
-      <td>${p.Status || ''}</td>
-      <td>${p.Voluntario_Responsavel || ''}</td>
-      <td>${p.Tipo_Unidade || ''}</td>
-      <td>${p.Latitude || ''}, ${p.Longitude || ''}</td>
-    </tr>`).join('');
-
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
-    <meta charset="UTF-8">
-    <title>${S5U.PDF_TITULO}</title>
-    <style>
-      body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 20px; }
-      h1   { font-size: 18px; color: #0B1628; margin: 0; }
-      h2   { font-size: 13px; color: #F4521E; margin: 4px 0 16px; }
-      .meta { font-size: 10px; color: #555; margin-bottom: 16px; }
-      .stats { display: flex; gap: 16px; margin-bottom: 20px; }
-      .stat  { background: #f5f5f5; border-radius: 6px; padding: 8px 14px; text-align: center; }
-      .stat-n { font-size: 22px; font-weight: bold; color: #0B1628; }
-      .stat-l { font-size: 10px; color: #666; }
-      table { width: 100%; border-collapse: collapse; font-size: 10px; }
-      th    { background: #0B1628; color: #F4521E; padding: 6px 4px; text-align: left; }
-      td    { border-bottom: 1px solid #eee; padding: 5px 4px; vertical-align: top; }
-      tr:nth-child(even) td { background: #fafafa; }
-      .rodape { margin-top: 24px; font-size: 9px; color: #aaa; text-align: center; }
-      @media print { body { margin: 0; } }
-    </style>
-  </head><body>
-    <h1>${S5U.PDF_TITULO}</h1>
-    <h2>${S5U.PDF_SUBTITULO}${mapaAtual ? ' · ' + mapaAtual : ''}</h2>
-    <div class="meta">Gerado em ${dataStr} às ${horaStr}</div>
-    <div class="stats">
-      <div class="stat"><div class="stat-n">${total}</div><div class="stat-l">Total</div></div>
-      <div class="stat"><div class="stat-n">${concluidos}</div><div class="stat-l">Concluídos</div></div>
-      <div class="stat"><div class="stat-n">${pendentes}</div><div class="stat-l">Pendentes</div></div>
-      <div class="stat"><div class="stat-n" style="color:#EF4444">${criticos}</div><div class="stat-l">Críticos</div></div>
-    </div>
-    <table>
-      <thead><tr>
-        <th>${S5U.PDF_COL_ID}</th>
-        <th>${S5U.PDF_COL_END}</th>
-        <th>${S5U.PDF_COL_AREA}</th>
-        <th>${S5U.PDF_COL_STATUS}</th>
-        <th>${S5U.PDF_COL_VOL}</th>
-        <th>${S5U.PDF_COL_DANO}</th>
-        <th>${S5U.PDF_COL_COORDS}</th><!-- BUG-17 -->
-      </tr></thead>
-      <tbody>${linhasTabela}</tbody>
-    </table>
-    <div class="rodape">${S5U.PDF_RODAPE}</div>
-  </body></html>`;
-
-  const janela = window.open('', '_blank');
-  if (!janela) { toast('⚠️ Permita popups para gerar o PDF.'); return; }
-  janela.document.write(html);
-  janela.document.close();
-  janela.onload = () => { janela.focus(); janela.print(); };
-  toast(S5U.PDF_GERADO);
-}
-
-// ════════════════════════════════════════════════════════════════
-// LINKS EXTERNOS — Sheets / Drive / Looker
-// ════════════════════════════════════════════════════════════════
-function abrirLink(tipo) {
-  const L   = CONFIG.LINKS;
-  const S5U = CONFIG.UI_S5;
-  const urls   = { sheets: L.SHEETS, drive: L.DRIVE, looker: L.LOOKER };
-  const avisos = { sheets: S5U.SHEETS_SEM_URL, drive: S5U.DRIVE_SEM_URL, looker: S5U.LOOKER_SEM_URL };
-  const url = urls[tipo];
-  if (!url) { toast(avisos[tipo] || '⚠️ URL não configurada'); return; }
-  window.open(url, '_blank');
-}
-// ── [FASE 7] abrirModalEditarUsuario ─────────────────────────
-// Busca o usuário por ID, pré-carrega dados no modal e abre.
-// Historial de registros intacto — só edita a fila do usuário.
-function abrirModalEditarUsuario(userId) {
-  const u = ESTADO_USERS.lista.find(x => (x.ID || x.id || '') === userId);
-  if (!u) { toast(CONFIG.UI.TOAST_BACKEND_ERR); return; }
-
-  const S5U = CONFIG.UI_S5;
-  _txt('modalEditarUserTitulo', S5U.EDITAR_USUARIO_TITULO);
-
-  // Pre-cargar datos actuales
-  document.getElementById('euId').value      = userId;
-  document.getElementById('euNome').value    = u.Nome    || u.nome    || '';
-  document.getElementById('euUsuario').value = u.Usuario || u.usuario || '';
-  document.getElementById('euSenha').value   = '';
-
-  // Label de senha y placeholder via CONFIG
-  const lblSenha = document.getElementById('euSenhaLabel');
-  const inpSenha = document.getElementById('euSenha');
-  if (lblSenha) lblSenha.textContent = S5U.EDITAR_SENHA_HINT;
-  if (inpSenha) inpSenha.placeholder = S5U.EDITAR_SENHA_HINT;
-
-  // Botón salvar via CONFIG
-  const btnSalvar = document.getElementById('euBtnSalvar');
-  if (btnSalvar) btnSalvar.textContent = S5U.EDITAR_SALVAR_BTN;
-
-  // Ocultar error previo
-  const erroEl = document.getElementById('euErro');
-  if (erroEl) erroEl.style.display = 'none';
-
-  // Popular select de área con la actual pre-seleccionada
-  _popularSelectArea('euArea', true);
-  const euArea = document.getElementById('euArea');
-  if (euArea) euArea.value = u.Areas_Permitidas || u.area || '';
-
-  openModal('modalEditarUsuario');
-}
-
-// ── [FASE 7] confirmarEditarUsuario ──────────────────────────
-// Valida, construye payload y llama CONFIG.ACOES.EDITAR_USUARIO.
-// No toca formularios ni pings — solo la fila del usuario en el Sheet.
-async function confirmarEditarUsuario() {
-  const S5U    = CONFIG.UI_S5;
-  const id     = document.getElementById('euId')?.value?.trim();
-  const nome   = document.getElementById('euNome')?.value?.trim();
-  const usuario= document.getElementById('euUsuario')?.value?.trim();
-  const senha  = document.getElementById('euSenha')?.value?.trim();
-  const area   = document.getElementById('euArea')?.value || '';
-  const erroEl = document.getElementById('euErro');
-
-  // Validaciones via CONFIG
-  if (!nome || !usuario) {
-    if (erroEl) { erroEl.textContent = S5U.EDITAR_ERR_CAMPOS; erroEl.style.display = 'block'; }
-    return;
-  }
-  if (senha && senha.length < CONFIG.S5.SENHA_MINIMA_LEN) {
-    if (erroEl) { erroEl.textContent = S5U.EDITAR_ERR_SENHA; erroEl.style.display = 'block'; }
-    return;
-  }
-  if (erroEl) erroEl.style.display = 'none';
-
-  // Construir payload — senha solo si fue modificada
-  const payload = {
-    acao:    CONFIG.ACOES.EDITAR_USUARIO,
-    id:      id,
-    Nome:    nome,
-    Usuario: usuario,
-    Areas_Permitidas: area,
-  };
-  if (senha) payload.Senha = senha;
-
-  try {
-    const r = await chamarBackend(payload);
-    if (r.sucesso) {
-      toast(S5U.EDITAR_OK);
-      closeModal('modalEditarUsuario');
-      await carregarUsuarios();   // S7 — recargar lista actualizada
-    } else {
-      if (erroEl) { erroEl.textContent = '⚠️ ' + (r.mensagem || S5U.EDITAR_ERR_CAMPOS); erroEl.style.display = 'block'; }
-    }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
-}
-// ── FIM [FASE 7] ─────────────────────────────────────────────
 
 </script>
 <!-- ============================================================
@@ -8109,11 +7357,10 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
     navDist.textContent = formatearDistancia(distancia);
   }
   
-  // Actualizar origen de la ruta a la posición actual del voluntario
-  // (funciona para línea recta y para ruta OSRM cacheada)
+  // Actualizar línea recta desde posición actual al destino
   if (_rutaLayer && mapVol) {
     const latlngs = _rutaLayer.getLatLngs();
-    if (latlngs.length >= 2) {
+    if (latlngs.length === 2) {
       latlngs[0] = L.latLng(latActual, lngActual);
       _rutaLayer.setLatLngs(latlngs);
     }
@@ -8170,16 +7417,6 @@ function cancelarNavegacion() {
   if (_rutaLayer && mapVol) {
     mapVol.removeLayer(_rutaLayer);
     _rutaLayer = null;
-  }
-  
-  // Barrido defensivo: remover cualquier polyline residual
-  // (excluye polígonos del área y otras formas geométricas)
-  if (mapVol) {
-    mapVol.eachLayer(function(layer) {
-      if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-        mapVol.removeLayer(layer);
-      }
-    });
   }
   
   console.log('[V8.4] Navegación cancelada');
@@ -9525,6 +8762,7 @@ function _fecharBottomSheet() {
   document.getElementById('bottomSheetPin')?.classList.remove('aberta');
   document.getElementById('bspOverlay')?.classList.remove('visivel');
   _pingBspAtual = null;
+  cancelarNavegacion();
 }
 
 // Llamado por el botón "🧭 Ir a este ponto" de la bottom sheet
