@@ -8082,10 +8082,11 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
     navDist.textContent = formatearDistancia(distancia);
   }
   
-  // Actualizar línea recta desde posición actual al destino
+  // Actualizar origen de la ruta a la posición actual del voluntario
+  // (funciona para línea recta y para ruta OSRM cacheada)
   if (_rutaLayer && mapVol) {
     const latlngs = _rutaLayer.getLatLngs();
-    if (latlngs.length === 2) {
+    if (latlngs.length >= 2) {
       latlngs[0] = L.latLng(latActual, lngActual);
       _rutaLayer.setLatLngs(latlngs);
     }
@@ -8142,6 +8143,16 @@ function cancelarNavegacion() {
   if (_rutaLayer && mapVol) {
     mapVol.removeLayer(_rutaLayer);
     _rutaLayer = null;
+  }
+  
+  // Barrido defensivo: remover cualquier polyline residual
+  // (excluye polígonos del área y otras formas geométricas)
+  if (mapVol) {
+    mapVol.eachLayer(function(layer) {
+      if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+        mapVol.removeLayer(layer);
+      }
+    });
   }
   
   console.log('[V8.4] Navegación cancelada');
