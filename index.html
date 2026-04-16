@@ -6190,7 +6190,7 @@ function atualizarBadges() {
   _txt('nb-areas', ESTADO.areas.length);
   _txt('nb-pings', ESTADO.pings.length);
   _txt('nb-vols',  ESTADO.voluntarios.length);
-  _txt('nb-mon',   ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO).length + '/' + ESTADO.pings.length);
+  _txt('nb-mon',   ESTADO.pings.filter(p=>p.Status===CONFIG.STATUS_PING.CONCLUIDO||p.Status===CONFIG.STATUS_PING.CRITICO).length + '/' + ESTADO.pings.length);
 }
 
 function atualizarProgressoGeral() {
