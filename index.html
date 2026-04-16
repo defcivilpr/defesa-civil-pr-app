@@ -1747,14 +1747,6 @@ textarea{resize:vertical;min-height:65px;}
 }
 #page-monitoreo > *{pointer-events:auto;}
 
-/* Header del monitoreo — compacto, sobre el mapa */
-#page-monitoreo .page-header{
-  background:rgba(11,22,40,.88);
-  backdrop-filter:blur(8px);
-  border-bottom:1px solid var(--border);
-  padding:8px 14px;
-}
-
 /* Panel flotante de stats — lateral derecho */
 #monitorPanel{
   position:absolute;right:10px;top:68px;
@@ -2944,15 +2936,6 @@ textarea{resize:vertical;min-height:65px;}
 
       <!-- PAGE: MONITOREO -->
       <div class="page" id="page-monitoreo">
-        <!-- [F6] Header compacto sobre el mapa -->
-        <div class="page-header">
-          <div><div class="page-title">📊 Monitoramento</div></div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <span id="dashAutoRefresh" style="font-size:10px;color:var(--muted)"></span>
-            <button id="btnToggleMonitor" onclick="_toggleMonitorPanel()">📋 Painel</button>
-            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="atualizarDados()">🔄</button>
-          </div>
-        </div>
 
         <!-- [F6] Panel flotante de stats — lateral derecho sobre el mapa -->
         <div id="monitorPanel">
