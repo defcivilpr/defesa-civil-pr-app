@@ -1059,6 +1059,8 @@ const CONFIG = {
     BTN_ARQUIVAR:  "🗄 Arquivar",
     BTN_ELIMINAR:  "🗑 Eliminar",
     BTN_EDITAR:    "✏️ Renomear",
+    BTN_VER_AREA:  "🗺 Ver",
+    TOAST_VER_AREA:"🗺 Centralizando em {nome}",
     ARQUIVADO_LABEL: "Arquivado",
     // Mover pin (Bloque 5)
     PING_MOVIDO_OK: "📍 Ponto movido com sucesso.",
@@ -4789,7 +4791,7 @@ function renderizarAreas() {
         </div>
         <div class="area-prog"><div class="area-prog-fill" style="width:${pct}%;${pct===100?'background:var(--green)':''}"></div></div>
         <div class="area-acts">
-          <button class="btn btn-ghost" onclick="navegarCoord('mapas',_navEl('mapas'));toast('🗺 Navegando para ${_esc(a.Nome)}')">🗺 Ver</button>
+          <button class="btn btn-ghost" onclick="focarAreaMapa('${_esc(a.ID_Area)}')">${CC.BTN_VER_AREA}</button>
           <button class="btn btn-ghost" title="${MA.RENOMEAR_PROMPT}" onclick="renomearArea('${_esc(a.ID_Area)}','${_esc(a.Nome).replace(/'/g,"\\'")}')">✏️</button>
           <button class="btn btn-ghost" title="${CC.BTN_ELIMINAR}" onclick="deleteArea('${_esc(a.ID_Area)}')">🗑</button>
         </div>
@@ -5051,6 +5053,31 @@ function focarPingMapa(lat, lng) {
   setTimeout(() => {
     mapCoord && mapCoord.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
   }, 100);
+}
+
+function focarAreaMapa(idArea) {
+  const area = ESTADO.areas.find(a => a.ID_Area === idArea);
+  if (!area) return;
+  navegarCoord('mapas', _navEl('mapas')); // navegarCoord en S7 — runtime call ✅
+  setTimeout(() => {
+    if (!mapCoord) return;
+    // Buscar polígono ya dibujado en la capa de áreas
+    let bounds = null;
+    if (_capaAreasExistentes) {
+      _capaAreasExistentes.eachLayer(layer => {
+        if (layer._areaId === idArea) bounds = layer.getBounds();
+      });
+    }
+    // Fallback: parsear desde los datos del área
+    if (!bounds && area[CONFIG.CAMPO_POLIGONO]) {
+      try {
+        const pts = JSON.parse(area[CONFIG.CAMPO_POLIGONO]);
+        if (pts && pts.length >= 3) bounds = L.latLngBounds(pts);
+      } catch(e) {}
+    }
+    if (bounds) mapCoord.fitBounds(bounds, { padding: [40, 40] });
+  }, 100);
+  toast(CONFIG.UI_CICLO.TOAST_VER_AREA.replace('{nome}', area.Nome));
 }
 
 // ════════════════════════════════════════════════════════════════
