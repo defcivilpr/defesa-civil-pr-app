@@ -8165,20 +8165,25 @@ function closeForm() {
   ESTADO.residentCount = 0;
 }
 
-// V9: Mostrar fotos existentes del backend — reutiliza _renderizarFotoThumb
+// V9.3 FIX: Soporta ambos formatos — cache local (nome/tipo/base64) y backend (Nome_Foto/Mime_Type/Dados_Base64)
 function _renderizarFotosExistentes(fotos) {
   if (!fotos || fotos.length === 0) return;
   fotos.forEach((f, idx) => {
-    const src = f.Dados_Base64
-      ? (f.Dados_Base64.startsWith('data:') ? f.Dados_Base64 : 'data:' + (f.Mime_Type || 'image/jpeg') + ';base64,' + f.Dados_Base64)
+    const base64 = f.Dados_Base64 || f.base64 || '';
+    const mime   = f.Mime_Type    || f.tipo    || 'image/jpeg';
+    const nome   = f.Nome_Foto    || f.nome    || 'Foto ' + (idx + 1);
+    const desc   = f.Descricao    || f.descricao || '';
+    const idFoto = f.ID_Foto      || f._uid    || idx;
+    const src = base64
+      ? (base64.startsWith('data:') ? base64 : 'data:' + mime + ';base64,' + base64)
       : '';
     const fotoObj = {
-      nome:       f.Nome_Foto || 'Foto ' + (idx + 1),
-      tipo:       f.Mime_Type || 'image/jpeg',
-      base64:     f.Dados_Base64 || '',
-      descricao:  f.Descricao || '',
+      nome:       nome,
+      tipo:       mime,
+      base64:     base64,
+      descricao:  desc,
       _local_url: src,
-      _uid:       'exist_' + (f.ID_Foto || idx) + '_' + Date.now().toString(36),
+      _uid:       'exist_' + idFoto + '_' + Date.now().toString(36),
       _existente: true,
     };
     _fotosBase64.push(fotoObj);
