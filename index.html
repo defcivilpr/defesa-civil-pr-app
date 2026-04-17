@@ -6818,7 +6818,8 @@ async function sincronizarAgora() {
   const total = resultado.enviados + resultado.fotosEnviadas;
   if (total > 0) {
     toast(CONFIG.UI_SYNC.NOTIF_SYNC_OK);
-    await carregarPingsVol(); // S9 — runtime call ✅
+    
+       // S9 — runtime call ✅
   } else {
     toast('✅ Nada para sincronizar.');
   }
@@ -7530,59 +7531,64 @@ async function carregarAreaVol() {
 // PINGS DEL VOLUNTARIO
 // [V8.3] BUG-4 FIX: Limpiar marcadores anteriores antes de agregar nuevos
 // ════════════════════════════════════════════════════════════════
-async function carregarPingsVol() {
+async function carregarPingsVol(forcarBackend = true) {
   const s = ESTADO.sessao;
   if (!s) return;
 
-  const listEl = document.getElementById('pingListVol');
-  if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_PINGS_CARREGANDO}</div>`;
+  // V9.2: Spinner solo en primera carga (cache vacío)
+  if (forcarBackend && (!ESTADO.pingsVol || ESTADO.pingsVol.length === 0)) {
+    const listEl = document.getElementById('pingListVol');
+    if (listEl) listEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_PINGS_CARREGANDO}</div>`;
+  }
 
-  try {
-    const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
-    if (r.sucesso && Array.isArray(r.dados)) {
-      const nomeVol = (s.Nome || s.nome || s.usuario || '').trim();
-      const areaIdOuNome = (s.Areas_Permitidas || '').trim();
-      
-      console.log('[V8.5] Filtrando pings para:', nomeVol, 'área:', areaIdOuNome);
-      
-      // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
-      let areaObj = ESTADO.areas.find(a => a.ID_Area === areaIdOuNome);
-      if (!areaObj) {
-        areaObj = ESTADO.areas.find(a => (a.Nome || '').trim() === areaIdOuNome);
-      }
-      const idAreaVol = areaObj ? areaObj.ID_Area : null;
-      console.log('[V8.5] ID_Area encontrado:', idAreaVol);
-      
-      // Filtrar pings: asignados a mí O en mi área
-      ESTADO.pingsVol = r.dados.filter(p => {
-        const esMio = p.Voluntario_Responsavel && 
-                      p.Voluntario_Responsavel.toString().trim() === nomeVol;
-        const enMiArea = idAreaVol && p.ID_Area === idAreaVol;
-        return esMio || enMiArea;
-      });
-      
-      console.log('[V8.5] Pings encontrados:', ESTADO.pingsVol.length);
-      
-      // Marcar pings propios vs de otros
-      ESTADO.pingsVol = ESTADO.pingsVol.map(p => ({
-        ...p,
-        _esMio: p.Voluntario_Responsavel && 
-                p.Voluntario_Responsavel.toString().trim() === nomeVol
-      }));
-      
-      try { 
-        sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); 
-      } catch(e) {}
-      
-      if (!offlineVol) precalcularRutas();
-    }
-  } catch(e) {
-    console.warn('[V8.3] Error cargando pings:', e);
+  if (forcarBackend) {
     try {
-      const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
-      if (cached) ESTADO.pingsVol = JSON.parse(cached);
-    } catch(ce) {}
-    ESTADO.pingsVol = ESTADO.pingsVol || [];
+      const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
+      if (r.sucesso && Array.isArray(r.dados)) {
+        const nomeVol = (s.Nome || s.nome || s.usuario || '').trim();
+        const areaIdOuNome = (s.Areas_Permitidas || '').trim();
+        
+        console.log('[V8.5] Filtrando pings para:', nomeVol, 'área:', areaIdOuNome);
+        
+        // [V8.5] FIX: Buscar área por ID primero, luego por nombre (compatibilidad)
+        let areaObj = ESTADO.areas.find(a => a.ID_Area === areaIdOuNome);
+        if (!areaObj) {
+          areaObj = ESTADO.areas.find(a => (a.Nome || '').trim() === areaIdOuNome);
+        }
+        const idAreaVol = areaObj ? areaObj.ID_Area : null;
+        console.log('[V8.5] ID_Area encontrado:', idAreaVol);
+        
+        // Filtrar pings: asignados a mí O en mi área
+        ESTADO.pingsVol = r.dados.filter(p => {
+          const esMio = p.Voluntario_Responsavel && 
+                        p.Voluntario_Responsavel.toString().trim() === nomeVol;
+          const enMiArea = idAreaVol && p.ID_Area === idAreaVol;
+          return esMio || enMiArea;
+        });
+        
+        console.log('[V8.5] Pings encontrados:', ESTADO.pingsVol.length);
+        
+        // Marcar pings propios vs de otros
+        ESTADO.pingsVol = ESTADO.pingsVol.map(p => ({
+          ...p,
+          _esMio: p.Voluntario_Responsavel && 
+                  p.Voluntario_Responsavel.toString().trim() === nomeVol
+        }));
+        
+        try { 
+          sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); 
+        } catch(e) {}
+        
+        if (!offlineVol) precalcularRutas();
+      }
+    } catch(e) {
+      console.warn('[V8.3] Error cargando pings:', e);
+      try {
+        const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
+        if (cached) ESTADO.pingsVol = JSON.parse(cached);
+      } catch(ce) {}
+      ESTADO.pingsVol = ESTADO.pingsVol || [];
+    }
   }
   
   renderizarPingsVol();
@@ -7916,36 +7922,37 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
     }
   } catch(e) {}
 
-  // 2. Si no hay en cola, consultar backend (fuente de verdad)
+  // 2. V9.2: Cache local es fuente de verdad (voluntario ya envió estos datos)
   if (!dadosPrecarga && pingAtualDados &&
       (pingAtualDados.Status === CONFIG.STATUS_PING.CONCLUIDO ||
        pingAtualDados.Status === CONFIG.STATUS_PING.CRITICO)) {
     try {
-      toast(CONFIG.UI_FORM_EDIT.CARREGANDO);
-      const r = await chamarBackend({
-        acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO,
-        idPing: idPing
-      });
-      if (r.sucesso && r.dados && r.dados.unidade) {
-        dadosPrecarga = _mapearUnidadeParaForm(r.dados.unidade);
-        dadosPrecarga._fonte = 'backend';
-        dadosPrecarga._residentes = r.dados.residentes || [];
-        dadosPrecarga._fotos = r.dados.fotos || [];
-        dadosPrecarga.critico = (r.dados.ping && r.dados.ping.Status === CONFIG.STATUS_PING.CRITICO);
-        // Guardar en caché para fallback offline
-        try {
-          await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing, dadosPrecarga);
-        } catch(e) {}
+      const cached = await idbGet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing);
+      if (cached) {
+        dadosPrecarga = cached;
+        dadosPrecarga._fonte = 'cache';
       }
-    } catch(e) {
-      // 3. Sin conexión — fallback a caché local
+    } catch(e) {}
+
+    // 3. Último recurso: backend (solo si no hay nada local)
+    if (!dadosPrecarga) {
       try {
-        const cached = await idbGet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing);
-        if (cached) {
-          dadosPrecarga = cached;
-          dadosPrecarga._fonte = 'cache';
+        toast(CONFIG.UI_FORM_EDIT.CARREGANDO);
+        const r = await chamarBackend({
+          acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO,
+          idPing: idPing
+        });
+        if (r.sucesso && r.dados && r.dados.unidade) {
+          dadosPrecarga = _mapearUnidadeParaForm(r.dados.unidade);
+          dadosPrecarga._fonte = 'backend';
+          dadosPrecarga._residentes = r.dados.residentes || [];
+          dadosPrecarga._fotos = r.dados.fotos || [];
+          dadosPrecarga.critico = (r.dados.ping && r.dados.ping.Status === CONFIG.STATUS_PING.CRITICO);
+          try {
+            await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + idPing, dadosPrecarga);
+          } catch(e) {}
         }
-      } catch(e2) {}
+      } catch(e) {}
     }
   }
 
@@ -8340,14 +8347,44 @@ async function submitForm() {
         await enviarFotosBackend(pingAtualForm, volNome);
       }
 
-      // V9.1: Invalidar caché local — la próxima apertura consultará el backend
-      try { await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + pingAtualForm, null); } catch(e) {}
+      // V9.2: Guardar formulario en cache local (voluntario = fuente de verdad)
+      try {
+        const residentes = coletarResidentes();
+        const cacheForm = {
+          ...dados,
+          _fonte: 'local',
+          _residentes: residentes,
+          _fotos: _fotosBase64.map(f => ({
+            nome: f.nome,
+            tipo: f.tipo,
+            base64: f.base64,
+            descricao: f.descricao || '',
+          })),
+        };
+        await idbSet(CONFIG.IDB.STORE_CACHE, 'form_' + pingAtualForm, cacheForm);
+      } catch(e) {}
+
+      // V9.2: Actualizar status local sin llamar al backend
+      if (pingAtualForm && ESTADO.pingsVol) {
+        const idx = ESTADO.pingsVol.findIndex(p => p.ID_Ping === pingAtualForm);
+        if (idx !== -1) {
+          ESTADO.pingsVol[idx].Status = ehCritico
+            ? CONFIG.STATUS_PING.CRITICO
+            : CONFIG.STATUS_PING.CONCLUIDO;
+          try {
+            sessionStorage.setItem(
+              CONFIG.STORAGE.PINGS_CACHE,
+              JSON.stringify(ESTADO.pingsVol)
+            );
+          } catch(e) {}
+        }
+      }
 
       if (ehCritico) toast(CONFIG.UI.FORM_CRITICO_ALERTA);
       else toast(offlineVol ? CONFIG.UI.FORM_OFFLINE_OK : CONFIG.UI.FORM_ENVIADO_OK);
 
       setTimeout(closeForm, 1500);
-      await carregarPingsVol();
+      renderizarPingsVol();
     } else {
       toast('⚠️ ' + (result.mensagem || 'Erro ao enviar'));
     }
@@ -8542,7 +8579,23 @@ async function createNewPing() {
           abrirFormulario(r.dados ? r.dados.id : null, addr||'Novo Ponto');
         }, 800);
       }
-      await carregarPingsVol();
+      // V9.2: Agregar ping nuevo al estado local
+      if (r.dados) {
+        const nomeVol = (ESTADO.sessao.Nome || ESTADO.sessao.nome || ESTADO.sessao.usuario || '').trim();
+        ESTADO.pingsVol.push({
+          ...r.dados,
+          _esMio: true,
+          Status: CONFIG.STATUS_PING.PENDENTE,
+          Voluntario_Responsavel: nomeVol,
+        });
+        try {
+          sessionStorage.setItem(
+            CONFIG.STORAGE.PINGS_CACHE,
+            JSON.stringify(ESTADO.pingsVol)
+          );
+        } catch(e) {}
+      }
+      renderizarPingsVol();
     } else {
       toast('⚠️ ' + r.mensagem);
     }
