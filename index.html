@@ -546,6 +546,14 @@ const CONFIG = {
     HABILITADO: true,
   },
 
+  // ── [V9.3] Notificación de formularios nuevos (Coordenador) ──
+  UI_COORD_NOTIF: {
+    PILL_TEXTO:     "🔔 {n} Formulários Novos",
+    PILL_TEXTO_1:   "🔔 1 Formulário Novo",
+    PILL_BTN:       "Atualizar",
+    PILL_SEPARADOR: " · ",
+  },
+
   // ── [V8.2] Textos para visualización de formulario completo ──
   UI_FORMULARIO: {
     TITULO:           "📋 Formulário Completo",
@@ -1321,6 +1329,8 @@ textarea{resize:vertical;min-height:65px;padding-left:12px;}
 .pill-online{background:var(--green-glow);border:1px solid rgba(34,197,94,.25);color:var(--green);}
 .pill-offline{background:var(--yellow-glow);border:1px solid rgba(245,158,11,.3);color:var(--yellow);}
 .pill-gps{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);color:var(--blue);}
+.pill-notif{background:var(--yellow-glow);border:1px solid rgba(245,158,11,.35);color:var(--yellow);cursor:pointer;transition:all .15s;}
+.pill-notif:hover{background:rgba(245,158,11,.18);border-color:var(--yellow);}
 .dot-blink{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.5s infinite;}
 .tb-right{display:flex;align-items:center;gap:8px;}
 .role-badge{
@@ -2779,6 +2789,9 @@ textarea{resize:vertical;min-height:65px;}
       </div>
       <div class="status-pill pill-gps"><div class="dot-blink"></div><span id="gpsLabelCoord"></span></div>
       <span style="font-size:10px;color:var(--muted)" id="clockCoord">--:--</span>
+      <div class="status-pill pill-notif" id="coordNotifPill" style="display:none" onclick="atualizarDadosCoord()">
+        <span id="coordNotifTxt"></span>
+      </div>
     </div>
     <div class="tb-right">
       <div class="role-badge" id="coordRoleBadge"></div>
@@ -4130,6 +4143,8 @@ function encerrarSessao() {
   ESTADO.syncInfo          = { enviados:0, fotos:0, pendentes:0, ultima:null };
   // BUG-10: parar timer do relógio ao encerrar sessão
   if (_clockInterval) { clearInterval(_clockInterval); _clockInterval = null; }
+  // [V9.3] Parar polling de notificaciones
+  pararDashboardAutoRefresh();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -4309,6 +4324,11 @@ function inicializarCoordenador() {
   _clockInterval = setInterval(atualizarRelogio, 1000);
   // [F1] Garantir tamanho correto do mapa após montagem completa do layout
   setTimeout(() => mapCoord && mapCoord.invalidateSize(), 200);
+
+  // [V9.3] Iniciar polling silencioso para detectar formularios nuevos
+  if (CONFIG.POLLING && CONFIG.POLLING.HABILITADO) {
+    iniciarDashboardAutoRefresh();
+  }
 }
 
 function atualizarRelogio() {
@@ -6197,15 +6217,50 @@ async function atualizarDados() {
 function iniciarDashboardAutoRefresh() {
   pararDashboardAutoRefresh();
   _dashTimer = setInterval(async () => {
+    if (!ESTADO.sessao) return;
+
+    // [V9.3] Polling silencioso: traer pings del backend y detectar cambios
+    try {
+      const r = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_PINGS });
+      if (r.sucesso && Array.isArray(r.dados)) {
+        const novos = r.dados.filter(pNuevo => {
+          const pViejo = ESTADO.pings.find(p => p.ID_Ping === pNuevo.ID_Ping);
+          if (!pViejo) return true;
+          return pViejo.Status !== pNuevo.Status;
+        });
+
+        if (novos.length > 0) {
+          const NT = CONFIG.UI_COORD_NOTIF;
+          const msg = novos.length === 1
+            ? NT.PILL_TEXTO_1
+            : NT.PILL_TEXTO.replace('{n}', novos.length);
+          const pill = document.getElementById('coordNotifPill');
+          const txt  = document.getElementById('coordNotifTxt');
+          if (pill && txt) {
+            txt.textContent = msg + NT.PILL_SEPARADOR + NT.PILL_BTN;
+            pill.style.display = 'flex';
+          }
+        }
+      }
+    } catch(e) {}
+
+    // [F6] Actualizar dashboard si está en la pestaña monitoreo
     if (ESTADO.paginaAtual === 'monitoreo') {
-      // [F6] Actualiza mapa coloreado y stats en cada ciclo de refresh
       await renderizarMonitoramento();
     }
-  }, CONFIG.S5.DASHBOARD_REFRESH);
+  }, CONFIG.POLLING.INTERVALO_MS);
 }
 
 function pararDashboardAutoRefresh() {
   if (_dashTimer) { clearInterval(_dashTimer); _dashTimer = null; }
+}
+
+// [V9.3] Actualizar datos del coordinador desde el pill de notificación
+function atualizarDadosCoord() {
+  const pill = document.getElementById('coordNotifPill');
+  if (pill) pill.style.display = 'none';
+  toast(CONFIG.UI.TOAST_ATUALIZAR);
+  carregarDadosCoord();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -6433,9 +6488,6 @@ function navegarCoord(pagina, el) {
   // Ações ao entrar em cada página
   if (pagina === 'monitoreo') {
     renderizarMonitoramento();        // S6 — runtime call ✅
-    iniciarDashboardAutoRefresh();    // S6 — runtime call ✅
-  } else {
-    pararDashboardAutoRefresh();      // S6 — runtime call ✅
   }
 }
 
@@ -9621,7 +9673,6 @@ function validarFormulario(dados, esquema) {
 <!-- ============================================================
      FIM SECCIÓN 9 — VOLUNTARIO
      ============================================================ -->
-
 
 </body>
 </html>
