@@ -240,8 +240,8 @@ const CONFIG = {
     CARTO_ATTR:  '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
     OSM_URL:     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     OSM_ATTR:    '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    TOPO_URL:    "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    TOPO_ATTR:   '© <a href="https://opentopomap.org">OpenTopoMap</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    TOPO_URL:    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    TOPO_ATTR:   'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
     NOMINATIM:   "https://nominatim.openstreetmap.org/search",
   },
 
@@ -514,7 +514,7 @@ const CONFIG = {
     TILE_DOMAINS: [
       "basemaps.cartocdn.com",
       "tile.openstreetmap.org",
-      "tile.opentopomap.org",
+      "server.arcgisonline.com",
     ],
     // [V8.2] Clave para guardar versión en localStorage
     VERSION_KEY: "dcpr_app_version",
@@ -4353,7 +4353,7 @@ function inicializarMapaCoord() {
   });
   const cartoDark = L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR, maxZoom: 20 });
   const osm       = L.tileLayer(M.OSM_URL,   { attribution: M.OSM_ATTR,   maxZoom: 20 });
-  const topo      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 17 });
+  const topo      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 19 });
   cartoDark.addTo(mapCoord);
   L.control.layers({ 'CARTO Dark': cartoDark, 'OpenStreetMap': osm, 'Relevo': topo }).addTo(mapCoord);
   mapCoord.on('click',    onMapClick);
@@ -7142,7 +7142,7 @@ function inicializarMapaVol() {
   });
   const cartoDarkV = L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR, maxZoom: 20 });
   const osmV       = L.tileLayer(M.OSM_URL,   { attribution: M.OSM_ATTR,   maxZoom: 20 });
-  const topoV      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 17 });
+  const topoV      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 19 });
   cartoDarkV.addTo(mapVol);
   L.control.layers({ 'CARTO Dark': cartoDarkV, 'OpenStreetMap': osmV, 'Relevo': topoV }).addTo(mapVol);
 
@@ -7791,7 +7791,7 @@ function initNewPingMap() {
   });
   const cartoDarkNP = L.tileLayer(M.CARTO_URL, { attribution: M.CARTO_ATTR, maxZoom: 20 });
   const osmNP       = L.tileLayer(M.OSM_URL,   { attribution: M.OSM_ATTR,   maxZoom: 20 });
-  const topoNP      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 17 });
+  const topoNP      = L.tileLayer(M.TOPO_URL,  { attribution: M.TOPO_ATTR,  maxZoom: 19 });
   cartoDarkNP.addTo(newPingMapVol);
   L.control.layers({ 'CARTO Dark': cartoDarkNP, 'OpenStreetMap': osmNP, 'Relevo': topoNP }).addTo(newPingMapVol);
   
