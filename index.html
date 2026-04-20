@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Defesa Civil">
 <meta name="description" content="App de levantamento para Defesa Civil do Paraná">
-<link id="pwa-manifest" rel="manifest" href="">
+<link id="pwa-manifest" rel="manifest" href="./manifest.webmanifest">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -504,8 +504,8 @@ const CONFIG = {
     CACHE_PREFIX:   "dcpr-",
     CACHE_NOME:     "dcpr-cache-v13",  // Legacy — mantido para compatibilidade
     // BUG-26: PATH null = blob URL (Chrome/Firefox ok, Safari falha silenciosamente).
-    // Para Safari: extrair SW para /sw.js no servidor e definir PATH = "/sw.js"
-    PATH: null,
+    // [V10.1] Activado archivo físico en GitHub Pages — iOS Safari compatible.
+    PATH: "./sw.js",
     ASSETS: [
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
