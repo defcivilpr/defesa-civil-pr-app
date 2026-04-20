@@ -2816,7 +2816,7 @@ textarea{resize:vertical;min-height:65px;}
       <div id="sidebarNav"></div>
       <div class="sidebar-group">
         <div class="sidebar-label">Sistema</div>
-        <div class="nav-item" onclick="toggleOfflineCoord()">
+        <div class="nav-item" style="cursor:default">
           <span class="nav-icon" id="connIconCoord">🌐</span>
           <span id="connLabelCoord"></span>
         </div>
@@ -3241,7 +3241,7 @@ textarea{resize:vertical;min-height:65px;}
         <div id="map-vol"></div>
         <div class="map-overlay-top">
           <div class="map-tag gps-buscando" id="gpsTagVol">📡 GPS</div>
-          <div class="map-tag online" id="modeTagVol" onclick="toggleOfflineVol()">🌐 ONLINE</div>
+          <div class="map-tag online" id="modeTagVol">🌐 ONLINE</div>
         </div>
         <div class="map-coords" id="mapCoordsVol">—</div>
         <!-- [V8.4] Botón flotante para centrar en GPS -->
@@ -4334,6 +4334,9 @@ function inicializarCoordenador() {
   _clockInterval = setInterval(atualizarRelogio, 1000);
   // [F1] Garantir tamanho correto do mapa após montagem completa do layout
   setTimeout(() => mapCoord && mapCoord.invalidateSize(), 200);
+
+  // [V10.2] Sincronizar cartel de conexión con el estado real al arrancar
+  actualizarEstadoOnlineCoord();
 
   // [V9.3] Iniciar polling silencioso para detectar formularios nuevos
   if (CONFIG.POLLING && CONFIG.POLLING.HABILITADO) {
@@ -5731,8 +5734,10 @@ function filtrarPings(q) { aplicarFiltrosPings(); }
 function filtrarPingsPorArea(area) { aplicarFiltrosPings(); }
 function filtrarPingsPorStatus(status) { aplicarFiltrosPings(); }
 
-function toggleOfflineCoord() {
-  offlineCoord = !offlineCoord;
+// [V10.2] Convertida de botón manual a cartel pasivo.
+// Detección automática via navigator.onLine — sin clicks del usuario.
+function actualizarEstadoOnlineCoord() {
+  offlineCoord = !navigator.onLine;
   ESTADO.offline = offlineCoord;
   const pill    = document.getElementById('connPillCoord');
   const txt     = document.getElementById('connTxtCoord');
@@ -5740,21 +5745,19 @@ function toggleOfflineCoord() {
   const label   = document.getElementById('connLabelCoord');
   const banner  = document.getElementById('offlineBannerCoord');
   if (offlineCoord) {
-    pill.className = 'status-pill pill-offline';
-    txt.textContent   = CONFIG.UI.OFFLINE;
-    icon.textContent  = '📶';
-    label.textContent = CONFIG.UI.MODO_OFFLINE;
-    banner.style.display = 'flex';
+    if (pill) pill.className = 'status-pill pill-offline';
+    if (txt)   txt.textContent   = CONFIG.UI.OFFLINE;
+    if (icon)  icon.textContent  = '📶';
+    if (label) label.textContent = CONFIG.UI.MODO_OFFLINE;
+    if (banner) banner.style.display = 'flex';
   } else {
-    pill.className = 'status-pill pill-online';
-    txt.textContent   = CONFIG.UI.ONLINE;
-    icon.textContent  = '🌐';
-    label.textContent = CONFIG.UI.MODO_ONLINE;
-    banner.style.display = 'none';
+    if (pill) pill.className = 'status-pill pill-online';
+    if (txt)   txt.textContent   = CONFIG.UI.ONLINE;
+    if (icon)  icon.textContent  = '🌐';
+    if (label) label.textContent = CONFIG.UI.MODO_ONLINE;
+    if (banner) banner.style.display = 'none';
   }
-  toast(offlineCoord ? CONFIG.UI.TOAST_OFFLINE_ON : CONFIG.UI.TOAST_OFFLINE_OFF);
 }
-
 // Helper seguro: obtém elemento nav por id de página (gerado dinamicamente)
 function _navEl(id) {
   return document.getElementById('nav-' + id) || null;
@@ -7024,13 +7027,24 @@ async function _sincronizarFila() {
 
 // Listener de reconexão — B-19
 // carregarPingsVol definida en S9 — runtime call ✅
+// [V10.2] Extendido: actualizar carteles de estado automáticamente
 window.addEventListener('online', async () => {
+  // Actualizar carteles visuales de conexión (voluntario + coordinador)
+  if (typeof actualizarEstadoOnlineVol   === 'function') actualizarEstadoOnlineVol();
+  if (typeof actualizarEstadoOnlineCoord === 'function') actualizarEstadoOnlineCoord();
   toast(CONFIG.UI_S4.SYNC_AUTO);
   const res = await _sincronizarFila();
   if (res.enviados + res.fotosEnviadas > 0) {
     toast(CONFIG.UI_S4.SYNC_DONE);
     await carregarPingsVol(); // S9 — runtime call ✅
   }
+});
+
+// [V10.2] Listener de desconexión — actualizar carteles al perder señal
+window.addEventListener('offline', () => {
+  if (typeof actualizarEstadoOnlineVol   === 'function') actualizarEstadoOnlineVol();
+  if (typeof actualizarEstadoOnlineCoord === 'function') actualizarEstadoOnlineCoord();
+  toast(CONFIG.UI.TOAST_OFFLINE_ON);
 });
 
 // ════════════════════════════════════════════════════════════════
@@ -7115,7 +7129,10 @@ async function inicializarVoluntario() {
   
   // [V8.3] FIX: AHORA cargar pings (ya tiene ESTADO.areas y mapa centrado)
   await carregarPingsVol();
-  
+
+  // [V10.2] Sincronizar cartel de conexión con el estado real al arrancar
+  actualizarEstadoOnlineVol();
+
   // [V8.2] Iniciar polling de notificaciones si está habilitado
   if (CONFIG.POLLING && CONFIG.POLLING.HABILITADO) {
     iniciarPollingPings();
@@ -7474,16 +7491,14 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
   if (navDist) {
     navDist.textContent = formatearDistancia(distancia);
   }
-  
-  // Actualizar origen de la ruta a la posición actual del voluntario
-  // (funciona para línea recta y para ruta OSRM cacheada)
-  if (_rutaLayer && mapVol) {
-    const latlngs = _rutaLayer.getLatLngs();
-    if (latlngs.length >= 2) {
-      latlngs[0] = L.latLng(latActual, lngActual);
-      _rutaLayer.setLatLngs(latlngs);
-    }
-  }
+
+  // [V10.2] Eliminado el parcheo del punto 0 del layer.
+  // Antes: movía el primer punto de la ruta al voluntario en cada fix GPS,
+  //        lo que creaba líneas rectas desde puntos aleatorios al recalcular.
+  // Ahora: la ruta queda fija mostrando el camino a seguir. El punto azul
+  //        del voluntario (marker GPS) es quien se mueve sobre el mapa.
+  //        Cuando el voluntario se desvía > RECALCULAR_RUTA_M, la ruta se
+  //        redibuja completa desde la posición actual vía navegarAlPin.
 
   // [V10.1] RECÁLCULO POR DESVÍO DE RUTA
   // Medir distancia perpendicular del voluntario a la polilínea dibujada.
@@ -7983,24 +7998,30 @@ function renderizarFiltrosPontos() {
   ).join('');
 }
 
-function toggleOfflineVol() {
-  offlineVol = !offlineVol;
+// [V10.2] Convertida de botón manual a cartel pasivo.
+// Ya no se llama desde un onclick — se llama automáticamente al detectar
+// cambios reales de conexión vía navigator.onLine.
+function actualizarEstadoOnlineVol() {
+  offlineVol = !navigator.onLine;
   ESTADO.offline = offlineVol;
   const tag    = document.getElementById('modeTagVol');
   const banner = document.getElementById('offlineBannerVol');
   const pill   = document.getElementById('gpsPill');
   if (offlineVol) {
-    tag.textContent  = '📶 OFFLINE';
-    tag.className    = 'map-tag offline';
-    banner.style.display = 'flex';
+    if (tag) {
+      tag.textContent  = '📶 OFFLINE';
+      tag.className    = 'map-tag offline';
+    }
+    if (banner) banner.style.display = 'flex';
     if (pill) pill.style.borderColor = 'var(--yellow)';
   } else {
-    tag.textContent  = '🌐 ONLINE';
-    tag.className    = 'map-tag online';
-    banner.style.display = 'none';
+    if (tag) {
+      tag.textContent  = '🌐 ONLINE';
+      tag.className    = 'map-tag online';
+    }
+    if (banner) banner.style.display = 'none';
     if (pill) pill.style.borderColor = '';
   }
-  toast(offlineVol ? CONFIG.UI.TOAST_OFFLINE_ON : CONFIG.UI.TOAST_OFFLINE_OFF);
 }
 
 // ════════════════════════════════════════════════════════════════
