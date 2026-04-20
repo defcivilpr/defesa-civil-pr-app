@@ -250,7 +250,11 @@ const CONFIG = {
     // Opciones de geolocalización
     ALTA_PRECISION:     true,
     TIMEOUT_MS:         15000,
-    MAX_AGE_MS:         3000,
+    // [V10.1] 0 = nunca aceptar cache, siempre lectura fresca del GPS
+    MAX_AGE_MS:         0,
+    // [V10.1] Descartar fixes con precisión peor a este umbral (en metros)
+    // Salvo que no haya ninguna posición previa (primera lectura siempre entra)
+    PRECISION_MAXIMA_ACEPTABLE_M: 50,
     // Marcador del voluntario
     MARCADOR_RADIO:     12,
     MARCADOR_COLOR:     '#3B82F6',
@@ -259,7 +263,9 @@ const CONFIG = {
     PRECISION_BORDE:    'rgba(59, 130, 246, 0.4)',
     // Navegación
     DISTANCIA_LLEGADA_M: 25,
-    RECALCULAR_RUTA_M:   50,
+    // [V10.1] Umbral de desvío de la ruta — si el voluntario se aleja
+    // más de X metros de la polilínea, recalcular
+    RECALCULAR_RUTA_M:   30,
     // Textos UI
     TEXTOS: {
       BUSCANDO:       '📡 Buscando GPS...',
@@ -3597,11 +3603,12 @@ let _rutaLayer     = null;    // L.polyline de la ruta activa en mapVol
 let viewAtual    = 'mapa';
 // [V8.4] GPS Tracking en tiempo real
 let _gpsWatchId        = null;    // ID del watchPosition
-let _voluntarioMarker  = null;    // Marcador del voluntario (se actualiza)
+let _voluntarioMarker  = null;    // Marcador del voluntario en el mapa
 let _precisionCircle   = null;    // Círculo de precisión GPS
 let _ultimaPosicion    = null;    // {lat, lng, precision, timestamp}
 let _destinoNavegacion = null;    // {lat, lng} del ping destino actual
 let _navegandoActivo   = false;   // Flag de navegación activa
+let _recalculandoRuta  = false;   // [V10.1] Flag anti-rebote para recálculo de ruta
 // [B4] Variables del ping pendiente en la tarjeta flotante del coordinador
 let _pingPendenteLat  = null;
 let _pingPendenteLng  = null;
@@ -7190,19 +7197,10 @@ function iniciarTrackingGPS() {
     maximumAge:         G.MAX_AGE_MS,
   };
   
-  // [V8.4 FIX] Obtener posición inmediata primero (más confiable en móviles)
-  console.log('[V8.4] Solicitando GPS inmediato...');
-  navigator.geolocation.getCurrentPosition(
-    posicion => {
-      console.log('[V8.4] GPS inmediato OK');
-      onPosicionGPS(posicion);
-    },
-    err => {
-      console.warn('[V8.4] GPS inmediato falló:', err.code, err.message);
-      actualizarUIGps('error');
-    },
-    opciones
-  );
+  // [V10.1] Eliminado getCurrentPosition inicial — en celulares devolvía
+  // un fix cacheado/impreciso de torre celular que se pintaba por segundos
+  // antes de llegar el primer fix real del watchPosition.
+  // watchPosition ya emite su primera lectura rápidamente y con mejor calidad.
   
   // Iniciar tracking continuo
   _gpsWatchId = navigator.geolocation.watchPosition(
@@ -7231,7 +7229,16 @@ function detenerTrackingGPS() {
 function onPosicionGPS(posicion) {
   const { latitude: lat, longitude: lng, accuracy: precision } = posicion.coords;
   const G = CONFIG.GPS;
-  
+
+  // [V10.1] Filtro de precisión: si la lectura es peor que el umbral
+  // Y ya tenemos una posición previa, descartamos esta lectura mala.
+  // La primera lectura SIEMPRE entra (aunque sea imprecisa) para no dejar
+  // al voluntario sin marcador al arrancar.
+  if (precision > G.PRECISION_MAXIMA_ACEPTABLE_M && _ultimaPosicion) {
+    console.log('[V10.1] GPS descartado por baja precisión: ±' + Math.round(precision) + 'm (umbral: ' + G.PRECISION_MAXIMA_ACEPTABLE_M + 'm)');
+    return;
+  }
+
   // Guardar última posición
   _ultimaPosicion = {
     lat,
@@ -7253,7 +7260,6 @@ function onPosicionGPS(posicion) {
   
   console.log('[V8.4] GPS actualizado:', lat.toFixed(5), lng.toFixed(5), '±', Math.round(precision), 'm');
 }
-
 /**
  * Callback cuando hay error de GPS
  */
@@ -7398,6 +7404,46 @@ function calcularDistanciaGPS(lat1, lng1, lat2, lng2) {
 }
 
 /**
+ * [V10.1] Distancia mínima perpendicular desde un punto a una polilínea.
+ * Recorre cada segmento de la ruta y devuelve la menor distancia en metros.
+ * Usa una aproximación plana válida para distancias cortas (< 100 km).
+ * coords: array de [lat, lng] o array de L.latLng
+ */
+function distanciaAPolilinea(lat, lng, coords) {
+  if (!coords || coords.length < 2) return Infinity;
+
+  let distMin = Infinity;
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const a = coords[i];
+    const b = coords[i + 1];
+    const aLat = Array.isArray(a) ? a[0] : a.lat;
+    const aLng = Array.isArray(a) ? a[1] : a.lng;
+    const bLat = Array.isArray(b) ? b[0] : b.lat;
+    const bLng = Array.isArray(b) ? b[1] : b.lng;
+
+    // Proyección del punto sobre el segmento (coordenadas planas aproximadas)
+    const dx = bLng - aLng;
+    const dy = bLat - aLat;
+    const lenSq = dx * dx + dy * dy;
+
+    let t = 0;
+    if (lenSq > 0) {
+      t = ((lng - aLng) * dx + (lat - aLat) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+    }
+
+    const projLat = aLat + t * dy;
+    const projLng = aLng + t * dx;
+
+    const d = calcularDistanciaGPS(lat, lng, projLat, projLng);
+    if (d < distMin) distMin = d;
+  }
+
+  return distMin;
+}
+
+/**
  * Formatea distancia para mostrar (m o km)
  */
 function formatearDistancia(metros) {
@@ -7436,6 +7482,22 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
     if (latlngs.length >= 2) {
       latlngs[0] = L.latLng(latActual, lngActual);
       _rutaLayer.setLatLngs(latlngs);
+    }
+  }
+
+  // [V10.1] RECÁLCULO POR DESVÍO DE RUTA
+  // Medir distancia perpendicular del voluntario a la polilínea dibujada.
+  // Si se desvió más que el umbral, recalcular la ruta (online vía OSRM,
+  // offline vía línea recta — navegarAlPin maneja ambos casos).
+  if (_rutaLayer && !_recalculandoRuta) {
+    const coordsRuta = _rutaLayer.getLatLngs();
+    const desvio = distanciaAPolilinea(latActual, lngActual, coordsRuta);
+    if (desvio > G.RECALCULAR_RUTA_M) {
+      console.log('[V10.1] Desvío detectado: ' + Math.round(desvio) + 'm (umbral: ' + G.RECALCULAR_RUTA_M + 'm). Recalculando...');
+      _recalculandoRuta = true;
+      toast(G.TEXTOS.RECALCULANDO);
+      navegarAlPin(_destinoNavegacion.lat, _destinoNavegacion.lng)
+        .finally(() => { _recalculandoRuta = false; });
     }
   }
   
