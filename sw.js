@@ -1,6 +1,8 @@
 const CACHE = 'dcpr-v10';
 const CACHE_PREFIX = 'dcpr-';
 const ASSETS = [
+  "./",
+  "./manifest.webmanifest",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
 ];
