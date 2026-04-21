@@ -253,6 +253,14 @@ const CONFIG = {
     TIMEOUT_MS:         15000,
     // [V10.3] Timeout inicial para decidir GPS INATIVO al abrir la app
     TIMEOUT_INICIAL_MS: 5000,
+    // [V10.4] Intervalo de reintento cuando GPS está INATIVO — detecta
+    // cuando el voluntario activa el GPS del celular a mitad de sesión.
+    REINTENTO_GPS_MS:   3000,
+    // [V10.4] Watchdog de inactividad — si pasa este tiempo sin recibir
+    // ningún fix nuevo, asumir que el GPS fue desactivado y marcar INATIVO.
+    INACTIVIDAD_MAX_MS: 10000,
+    // [V10.4] Frecuencia con la que el watchdog verifica inactividad.
+    WATCHDOG_CHECK_MS:  2000,
     // [V10.1] 0 = nunca aceptar cache, siempre lectura fresca del GPS
     MAX_AGE_MS:         0,
     // [V10.3] Precisión considerada "exacta" — punto azul estable
@@ -892,6 +900,10 @@ const CONFIG = {
   // Sem sinal  → rota pré-calculada cacheada no IndexedDB
   // IMPORTANTE: OSRM usa formato longitude,latitude (lng,lat) NO (lat,lng)
   OSRM_URL: "https://router.project-osrm.org/route/v1/foot/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson",
+  // [V10.4] Timeout para el cálculo de ruta OSRM — si el servidor tarda
+  // más que esto, abortar y caer a línea recta. Evita "Calculando rota..."
+  // eterno cuando el servidor público está saturado.
+  OSRM_TIMEOUT_MS: 8000,
 
   // ── [F0] Formato do código legível de ping (M01-A02-P003) ─────
   // Referenciado por: generarCodigoPing() — Fase 4
@@ -3631,6 +3643,8 @@ let _navegandoActivo   = false;   // Flag de navegación activa
 let _recalculandoRuta  = false;   // [V10.1] Flag anti-rebote para recálculo de ruta
 // [V10.3] Nuevo sistema GPS + ruta de 2 tramos
 let _gpsTimeoutInicial = null;    // setTimeout de 5s para decidir GPS INATIVO
+let _gpsReintentoInt   = null;    // [V10.4] setInterval de reintento cuando GPS INATIVO
+let _gpsWatchdogInt    = null;    // [V10.4] setInterval watchdog de inactividad
 let _primerFixRecibido = false;   // true cuando llega el primer fix exitoso
 let _fixEsFiable       = false;   // true cuando precision <= PRECISION_FIABLE_M
 let _rutaLayerTramo1   = null;    // polyline tramo 1 (sólida — OSRM o recta)
@@ -7246,12 +7260,23 @@ function iniciarTrackingGPS() {
   if (_gpsTimeoutInicial) clearTimeout(_gpsTimeoutInicial);
   _gpsTimeoutInicial = setTimeout(() => {
     if (!_primerFixRecibido) {
-      console.warn('[V10.3] GPS INATIVO — timeout inicial sin fix');
+      console.warn('[V10.4] GPS INATIVO — timeout inicial sin fix');
       actualizarUIGps('inativo');
       toast(G.TEXTOS.ACTIVAR_GPS);
+      // [V10.4] Arrancar reintento periódico hasta que llegue un fix real.
+      // Detecta cuando el voluntario activa el GPS del celular sin recargar.
+      if (_gpsReintentoInt) clearInterval(_gpsReintentoInt);
+      _gpsReintentoInt = setInterval(() => {
+        if (_primerFixRecibido) {
+          clearInterval(_gpsReintentoInt);
+          _gpsReintentoInt = null;
+          return;
+        }
+        console.log('[V10.4] Reintentando GPS...');
+        iniciarTrackingGPS();
+      }, G.REINTENTO_GPS_MS);
     }
   }, G.TIMEOUT_INICIAL_MS);
-
   // [V10.3] Listener de cambio de permisos en runtime — detectar cuando
   // el voluntario activa o desactiva el GPS del celular mientras usa la app.
   // navigator.permissions no existe en iOS < 16 → try/catch.
@@ -7286,7 +7311,34 @@ function iniciarTrackingGPS() {
     opciones
   );
 
-  console.log('[V10.3] GPS tracking iniciado, watchId:', _gpsWatchId);
+  // [V10.4] Watchdog de inactividad — detecta cuando el GPS del celular
+  // se apaga y el navegador simplemente deja de mandar fixes (sin error).
+  if (_gpsWatchdogInt) clearInterval(_gpsWatchdogInt);
+  _gpsWatchdogInt = setInterval(() => {
+    if (!_ultimaPosicion || !_ultimaPosicion.timestamp) return;
+    const gap = Date.now() - _ultimaPosicion.timestamp;
+    if (gap > G.INACTIVIDAD_MAX_MS && _primerFixRecibido) {
+      console.warn('[V10.4] Watchdog: sin fix hace ' + gap + 'ms → GPS INATIVO');
+      _primerFixRecibido = false;
+      _fixEsFiable       = false;
+      _ultimaPosicion    = null;  // Invalidar posición vieja
+      actualizarUIGps('inativo');
+      toast(G.TEXTOS.ACTIVAR_GPS);
+      // Arrancar reintento periódico — reutiliza lógica del bug 1
+      if (!_gpsReintentoInt) {
+        _gpsReintentoInt = setInterval(() => {
+          if (_primerFixRecibido) {
+            clearInterval(_gpsReintentoInt);
+            _gpsReintentoInt = null;
+            return;
+          }
+          iniciarTrackingGPS();
+        }, G.REINTENTO_GPS_MS);
+      }
+    }
+  }, G.WATCHDOG_CHECK_MS);
+
+  console.log('[V10.4] GPS tracking iniciado, watchId:', _gpsWatchId);
 }
 
 /**
@@ -7313,6 +7365,11 @@ function onPosicionGPS(posicion) {
   if (_gpsTimeoutInicial) {
     clearTimeout(_gpsTimeoutInicial);
     _gpsTimeoutInicial = null;
+  }
+  // [V10.4] Cancelar reintento periódico — GPS ya responde.
+  if (_gpsReintentoInt) {
+    clearInterval(_gpsReintentoInt);
+    _gpsReintentoInt = null;
   }
 
   // [V10.3] Guardar SIEMPRE la última posición (aunque sea imprecisa).
@@ -9069,13 +9126,12 @@ function _onBspNav() {
   const lat = parseFloat(_pingBspAtual.Latitude);
   const lng = parseFloat(_pingBspAtual.Longitude);
   if (!lat || !lng) { toast(CONFIG.UI_BOTTOM_SHEET.NAV_GPS_ERR); return; }
-  // [V10.3] Validar que hay GPS activo antes de intentar navegar
-  if (!_ultimaPosicion) {
+  // [V10.4] Validar GPS activo Y respondiendo (no posición fantasma vieja)
+  if (!_ultimaPosicion || !_primerFixRecibido) {
     toast(CONFIG.GPS.TEXTOS.ACTIVAR_GPS);
     return;
   }
   iniciarNavegacion(lat, lng);
-}
 
 // Llamado por el botón "▶ Iniciar Relevamento" de la bottom sheet
 function _onBspForm() {
@@ -9099,20 +9155,21 @@ async function navegarAlPin(lat, lng) {
   // [V10.3] Limpiar AMBOS tramos antes de redibujar
   _limparRutaLayers();
 
-  // [V10.3] PASO A — obtener posAtual desde el tracking activo
-  const posAtual = _ultimaPosicion && _ultimaPosicion.lat && _ultimaPosicion.lng
+  // [V10.4] PASO A — obtener posAtual desde el tracking activo.
+  // Requiere también _primerFixRecibido=true para descartar posiciones
+  // fantasma que quedaron en memoria tras desactivar el GPS.
+  const posAtual = _ultimaPosicion && _ultimaPosicion.lat && _ultimaPosicion.lng && _primerFixRecibido
     ? _ultimaPosicion
     : null;
 
   if (!posAtual) {
     // Sin GPS → aviso + abortar (no dibujar nada)
-    console.warn('[V10.3] navegarAlPin abortado — sin _ultimaPosicion');
+    console.warn('[V10.4] navegarAlPin abortado — GPS INATIVO o sin fix válido');
     if (distEl)  distEl.textContent  = G.TEXTOS.ACTIVAR_GPS;
     if (navDist) navDist.textContent = '---';
     toast(G.TEXTOS.ACTIVAR_GPS);
     return;
   }
-
   console.log('[V10.3] navegarAlPin - offlineVol:', offlineVol, 'desde:', posAtual.lat, posAtual.lng);
 
   // [V10.3] PASO B — TRAMO 1 (voluntario → calle más cercana al pin)
@@ -9123,11 +9180,16 @@ async function navegarAlPin(lat, lng) {
   let esOnline     = false;
 
   if (!offlineVol) {
+    // [V10.4] AbortController para timeout — cancela el fetch si OSRM tarda
+    // más que CONFIG.OSRM_TIMEOUT_MS. Sin esto, el navegador esperaba 30-60s.
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), CONFIG.OSRM_TIMEOUT_MS);
     try {
       const url = CONFIG.OSRM_URL
         .replace('{lng1}', posAtual.lng).replace('{lat1}', posAtual.lat)
         .replace('{lng2}', lng).replace('{lat2}', lat);
-      const r    = await fetch(url);
+      const r    = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(tid);
       const data = await r.json();
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
         coordsTramo1 = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
@@ -9138,7 +9200,8 @@ async function navegarAlPin(lat, lng) {
         try { await idbAddRuta({ key, coords: coordsTramo1, dist: distTramo1, ts: Date.now() }); } catch(e){}
       }
     } catch(e) {
-      console.warn('[V10.3] OSRM falló:', e.message);
+      clearTimeout(tid);
+      console.warn('[V10.4] OSRM falló:', e.name === 'AbortError' ? 'timeout' : e.message);
     }
   }
 
