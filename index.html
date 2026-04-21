@@ -245,16 +245,20 @@ const CONFIG = {
     NOMINATIM:   "https://nominatim.openstreetmap.org/search",
   },
 
-  // ── [V8.4] GPS: configuración de tracking en tiempo real ──────
+  // ── [V10.3] GPS: configuración de tracking en tiempo real ─────
   GPS: {
     // Opciones de geolocalización
     ALTA_PRECISION:     true,
+    // [V10.3] Timeout del watchPosition continuo — paciente
     TIMEOUT_MS:         15000,
+    // [V10.3] Timeout inicial para decidir GPS INATIVO al abrir la app
+    TIMEOUT_INICIAL_MS: 5000,
     // [V10.1] 0 = nunca aceptar cache, siempre lectura fresca del GPS
     MAX_AGE_MS:         0,
-    // [V10.1] Descartar fixes con precisión peor a este umbral (en metros)
-    // Salvo que no haya ninguna posición previa (primera lectura siempre entra)
-    PRECISION_MAXIMA_ACEPTABLE_M: 50,
+    // [V10.3] Precisión considerada "exacta" — punto azul estable
+    // Fixes con peor precisión pintan el marcador igual pero mantienen
+    // el mensaje "Confirmando localização..." hasta lograr <= este umbral.
+    PRECISION_FIABLE_M:          30,
     // Marcador del voluntario
     MARCADOR_RADIO:     12,
     MARCADOR_COLOR:     '#3B82F6',
@@ -263,21 +267,30 @@ const CONFIG = {
     PRECISION_BORDE:    'rgba(59, 130, 246, 0.4)',
     // Navegación
     DISTANCIA_LLEGADA_M: 25,
-    // [V10.1] Umbral de desvío de la ruta — si el voluntario se aleja
+    // [V10.3] Umbral de desvío de la ruta — si el voluntario se aleja
     // más de X metros de la polilínea, recalcular
-    RECALCULAR_RUTA_M:   30,
+    RECALCULAR_RUTA_M:   20,
+    // [V10.3] Estilo visual de los 2 tramos de ruta
+    TRAMO1_COLOR:       '#3B82F6',
+    TRAMO1_WEIGHT:      5,
+    TRAMO1_OPACITY:     0.9,
+    TRAMO1_DASH:        null,
+    TRAMO2_COLOR:       '#3B82F6',
+    TRAMO2_WEIGHT:      4,
+    TRAMO2_OPACITY:     0.9,
+    TRAMO2_DASH:        '8,6',
     // Textos UI
     TEXTOS: {
-      BUSCANDO:       '📡 Buscando GPS...',
-      ACTIVO:         '📍 GPS Activo',
-      SIN_SENAL:      '⚠️ Sin señal GPS',
-      ERROR:          '⚠️ GPS no disponible',
-      LLEGASTE:       '🎯 ¡Llegaste al destino!',
-      RECALCULANDO:   '🔄 Recalculando ruta...',
-      PRECISION:      'Precisión: ',
+      CONFIRMANDO:    'Confirmando localização...',
+      ACTIVO:         'GPS ATIVO',
+      INATIVO:        'GPS INATIVO',
+      ACTIVAR_GPS:    '⚠️ Ative o GPS para continuar',
+      CHEGOU:         'Você chegou',
+      RECALCULANDO:   '🔄 Recalculando rota...',
+      PRECISION:      'Precisão: ',
       METROS:         ' m',
       BTN_CENTRAR:    '◎',
-      BTN_CENTRAR_TITLE: 'Centrar en mi ubicación',
+      BTN_CENTRAR_TITLE: 'Centralizar em minha localização',
     },
   },
 
@@ -2652,8 +2665,15 @@ textarea{resize:vertical;min-height:65px;}
   border-radius:20px;padding:3px 10px;
   font-size:11px;color:var(--green);
   font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;
+  transition:background .25s,border-color .25s,color .25s;
+}
+.gps-pill.inativo{
+  background:rgba(239,68,68,.12);
+  border-color:rgba(239,68,68,.4);
+  color:var(--red);
 }
 .gps-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
+.gps-pill.inativo .gps-dot{background:var(--red);}
 
 /* ── Sprint 5: Dashboard, Alertas ── */
 
@@ -3609,6 +3629,12 @@ let _ultimaPosicion    = null;    // {lat, lng, precision, timestamp}
 let _destinoNavegacion = null;    // {lat, lng} del ping destino actual
 let _navegandoActivo   = false;   // Flag de navegación activa
 let _recalculandoRuta  = false;   // [V10.1] Flag anti-rebote para recálculo de ruta
+// [V10.3] Nuevo sistema GPS + ruta de 2 tramos
+let _gpsTimeoutInicial = null;    // setTimeout de 5s para decidir GPS INATIVO
+let _primerFixRecibido = false;   // true cuando llega el primer fix exitoso
+let _fixEsFiable       = false;   // true cuando precision <= PRECISION_FIABLE_M
+let _rutaLayerTramo1   = null;    // polyline tramo 1 (sólida — OSRM o recta)
+let _rutaLayerTramo2   = null;    // polyline tramo 2 (punteada — calle→pin)
 // [B4] Variables del ping pendiente en la tarjeta flotante del coordinador
 let _pingPendenteLat  = null;
 let _pingPendenteLng  = null;
@@ -7194,39 +7220,73 @@ function inicializarMapaVol() {
  */
 function iniciarTrackingGPS() {
   if (!navigator.geolocation) {
-    console.warn('[V8.4] Geolocalización no soportada');
-    actualizarUIGps('error');
+    console.warn('[V10.3] Geolocalización no soportada');
+    actualizarUIGps('inativo');
     return;
   }
-  
+
   // Limpiar watch anterior si existe
   if (_gpsWatchId !== null) {
     navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
   }
-  
+
   const G = CONFIG.GPS;
-  actualizarUIGps('buscando');
-  
-  // Opciones de geolocalización
+
+  // Resetear estado del primer fix
+  _primerFixRecibido = false;
+  _fixEsFiable       = false;
+
+  // Mostrar "Confirmando localização..." de entrada
+  actualizarUIGps('confirmando');
+
+  // [V10.3] Timeout inicial — si en TIMEOUT_INICIAL_MS no llega ningún fix,
+  // asumir GPS INATIVO (apagado / sin permiso / sin cobertura).
+  // Se cancela apenas llegue el primer fix exitoso.
+  if (_gpsTimeoutInicial) clearTimeout(_gpsTimeoutInicial);
+  _gpsTimeoutInicial = setTimeout(() => {
+    if (!_primerFixRecibido) {
+      console.warn('[V10.3] GPS INATIVO — timeout inicial sin fix');
+      actualizarUIGps('inativo');
+      toast(G.TEXTOS.ACTIVAR_GPS);
+    }
+  }, G.TIMEOUT_INICIAL_MS);
+
+  // [V10.3] Listener de cambio de permisos en runtime — detectar cuando
+  // el voluntario activa o desactiva el GPS del celular mientras usa la app.
+  // navigator.permissions no existe en iOS < 16 → try/catch.
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(status => {
+        status.onchange = () => {
+          console.log('[V10.3] Permiso GPS cambió a:', status.state);
+          if (status.state === 'denied') {
+            actualizarUIGps('inativo');
+            toast(G.TEXTOS.ACTIVAR_GPS);
+          } else if (status.state === 'granted') {
+            // Reanudar tracking si estaba caído
+            iniciarTrackingGPS();
+          }
+        };
+      }).catch(() => {});
+    }
+  } catch(e) { /* iOS < 16 — ignorar */ }
+
+  // Opciones del watchPosition continuo
   const opciones = {
     enableHighAccuracy: G.ALTA_PRECISION,
     timeout:            G.TIMEOUT_MS,
     maximumAge:         G.MAX_AGE_MS,
   };
-  
-  // [V10.1] Eliminado getCurrentPosition inicial — en celulares devolvía
-  // un fix cacheado/impreciso de torre celular que se pintaba por segundos
-  // antes de llegar el primer fix real del watchPosition.
-  // watchPosition ya emite su primera lectura rápidamente y con mejor calidad.
-  
+
   // Iniciar tracking continuo
   _gpsWatchId = navigator.geolocation.watchPosition(
     posicion => onPosicionGPS(posicion),
     error    => onErrorGPS(error),
     opciones
   );
-  
-  console.log('[V8.4] GPS tracking iniciado, watchId:', _gpsWatchId);
+
+  console.log('[V10.3] GPS tracking iniciado, watchId:', _gpsWatchId);
 }
 
 /**
@@ -7247,52 +7307,59 @@ function onPosicionGPS(posicion) {
   const { latitude: lat, longitude: lng, accuracy: precision } = posicion.coords;
   const G = CONFIG.GPS;
 
-  // [V10.1] Filtro de precisión: si la lectura es peor que el umbral
-  // Y ya tenemos una posición previa, descartamos esta lectura mala.
-  // La primera lectura SIEMPRE entra (aunque sea imprecisa) para no dejar
-  // al voluntario sin marcador al arrancar.
-  if (precision > G.PRECISION_MAXIMA_ACEPTABLE_M && _ultimaPosicion) {
-    console.log('[V10.1] GPS descartado por baja precisión: ±' + Math.round(precision) + 'm (umbral: ' + G.PRECISION_MAXIMA_ACEPTABLE_M + 'm)');
-    return;
+  // [V10.3] Cualquier fix que llega cancela el timeout inicial:
+  // el GPS está activo, ya no hay que avisar "GPS INATIVO".
+  _primerFixRecibido = true;
+  if (_gpsTimeoutInicial) {
+    clearTimeout(_gpsTimeoutInicial);
+    _gpsTimeoutInicial = null;
   }
 
-  // Guardar última posición
+  // [V10.3] Guardar SIEMPRE la última posición (aunque sea imprecisa).
+  // El marcador se pinta desde el primer fix. El mensaje "Confirmando..."
+  // solo desaparece cuando la precisión es <= PRECISION_FIABLE_M.
   _ultimaPosicion = {
     lat,
     lng,
     precision,
     timestamp: Date.now()
   };
-  
-  // Actualizar UI
-  actualizarUIGps('activo', precision);
-  
-  // Actualizar marcador del voluntario en el mapa
+
+  // Actualizar marcador del voluntario en el mapa (siempre)
   actualizarMarcadorVoluntario(lat, lng, precision);
-  
+
+  // [V10.3] Decidir estado de UI según precisión
+  _fixEsFiable = (precision <= G.PRECISION_FIABLE_M);
+  actualizarUIGps(_fixEsFiable ? 'activo' : 'confirmando', precision);
+
   // Si está navegando, actualizar info de navegación
   if (_navegandoActivo && _destinoNavegacion) {
     actualizarNavegacionEnCurso(lat, lng);
   }
-  
-  console.log('[V8.4] GPS actualizado:', lat.toFixed(5), lng.toFixed(5), '±', Math.round(precision), 'm');
+
+  console.log('[V10.3] GPS fix:', lat.toFixed(5), lng.toFixed(5), '±', Math.round(precision), 'm · fiable:', _fixEsFiable);
 }
 /**
  * Callback cuando hay error de GPS
  */
 function onErrorGPS(error) {
-  console.warn('[V8.4] Error GPS:', error.code, error.message);
-  
+  console.warn('[V10.3] Error GPS:', error.code, error.message);
+  const G = CONFIG.GPS;
+
   switch (error.code) {
     case error.PERMISSION_DENIED:
-      actualizarUIGps('error');
-      toast(CONFIG.GPS.TEXTOS.ERROR);
+      // Voluntario bloqueó el permiso → GPS INATIVO + aviso persistente
+      actualizarUIGps('inativo');
+      toast(G.TEXTOS.ACTIVAR_GPS);
       break;
     case error.POSITION_UNAVAILABLE:
-      actualizarUIGps('sin_senal');
+      // GPS del celular apagado o sin cobertura → GPS INATIVO + aviso
+      actualizarUIGps('inativo');
+      toast(G.TEXTOS.ACTIVAR_GPS);
       break;
     case error.TIMEOUT:
-      actualizarUIGps('buscando');
+      // Timeout del watchPosition — seguir buscando, mantener mensaje
+      actualizarUIGps('confirmando');
       break;
   }
 }
@@ -7342,41 +7409,49 @@ function actualizarMarcadorVoluntario(lat, lng, precision) {
  * Actualiza la UI del estado GPS (tag y botón)
  */
 function actualizarUIGps(estado, precision) {
-  const G = CONFIG.GPS;
-  const tag = document.getElementById('gpsTagVol');
-  const btn = document.getElementById('btnCentrarGps');
-  
+  const G   = CONFIG.GPS;
+  const tag = document.getElementById('gpsTagVol');      // tag del mapa
+  const btn = document.getElementById('btnCentrarGps');  // botón flotante ◎
+  const pill= document.getElementById('gpsPill');        // cartel topbar
+  const txt = document.getElementById('gpsTextVol');     // texto dentro del cartel
+
+  // Tag del mapa (arriba derecha)
   if (tag) {
     tag.className = 'map-tag';
     switch (estado) {
       case 'activo':
         tag.className += ' gps-activo';
-        tag.textContent = '📍 GPS';
+        tag.textContent = '📍 ' + G.TEXTOS.ACTIVO;
         break;
-      case 'buscando':
+      case 'confirmando':
         tag.className += ' gps-buscando';
-        tag.textContent = '📡 GPS...';
+        tag.textContent = '📡 ' + G.TEXTOS.CONFIRMANDO;
         break;
-      case 'sin_senal':
+      case 'inativo':
         tag.className += ' gps-error';
-        tag.textContent = '📡 ⚠️';
-        break;
-      case 'error':
-        tag.className += ' gps-error';
-        tag.textContent = '📍 ✕';
+        tag.textContent = '⚠️ ' + G.TEXTOS.INATIVO;
         break;
     }
   }
-  
+
+  // Botón flotante ◎
   if (btn) {
     btn.className = 'btn-centrar-gps';
-    switch (estado) {
-      case 'activo':
-        btn.className += ' activo';
-        break;
-      case 'buscando':
-        btn.className += ' buscando';
-        break;
+    if (estado === 'activo')          btn.className += ' activo';
+    else if (estado === 'confirmando')btn.className += ' buscando';
+  }
+
+  // [V10.3] Cartel topbar #gpsPill — verde GPS ATIVO / rojo GPS INATIVO
+  if (pill && txt) {
+    if (estado === 'activo') {
+      pill.classList.remove('inativo');
+      txt.textContent = G.TEXTOS.ACTIVO;
+    } else if (estado === 'confirmando') {
+      pill.classList.remove('inativo');
+      txt.textContent = G.TEXTOS.CONFIRMANDO;
+    } else if (estado === 'inativo') {
+      pill.classList.add('inativo');
+      txt.textContent = G.TEXTOS.INATIVO;
     }
   }
 }
@@ -7387,7 +7462,8 @@ function actualizarUIGps(estado, precision) {
  */
 function centrarEnMiUbicacion() {
   if (!_ultimaPosicion) {
-    toast(CONFIG.GPS.TEXTOS.BUSCANDO);
+    // [V10.3] Sin posición aún → aviso de activar GPS
+    toast(CONFIG.GPS.TEXTOS.ACTIVAR_GPS);
     return;
   }
   
@@ -7500,30 +7576,28 @@ function actualizarNavegacionEnCurso(latActual, lngActual) {
   //        Cuando el voluntario se desvía > RECALCULAR_RUTA_M, la ruta se
   //        redibuja completa desde la posición actual vía navegarAlPin.
 
-  // [V10.1] RECÁLCULO POR DESVÍO DE RUTA
-  // Medir distancia perpendicular del voluntario a la polilínea dibujada.
-  // Si se desvió más que el umbral, recalcular la ruta (online vía OSRM,
-  // offline vía línea recta — navegarAlPin maneja ambos casos).
-  if (_rutaLayer && !_recalculandoRuta) {
-    const coordsRuta = _rutaLayer.getLatLngs();
+  // [V10.3] RECÁLCULO POR DESVÍO DE RUTA
+  // Medir distancia perpendicular del voluntario al TRAMO 1 (el que debe seguir).
+  // Si se desvió más que el umbral, recalcular ambos tramos vía navegarAlPin.
+  if (_rutaLayerTramo1 && !_recalculandoRuta) {
+    const coordsRuta = _rutaLayerTramo1.getLatLngs();
     const desvio = distanciaAPolilinea(latActual, lngActual, coordsRuta);
     if (desvio > G.RECALCULAR_RUTA_M) {
-      console.log('[V10.1] Desvío detectado: ' + Math.round(desvio) + 'm (umbral: ' + G.RECALCULAR_RUTA_M + 'm). Recalculando...');
+      console.log('[V10.3] Desvío detectado: ' + Math.round(desvio) + 'm (umbral: ' + G.RECALCULAR_RUTA_M + 'm). Recalculando...');
       _recalculandoRuta = true;
       toast(G.TEXTOS.RECALCULANDO);
       navegarAlPin(_destinoNavegacion.lat, _destinoNavegacion.lng)
         .finally(() => { _recalculandoRuta = false; });
     }
   }
-  
+
   // Verificar si llegó al destino
   if (distancia <= G.DISTANCIA_LLEGADA_M) {
-    toast(G.TEXTOS.LLEGASTE);
+    toast(G.TEXTOS.CHEGOU);
     cancelarNavegacion();
-    
     // Abrir automáticamente el bottom sheet del ping
     if (_pingBspAtual) {
-      abrirBottomSheet(_pingBspAtual);
+      abrirBottomSheetPin(_pingBspAtual);
     }
   }
 }
@@ -7557,18 +7631,16 @@ async function iniciarNavegacion(lat, lng) {
  */
 function cancelarNavegacion() {
   _destinoNavegacion = null;
-  _navegandoActivo = false;
-  
+  _navegandoActivo   = false;
+  _recalculandoRuta  = false;
+
   // Ocultar barra de navegación
   const navBar = document.getElementById('navInfoBar');
   if (navBar) navBar.classList.remove('visible');
-  
-  // Limpiar ruta del mapa
-  if (_rutaLayer && mapVol) {
-    mapVol.removeLayer(_rutaLayer);
-    _rutaLayer = null;
-  }
-  
+
+  // [V10.3] Limpiar ambos tramos
+  _limparRutaLayers();
+
   // Barrido defensivo: remover cualquier polyline residual
   // (excluye polígonos del área y otras formas geométricas)
   if (mapVol) {
@@ -7578,8 +7650,8 @@ function cancelarNavegacion() {
       }
     });
   }
-  
-  console.log('[V8.4] Navegación cancelada');
+
+  console.log('[V10.3] Navegación cancelada');
 }
 
 // [V8.3] BUG-3 FIX: Cargar y dibujar área del voluntario
@@ -8997,7 +9069,11 @@ function _onBspNav() {
   const lat = parseFloat(_pingBspAtual.Latitude);
   const lng = parseFloat(_pingBspAtual.Longitude);
   if (!lat || !lng) { toast(CONFIG.UI_BOTTOM_SHEET.NAV_GPS_ERR); return; }
-  // [V8.4] Usar nuevo sistema de navegación activa
+  // [V10.3] Validar que hay GPS activo antes de intentar navegar
+  if (!_ultimaPosicion) {
+    toast(CONFIG.GPS.TEXTOS.ACTIVAR_GPS);
+    return;
+  }
   iniciarNavegacion(lat, lng);
 }
 
@@ -9013,129 +9089,115 @@ function _onBspForm() {
 // Sin señal  → usa ruta cacheada en IndexedDB
 // GPS activo → voluntario se ve en tiempo real sobre el mapa
 async function navegarAlPin(lat, lng) {
-  const BS = CONFIG.UI_BOTTOM_SHEET;
-  const distEl = document.getElementById('bspDist');
+  const BS      = CONFIG.UI_BOTTOM_SHEET;
+  const G       = CONFIG.GPS;
+  const distEl  = document.getElementById('bspDist');
   const navDist = document.getElementById('navDistancia');
-  if (distEl) distEl.textContent = BS.NAV_CALCULANDO;
+  if (distEl)  distEl.textContent  = BS.NAV_CALCULANDO;
   if (navDist) navDist.textContent = '...';
 
-  // Limpiar ruta anterior
-  if (_rutaLayer && mapVol) { _rutaLayer.remove(); _rutaLayer = null; }
+  // [V10.3] Limpiar AMBOS tramos antes de redibujar
+  _limparRutaLayers();
 
-  // [V8.4 FIX] Obtener posición GPS - múltiples intentos
-  let posAtual = null;
-  
-  // Intento 1: usar _ultimaPosicion del tracking
-  if (_ultimaPosicion && _ultimaPosicion.lat && _ultimaPosicion.lng) {
-    posAtual = _ultimaPosicion;
-    console.log('[V8.4] Usando posición del tracking:', posAtual.lat, posAtual.lng);
-  }
-  
-  // Intento 2: getCurrentPosition si no hay tracking
+  // [V10.3] PASO A — obtener posAtual desde el tracking activo
+  const posAtual = _ultimaPosicion && _ultimaPosicion.lat && _ultimaPosicion.lng
+    ? _ultimaPosicion
+    : null;
+
   if (!posAtual) {
-    console.log('[V8.4] Sin tracking, intentando getCurrentPosition...');
-    try {
-      posAtual = await new Promise((res, rej) => {
-        const timeoutId = setTimeout(() => rej(new Error('timeout')), 10000);
-        navigator.geolocation.getCurrentPosition(
-          p => {
-            clearTimeout(timeoutId);
-            res({ lat: p.coords.latitude, lng: p.coords.longitude, precision: p.coords.accuracy });
-          },
-          err => {
-            clearTimeout(timeoutId);
-            rej(err);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-        );
-      });
-      console.log('[V8.4] getCurrentPosition OK:', posAtual.lat, posAtual.lng);
-      // Actualizar marcador del voluntario
-      actualizarMarcadorVoluntario(posAtual.lat, posAtual.lng, posAtual.precision || 50);
-      _ultimaPosicion = posAtual;
-    } catch(e) {
-      console.warn('[V8.4] getCurrentPosition falló:', e.message);
-    }
+    // Sin GPS → aviso + abortar (no dibujar nada)
+    console.warn('[V10.3] navegarAlPin abortado — sin _ultimaPosicion');
+    if (distEl)  distEl.textContent  = G.TEXTOS.ACTIVAR_GPS;
+    if (navDist) navDist.textContent = '---';
+    toast(G.TEXTOS.ACTIVAR_GPS);
+    return;
   }
 
-  console.log('[V8.4] navegarAlPin - offlineVol:', offlineVol, 'posAtual:', !!posAtual);
+  console.log('[V10.3] navegarAlPin - offlineVol:', offlineVol, 'desde:', posAtual.lat, posAtual.lng);
 
-  // Tentar rota online via OSRM
-  if (!offlineVol && posAtual) {
+  // [V10.3] PASO B — TRAMO 1 (voluntario → calle más cercana al pin)
+  //   Online:  OSRM por calles (línea azul sólida)
+  //   Offline: línea recta directa (línea azul sólida)
+  let coordsTramo1 = null;   // array de [lat,lng]
+  let distTramo1   = 0;
+  let esOnline     = false;
+
+  if (!offlineVol) {
     try {
       const url = CONFIG.OSRM_URL
         .replace('{lng1}', posAtual.lng).replace('{lat1}', posAtual.lat)
         .replace('{lng2}', lng).replace('{lat2}', lat);
-      console.log('[V8.4] OSRM URL:', url);
-      const r = await fetch(url);
+      const r    = await fetch(url);
       const data = await r.json();
-      console.log('[V8.4] OSRM respuesta:', data.code);
       if (data.code === 'Ok' && data.routes && data.routes[0]) {
-        const coords = data.routes[0].geometry.coordinates
-          .map(c => [c[1], c[0]]);   // OSRM retorna [lng,lat] → Leaflet [lat,lng]
-        const dist   = data.routes[0].distance;
-        _rutaLayer   = L.polyline(coords, {
-          color: CONFIG.GPS.MARCADOR_COLOR,
-          weight: 5, opacity: 0.9, dashArray: '10,6',
-        }).addTo(mapVol);
-        mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
-        // Guardar en IndexedDB para uso offline
+        coordsTramo1 = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        distTramo1   = data.routes[0].distance;
+        esOnline     = true;
+        // Cachear para uso offline futuro
         const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
-        try { await idbAddRuta({ key, coords, dist, ts: Date.now() }); } catch(e){}
-        const distLabel = formatearDistancia(dist);
-        if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_ONLINE;
-        if (navDist) navDist.textContent = distLabel;
-        toast('🧭 ' + distLabel + ' ' + BS.NAV_ONLINE);
-        return;
+        try { await idbAddRuta({ key, coords: coordsTramo1, dist: distTramo1, ts: Date.now() }); } catch(e){}
       }
     } catch(e) {
-      console.warn('[V8.4] OSRM error:', e.message);
+      console.warn('[V10.3] OSRM falló:', e.message);
     }
   }
 
-  // Fallback: ruta cacheada en IndexedDB
-  try {
-    const key = 'ruta_' + lat.toFixed(5) + '_' + lng.toFixed(5);
-    console.log('[V8.4] Buscando ruta en cache:', key);
-    const cached = await idbGetRuta(key);
-    if (cached && cached.coords) {
-      console.log('[V8.4] Ruta encontrada en cache');
-      _rutaLayer = L.polyline(cached.coords, {
-        color: CONFIG.COR_PINES.Pendente,
-        weight: 5, opacity: 0.8, dashArray: '10,6',
+  // Fallback: offline o OSRM falló → una sola línea recta
+  if (!coordsTramo1) {
+    coordsTramo1 = [[posAtual.lat, posAtual.lng], [lat, lng]];
+    distTramo1   = calcularDistanciaGPS(posAtual.lat, posAtual.lng, lat, lng);
+    esOnline     = false;
+  }
+
+  // Dibujar TRAMO 1 (sólido)
+  _rutaLayerTramo1 = L.polyline(coordsTramo1, {
+    color:     G.TRAMO1_COLOR,
+    weight:    G.TRAMO1_WEIGHT,
+    opacity:   G.TRAMO1_OPACITY,
+    dashArray: G.TRAMO1_DASH,
+  }).addTo(mapVol);
+
+  // [V10.3] PASO C — TRAMO 2 (último punto OSRM → pin exacto)
+  //   Solo si tramo 1 fue OSRM (online). Offline ya es línea recta directa al pin.
+  //   Siempre dibujar aunque sean pocos metros (decisión del usuario).
+  if (esOnline && coordsTramo1.length >= 2) {
+    const ultimo = coordsTramo1[coordsTramo1.length - 1];
+    const distTramo2 = calcularDistanciaGPS(ultimo[0], ultimo[1], lat, lng);
+    if (distTramo2 > 0) {
+      _rutaLayerTramo2 = L.polyline([ultimo, [lat, lng]], {
+        color:     G.TRAMO2_COLOR,
+        weight:    G.TRAMO2_WEIGHT,
+        opacity:   G.TRAMO2_OPACITY,
+        dashArray: G.TRAMO2_DASH,
       }).addTo(mapVol);
-      mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
-      const distLabel = formatearDistancia(cached.dist);
-      if (distEl) distEl.textContent = BS.DIST_APROX + distLabel + ' · ' + BS.NAV_OFFLINE;
-      if (navDist) navDist.textContent = distLabel + ' 📶';
-      toast('🧭 ' + distLabel + ' (offline)');
-      return;
     }
-  } catch(e) {
-    console.warn('[V8.4] Error buscando cache:', e);
   }
 
-  // [V8.4 FIX] Fallback final: línea recta con distancia directa
-  console.log('[V8.4] Sin ruta OSRM ni cache, usando línea recta');
-  if (posAtual) {
-    const distDirecta = calcularDistanciaGPS(posAtual.lat, posAtual.lng, lat, lng);
-    _rutaLayer = L.polyline([[posAtual.lat, posAtual.lng], [lat, lng]], {
-      color: '#3B82F6',
-      weight: 3, opacity: 0.7, dashArray: '8,8',
-    }).addTo(mapVol);
-    mapVol.fitBounds(_rutaLayer.getBounds(), { padding: [50, 50] });
-    const distLabel = formatearDistancia(distDirecta);
-    if (distEl) distEl.textContent = '📏 ~' + distLabel + ' (linha reta)';
-    if (navDist) navDist.textContent = '~' + distLabel;
-    toast('📏 ~' + distLabel + ' (linha reta)');
-  } else {
-    // Sin GPS — al menos centrar en el destino
-    console.warn('[V8.4] Sin GPS disponible');
-    if (distEl) distEl.textContent = '⚠️ GPS não disponível';
-    if (navDist) navDist.textContent = '---';
-    if (mapVol) mapVol.setView([lat, lng], CONFIG.MAPA.ZOOM_PING);
-    toast('⚠️ Ative o GPS para navegar');
+  // Centrar mapa mostrando ambos tramos
+  const grupo = L.featureGroup([_rutaLayerTramo1]);
+  if (_rutaLayerTramo2) grupo.addLayer(_rutaLayerTramo2);
+  mapVol.fitBounds(grupo.getBounds(), { padding: [50, 50] });
+
+  // Distancia total mostrada = tramo 1 + tramo 2 (si existe)
+  let distTotal = distTramo1;
+  if (_rutaLayerTramo2) {
+    const ultimo = coordsTramo1[coordsTramo1.length - 1];
+    distTotal += calcularDistanciaGPS(ultimo[0], ultimo[1], lat, lng);
   }
+  const distLabel = formatearDistancia(distTotal);
+  if (distEl)  distEl.textContent  = BS.DIST_APROX + distLabel + ' · ' + (esOnline ? BS.NAV_ONLINE : BS.NAV_OFFLINE);
+  if (navDist) navDist.textContent = distLabel;
+  toast('🧭 ' + distLabel + (esOnline ? '' : ' (offline)'));
+}
+
+// [V10.3] Helper: limpiar ambos layers de ruta
+function _limparRutaLayers() {
+  if (_rutaLayerTramo1 && mapVol) { _rutaLayerTramo1.remove(); }
+  if (_rutaLayerTramo2 && mapVol) { _rutaLayerTramo2.remove(); }
+  _rutaLayerTramo1 = null;
+  _rutaLayerTramo2 = null;
+  // Limpiar referencia antigua si existiera
+  if (_rutaLayer && mapVol) { _rutaLayer.remove(); _rutaLayer = null; }
 }
 
 // ── precalcularRutas ─────────────────────────────────────────
