@@ -6967,6 +6967,10 @@ async function idbGetRuta(key) {
 // ════════════════════════════════════════════════════════════════
 async function guardarFilaOffline(dados) {
   try {
+    // Evita duplicar o mesmo envio (ex.: toque repetido em "Salvar")
+    const _chave = o => { const { _id, _ts, [CONFIG.IDB.CAMPO_INTENTOS || '_intentos']: _i, ...r } = o; return JSON.stringify(r); };
+    const _filaAtual = await idbGetAll(CONFIG.IDB.STORE_FILA);
+    if (_filaAtual.some(it => _chave(it) === _chave(dados))) return;
     await idbAdd(CONFIG.IDB.STORE_FILA, { ...dados, _ts: Date.now() });
     // BUG-18: IDB salvou com sucesso — remover do sessionStorage para evitar duplicação
     try { sessionStorage.removeItem(CONFIG.STORAGE.FILA_OFFLINE); } catch(e) {}
@@ -7005,7 +7009,20 @@ async function sincronizarAgora() {
   if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(false);
 }
 
+// Trava: evita sincronizações sobrepostas (evento online + botão)
+let _syncEmCurso = false;
 async function _sincronizarFila() {
+  if (_syncEmCurso) return { enviados: 0, fotosEnviadas: 0, fallidos: 0 };
+  _syncEmCurso = true;
+  try {
+    return await _sincronizarFilaInterno();
+  } finally {
+    _syncEmCurso = false;
+    if (typeof renderizarEstadoSync === 'function') renderizarEstadoSync(false);
+  }
+}
+
+async function _sincronizarFilaInterno() {
   let enviados = 0;
   let fotosEnviadas = 0;
   let fallidos = 0;
@@ -9512,7 +9529,7 @@ async function renderizarEstadoSync(sincronizando) {
     const pingObj  = (ESTADO.pingsVol || []).find(p => p.ID_Ping === idPing);
     const codigo   = (pingObj && (pingObj.Codigo || pingObj.codigo))
       ? (pingObj.Codigo || pingObj.codigo)
-      : (idPing ? SY.ITEM_PIN_LABEL + idPing : SY.ITEM_SEM_PIN);
+      : (idPing ? SY.ITEM_PIN_LABEL + idPing : (item.endereco || SY.ITEM_SEM_PIN));
 
     return `<div class="sync-item-pend${sincronizando ? '' : ''}">
       <div class="sip-ico">${sincronizando ? '⏳' : '📋'}</div>
