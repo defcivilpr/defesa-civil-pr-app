@@ -327,6 +327,22 @@ const CONFIG = {
   ],
 
   // ── Textos da interface ──────────────────────────────────────
+    // ── Bloqueio de espera — só ações de escrita no Drive ───────
+  ESPERA: {
+    MSG:              "⏳ Aguarde, processando sua ação...",
+    DELAY_OCULTAR_MS: 300,     // evita piscar entre chamadas encadeadas
+    MAX_MS:           60000,   // failsafe: libera a tela se o servidor não responder
+    // Chaves de CONFIG.ACOES que gravam na base de dados
+    ACOES_ESCRITA: [
+      "SALVAR_MAPA", "RENOMEAR_MAPA", "DELETAR_MAPA", "ARQUIVAR_MAPA",
+      "SALVAR_AREA", "RENOMEAR_AREA", "DELETAR_AREA", "ARQUIVAR_AREA",
+      "SALVAR_PING", "ATUALIZAR_PING", "MOVER_PING", "DELETAR_PING", "ARQUIVAR_PING",
+      "DESIGNAR_VOLUNTARIO", "CRIAR_USUARIO", "EDITAR_USUARIO",
+      "DESATIVAR_USUARIO", "REATIVAR_USUARIO",
+      "SALVAR_FORMULARIO", "SALVAR_RESIDENTES", "SALVAR_FOTOS",
+    ],
+  },
+
   UI: {
     // Login
     LOGIN_TITULO:       "DEFESA CIVIL",
@@ -1443,9 +1459,20 @@ textarea{resize:vertical;min-height:65px;}
   border-radius:20px;padding:9px 18px;font-size:12px;
   font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;
   white-space:nowrap;z-index:9999;display:none;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(8px);
+    box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(8px);
 }
-
+#overlayEspera{
+  position:fixed;inset:0;z-index:9998;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(11,22,40,.55);cursor:wait;
+}
+#overlayEspera.ativo{display:flex;}
+#overlayEsperaMsg{
+  background:rgba(20,32,56,.97);border:1px solid var(--border);
+  border-radius:20px;padding:12px 22px;font-size:13px;
+  font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
 
 /* ═══════════════════════════════════════════
    TELA COORDENADOR
@@ -3557,6 +3584,7 @@ textarea{resize:vertical;min-height:65px;}
 </div><!-- /tela-vol -->
 
 <div id="toast"></div>
+<div id="overlayEspera"><div id="overlayEsperaMsg"></div></div>
 
 <!-- Banner de Instalação PWA — B-22 -->
 <div id="installBanner" style="
@@ -4072,7 +4100,41 @@ window.addEventListener('load', () => {
 // suporte a payloads grandes (fotos em base64).
 // V5: Incluye token automáticamente en cada request autenticado.
 // ════════════════════════════════════════════════════════════════
-async function chamarBackend(params) {
+// ── Bloqueio de espera: só ações de CONFIG.ESPERA.ACOES_ESCRITA ──
+let _esperaContador = 0;
+let _esperaTimer    = null;
+let _esperaFailsafe = null;
+
+function _esAcaoEscrita(acao) {
+  return CONFIG.ESPERA.ACOES_ESCRITA.some(k => CONFIG.ACOES[k] === acao);
+}
+
+function _mostrarEspera() {
+  _esperaContador++;
+  clearTimeout(_esperaTimer);
+  clearTimeout(_esperaFailsafe);
+  _esperaFailsafe = setTimeout(() => { _esperaContador = 1; _ocultarEspera(); }, CONFIG.ESPERA.MAX_MS);
+  const el = document.getElementById('overlayEspera');
+  if (!el) return;
+  document.getElementById('overlayEsperaMsg').textContent = CONFIG.ESPERA.MSG;
+  el.classList.add('ativo');
+}
+
+function _ocultarEspera() {
+  _esperaContador = Math.max(0, _esperaContador - 1);
+  if (_esperaContador > 0) return;
+  clearTimeout(_esperaFailsafe);
+  clearTimeout(_esperaTimer);
+  _esperaTimer = setTimeout(() => {
+    const el = document.getElementById('overlayEspera');
+    if (el && _esperaContador === 0) el.classList.remove('ativo');
+  }, CONFIG.ESPERA.DELAY_OCULTAR_MS);
+}
+
+async function chamarBackend(params, silencioso) {
+  const bloquear = !silencioso && _esAcaoEscrita(params && params.acao);
+  if (bloquear) _mostrarEspera();
+  try {
   // V5: Agregar token si existe
   const token = obterToken();
   const paramsConToken = { ...params };
@@ -4090,7 +4152,10 @@ async function chamarBackend(params) {
   try {
     return JSON.parse(text);
   } catch(e) {
-    return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
+        return { sucesso: false, mensagem: 'Resposta inválida do servidor', dados: null };
+  }
+  } finally {
+    if (bloquear) _ocultarEspera();
   }
 }
 
@@ -6956,8 +7021,8 @@ async function _sincronizarFila() {
       try {
         const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
         const intentos = (intentosActuales || 0) + 1;
-        
-        const r = await chamarBackend(dados);
+           
+        const r = await chamarBackend(dados, true);
         if (r.sucesso) {
           await idbDelete(CONFIG.IDB.STORE_FILA, _id);
           enviados++;
@@ -6998,7 +7063,7 @@ async function _sincronizarFila() {
     for (const item of filaSession) {
       try {
         const intentos = (item[CAMPO_INTENTOS] || 0) + 1;
-        const r = await chamarBackend(item);
+        const r = await chamarBackend(item, true);
         if (r.sucesso) {
           enviados++;
           // [F9] Notificar progreso
