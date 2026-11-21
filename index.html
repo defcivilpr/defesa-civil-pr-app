@@ -3852,7 +3852,7 @@ function renderizarTextos() {
     items.forEach((p, i) => {
       const isFirst = i === 0 && grupo === Object.keys(grupos)[0];
       sidebarHTML += `
-        <div class="nav-item${isFirst ? ' active' : ''}" id="nav-${p.id}" onclick="navegarCoord('${p.id}',this)">
+        <div class="nav-item${isFirst ? ' active' : ''}" id="nav-${p.id}" onclick="navegarCoord('${p.id}',this,true)">
           <span class="nav-icon">${p.icon}</span>${p.label}
           ${p.badge ? `<span class="nav-badge${p.badgeClass ? ' '+p.badgeClass : ''}" id="${p.badge}">0</span>` : ''}
         </div>`;
@@ -6529,7 +6529,7 @@ function _toggleMonitorPanel() {
 // iniciarDashboardAutoRefresh [S6], pararDashboardAutoRefresh [S6],
 // _popularFiltroRole [S7], _popularSelectRole [S7], carregarUsuarios [S7]
 // ════════════════════════════════════════════════════════════════
-function navegarCoord(pagina, el) {
+function navegarCoord(pagina, el, desdeMenu) {
   // [F1] Remover active de páginas não-mapa — #page-mapas NUNCA é ocultado
   // O mapa permanece visível como camada base em qualquer navegação
   document.querySelectorAll('.page:not(#page-mapas)').forEach(p => p.classList.remove('active'));
@@ -6541,7 +6541,7 @@ function navegarCoord(pagina, el) {
     if (pg) pg.classList.add('active');
   }
   if (el) el.classList.add('active');
-  ESTADO.paginaAtual = pagina;
+  ESTADO.paginaAtual = pagina;   if (pagina === 'mapas' && desdeMenu && !document.querySelector('.maps-sidebar.aberta')) _toggleMapasSidebar();
 
   // [F1] Mapa sempre presente — invalidar tamanho em toda navegação
   setTimeout(() => mapCoord && mapCoord.invalidateSize(), 60);
