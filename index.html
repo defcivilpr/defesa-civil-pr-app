@@ -6367,9 +6367,17 @@ function iniciarDashboardAutoRefresh() {
           const pill = document.getElementById('coordNotifPill');
           const txt  = document.getElementById('coordNotifTxt');
           if (pill && txt) {
-            txt.textContent = msg + NT.PILL_SEPARADOR + NT.PILL_BTN;
+            txt.textContent = msg + NT.PILL_SEPARADOR + NT.PILL_BTN;           
             pill.style.display = 'flex';
           }
+        }
+
+        // Tabela de pings: atualiza sozinha se o coordenador estiver nela (mantém filtros)
+        if (ESTADO.paginaAtual === 'pings') {
+          ESTADO.pings = r.dados;
+          const rf = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_FORMULARIOS });
+          if (rf.sucesso && Array.isArray(rf.dados)) ESTADO.formularios = rf.dados;
+          aplicarFiltrosPings();
         }
       }
     } catch(e) {}
