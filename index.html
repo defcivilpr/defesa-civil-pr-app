@@ -4507,8 +4507,12 @@ async function carregarDadosCoord() {
     }
 
     // Áreas
-    const resAreas = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });
+    const resAreas = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_AREAS });   
     if (resAreas.sucesso) ESTADO.areas = resAreas.dados || [];
+
+    // Formulários — a tabela de pings mostra o endereço corrigido no formulário
+    const resForms = await chamarBackend({ acao: CONFIG.ACOES.LISTAR_FORMULARIOS });
+    if (resForms.sucesso) ESTADO.formularios = resForms.dados || [];    
 
   } catch(e) {
     toast(CONFIG.UI.TOAST_BACKEND_ERR);
@@ -4694,7 +4698,7 @@ function renderizarPings(lista) {
           : `<span style="color:var(--muted)">${_esc(p.ID_Ping)||'—'}</span>`
         }
       </td>
-      <td><div style="font-weight:500;color:var(--text)">${_esc(p.Endereco)||'—'}</div></td>
+      <td><div style="font-weight:500;color:var(--text)">${_esc(((ESTADO.formularios || []).find(f => f.ID_Ping === p.ID_Ping) || {}).Endereco || p.Endereco)||'—'}</div></td>
       <td style="font-size:11px;color:var(--muted)">${_esc(mapaNome)}</td>
       <td style="font-size:11px;color:var(--text)">${_esc(areaNome)}</td>
       <td><span class="tag ${css==='s-done'?'tag-done':css==='s-critical'?'tag-critical':'tag-pending'}">${label}</span></td>
