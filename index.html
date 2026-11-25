@@ -9667,7 +9667,7 @@ function renderizarFormularioCompleto(dados) {
         </div>
         <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_ENDERECO}</span>
-          <span class="form-view-value">${_esc(ping.Endereco || '—')}</span>
+          <span class="form-view-value">${_esc(unidade.Endereco || ping.Endereco || '—')}</span>
         </div>
         <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_COORDS}</span>
@@ -9880,7 +9880,7 @@ function baixarPdfFormulario() {
       
       <h2>📍 Dados do Ponto</h2>
       <div class="row"><span class="label">Código:</span><span class="value">${_esc(ping.Codigo || ping.ID_Ping || '—')}</span></div>
-      <div class="row"><span class="label">Endereço:</span><span class="value">${_esc(ping.Endereco || '—')}</span></div>
+      <div class="row"><span class="label">Endereço:</span><span class="value">${_esc(unidade.Endereco || ping.Endereco || '—')}</span></div>
       <div class="row"><span class="label">Coordenadas:</span><span class="value">${ping.Latitude || '—'}, ${ping.Longitude || '—'}</span></div>
       <div class="row"><span class="label">Voluntário:</span><span class="value">${_esc(ping.Voluntario_Responsavel || '—')}</span></div>
       <div class="row"><span class="label">Status:</span><span class="value">${ping.Status || '—'}</span></div>
