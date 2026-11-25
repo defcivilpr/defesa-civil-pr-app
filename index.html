@@ -796,7 +796,7 @@ const CONFIG = {
     FILTRO_TODAS_AREAS:  "Todas as áreas",
     FILTRO_TODOS_STATUS: "Todos os status",
     // Placeholder búsqueda
-    BUSCA_PLACEHOLDER:   "Buscar por endereço, área ou voluntário...",
+    BUSCA_PLACEHOLDER:   "Buscar por endereço ou voluntário...",
     // Mensajes
     SEM_MAPA:      "—",
     SEM_AREA:      "—",
@@ -5849,12 +5849,13 @@ function aplicarFiltrosPings() {
   
   // Filtrar por búsqueda de texto
   if (busca) {
-    resultado = resultado.filter(p =>
-      (p.Endereco || '').toLowerCase().includes(busca) ||
-      (p.Codigo || '').toLowerCase().includes(busca) ||
-      (p.Voluntario_Responsavel || '').toLowerCase().includes(busca) ||
-      (p.Tipo_Unidade || '').toLowerCase().includes(busca)
-    );
+    const norm = v => String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = norm(busca);
+    resultado = resultado.filter(p => {
+      const form = (ESTADO.formularios || []).find(f => f.ID_Ping === p.ID_Ping) || {};
+      return [form.Endereco || p.Endereco, p.Codigo, p.Voluntario_Responsavel, p.Tipo_Unidade]
+        .some(v => norm(v).includes(q));
+    });
   }
   
   renderizarPings(resultado);
