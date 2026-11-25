@@ -7113,7 +7113,7 @@ async function _sincronizarFilaInterno() {
         const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
         const intentos = (intentosActuales || 0) + 1;
         
-        const r = await chamarBackend(dados);
+        const r = await chamarBackend(dados, true);
         if (r.sucesso) {
           await idbDelete(CONFIG.IDB.STORE_FOTOS, _id);
           fotosEnviadas++;
