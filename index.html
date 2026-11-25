@@ -8891,6 +8891,7 @@ async function submitForm() {
       ESTADO.pingsVol[idx].Status = ehCritico
         ? CONFIG.STATUS_PING.CRITICO
         : CONFIG.STATUS_PING.CONCLUIDO;
+      if (end) ESTADO.pingsVol[idx].Endereco = end;
       try {
         sessionStorage.setItem(
           CONFIG.STORAGE.PINGS_CACHE,
