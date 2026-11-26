@@ -591,8 +591,8 @@ const CONFIG = {
   // ── Upload de fotos — B-20 ───────────────────────────────────
   FOTOS: {
     MAX_TAMANHO_MB:  5,
-    QUALIDADE_JPEG:  0.5,
-    LARGURA_MAX_PX:  640,
+    QUALIDADE_JPEG:  0.6,
+    LARGURA_MAX_PX:  1024,
     TIPOS_ACEITOS:   ["image/jpeg", "image/png", "image/webp"],
     EXTENSOES:       ".jpg,.jpeg,.png,.webp",
   },
@@ -8879,7 +8879,8 @@ async function submitForm() {
   }
 
   if (enviado) {
-    await enviarFotosBackend(pingAtualForm, volNome);
+    await enviarFotosBackend(pingAtualForm, volNome, true);   // fotos vão para a fila
+    _sincronizarFila();                                       // e sobem por trás, sem bloquear
   } else {
     await _reemplazarEnColaOffline(dados);
     await enviarFotosBackend(pingAtualForm, volNome, true);
