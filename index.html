@@ -614,6 +614,22 @@ const CONFIG = {
     CACHE_LISTA:      "pings_vol_",     // lista guardada no celular (abre sem sinal)
   },
 
+  // ── Mover ponto (só o voluntário, dentro da área) ────────────
+  MOVER: {
+    BTN:            "📍 Mover ponto",
+    AVISO:          "Arraste o ponto até o local exato",
+    BTN_CONFIRMAR:  "✔ Confirmar",
+    BTN_CANCELAR:   "✖ Cancelar",
+    PERGUNTA:       "Mover {codigo} {dist} m? Confirmar",
+    FORA_AREA:      "⚠️ O ponto deve ficar dentro da sua área",
+    MOVIDO:         "📍 Ponto movido",
+    BTN_DESFAZER:   "↩ Desfazer",
+    DESFEITO:       "↩ Movimento desfeito",
+    DESFAZER_MS:    10000,
+    SEM_MUDANCA_M:  0.5,               // abaixo disso não conta como movimento
+    DECIMAIS:       7,                 // precisão gravada (≈1 cm)
+  },
+
   // ── [V8.2] Polling de notificaciones ─────────────────────────
   POLLING: {
     INTERVALO_MS: 30000,  // 30 segundos
@@ -3605,6 +3621,7 @@ textarea{resize:vertical;min-height:65px;}
     <div class="bsp-btns">
       <button class="bsp-btn-nav"  id="bspBtnNav"  onclick="_onBspNav()"></button>
       <button class="bsp-btn-form" id="bspBtnForm" onclick="_onBspForm()"></button>
+      <button class="bsp-btn-nav"  id="bspBtnMover" onclick="_onBspMover()" style="grid-column:1/-1"></button>
     </div>
   </div>
 
@@ -4774,8 +4791,7 @@ function carregarMarcadoresPings() {
     // [F4] Mostrar código legible no popup — fallback para ID se não existir
     const codigo = p.Codigo || p.codigo || '';
     const m = L.marker([parseFloat(p.Latitude), parseFloat(p.Longitude)], {
-      icon,
-      draggable: true,  // [B5] Pin arrastrable — código no cambia al mover
+      icon,   // [Trabalho 2] coordenador não move pontos (só o voluntário)
     })
       .addTo(mapCoord)
       .bindPopup(`
@@ -4783,67 +4799,11 @@ function carregarMarcadoresPings() {
         <strong style="font-family:'Rajdhani',sans-serif">${_esc(p.Endereco)||'Ping'}</strong><br>
         <span style="color:${cor};font-size:11px">${CONFIG.STATUS_LABEL[p.Status]||p.Status}</span>`);
 
-    // [B5] Listener dragend — verificar área y guardar nueva posición
-    const latOrig = parseFloat(p.Latitude);
-    const lngOrig = parseFloat(p.Longitude);
-    const idAreaOrig = p.ID_Area || '';
-
-    m.on('dragend', async function(ev) {
-      const nuevaPos = ev.target.getLatLng();
-      const nuevaLat = nuevaPos.lat;
-      const nuevaLng = nuevaPos.lng;
-
-      // Verificar que el nuevo punto sigue dentro del área original
-      const areaEnNuevaPosicion = detectarAreaPorPonto(nuevaLat, nuevaLng);
-      const mismaArea = areaEnNuevaPosicion && areaEnNuevaPosicion.ID_Area === idAreaOrig;
-
-      if (!mismaArea) {
-        // Revertir al original — el pin no puede salir de su área
-        ev.target.setLatLng([latOrig, lngOrig]);
-        toast(CONFIG.UI_CICLO.PING_FORA_AREA);
-        return;
-      }
-
-      toast(CONFIG.UI_CICLO.PING_MOVENDO);
-      await moverPing(p.ID_Ping, nuevaLat, nuevaLng);
-    });
 
     pingMarkers.push(m);
   });
 }
 
-// ── [B5] moverPing ───────────────────────────────────────────
-// Actualiza lat/lng del ping en el backend.
-// El Codigo es inmutable — no se toca nunca.
-// Si éxito → actualiza ESTADO.pings en memoria (sin recargar todo).
-// Si error → revierte el marcador a la posición original.
-async function moverPing(idPing, lat, lng) {
-  try {
-    const r = await chamarBackend({
-      acao:      CONFIG.ACOES.MOVER_PING,
-      id:        idPing,
-      latitude:  lat,
-      longitude: lng,
-    });
-    if (r.sucesso) {
-      // Actualizar coordenadas en ESTADO.pings sin recargar todo
-      const idx = ESTADO.pings.findIndex(p => p.ID_Ping === idPing);
-      if (idx >= 0) {
-        ESTADO.pings[idx].Latitude  = lat;
-        ESTADO.pings[idx].Longitude = lng;
-      }
-      toast(CONFIG.UI_CICLO.PING_MOVIDO_OK);
-    } else {
-      // Error del backend — recargar para restaurar posición real
-      toast('⚠️ ' + (r.mensagem || CONFIG.UI.TOAST_BACKEND_ERR));
-      await carregarDadosCoord();
-    }
-  } catch(e) {
-    toast(CONFIG.UI.TOAST_BACKEND_ERR);
-    await carregarDadosCoord();
-  }
-}
-// ── FIM [B5] ─────────────────────────────────────────────────
 
 // Carrega polígonos das áreas salvas no backend e os desenha no mapa
 function carregarPoligonosAreas() {
@@ -6954,6 +6914,17 @@ async function idbGetAll(store) {
   });
 }
 
+// Atualiza um item existente (stores com _id): mantém o mesmo registro, sem duplicar
+async function idbPut(store, dados) {
+  const db  = await abrirIDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(dados);
+    req.onsuccess = () => resolve();
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
 async function idbDelete(store, id) {
   const db  = await abrirIDB();
   return new Promise((resolve, reject) => {
@@ -7079,6 +7050,7 @@ async function _sincronizarFilaInterno() {
   try {
     const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
     for (const item of fila) {
+      if (!item.acao) { try { await idbDelete(CONFIG.IDB.STORE_FILA, item._id); } catch(de) {} continue; }  // cópia inválida antiga
       try {
         const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
         const intentos = (intentosActuales || 0) + 1;
@@ -7098,7 +7070,7 @@ async function _sincronizarFilaInterno() {
             console.warn('Item removido da fila após', MAX_REINTENTOS, 'tentativas:', dados.acao, dados.idPing);
           } else {
             // Actualizar contador de intentos
-            await idbSet(CONFIG.IDB.STORE_FILA, _id, { ...item, [CAMPO_INTENTOS]: intentos });
+            await idbPut(CONFIG.IDB.STORE_FILA, { ...item, [CAMPO_INTENTOS]: intentos });
           }
         }
       } catch(e) {
@@ -7107,7 +7079,7 @@ async function _sincronizarFilaInterno() {
         if (intentos >= MAX_REINTENTOS) {
           try { await idbDelete(CONFIG.IDB.STORE_FILA, item._id); fallidos++; } catch(de) {}
         } else {
-          try { await idbSet(CONFIG.IDB.STORE_FILA, item._id, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
+          try { await idbPut(CONFIG.IDB.STORE_FILA, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
         }
       }
     }
@@ -7153,6 +7125,7 @@ async function _sincronizarFilaInterno() {
   try {
     const filaFotos = await idbGetAll(CONFIG.IDB.STORE_FOTOS);
     for (const item of filaFotos) {
+      if (!item.acao) { try { await idbDelete(CONFIG.IDB.STORE_FOTOS, item._id); } catch(de) {} continue; }  // cópia inválida antiga
       try {
         const { _id, _ts, [CAMPO_INTENTOS]: intentosActuales, ...dados } = item;
         const intentos = (intentosActuales || 0) + 1;
@@ -7166,7 +7139,7 @@ async function _sincronizarFilaInterno() {
             await idbDelete(CONFIG.IDB.STORE_FOTOS, _id);
             fallidos++;
           } else {
-            await idbSet(CONFIG.IDB.STORE_FOTOS, _id, { ...item, [CAMPO_INTENTOS]: intentos });
+            await idbPut(CONFIG.IDB.STORE_FOTOS, { ...item, [CAMPO_INTENTOS]: intentos });
           }
         }
       } catch(e) {
@@ -7174,7 +7147,7 @@ async function _sincronizarFilaInterno() {
         if (intentos >= MAX_REINTENTOS) {
           try { await idbDelete(CONFIG.IDB.STORE_FOTOS, item._id); fallidos++; } catch(de) {}
         } else {
-          try { await idbSet(CONFIG.IDB.STORE_FOTOS, item._id, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
+          try { await idbPut(CONFIG.IDB.STORE_FOTOS, { ...item, [CAMPO_INTENTOS]: intentos }); } catch(se) {}
         }
       }
     }
@@ -7257,7 +7230,7 @@ function _enviarAoSair() {
   idbGetAll(CONFIG.IDB.STORE_FILA).then(fila => {
     const token = obterToken();
     const pingsNaFila = new Set(fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING).map(it => it.idPing));
-    fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING ||
+    fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING || it.acao === CONFIG.ACOES.MOVER_PING ||
                       (it.acao === CONFIG.ACOES.SALVAR_FORMULARIO && !pingsNaFila.has(it.idPing))).forEach(item => {
       const { _id, _ts, [CONFIG.IDB.CAMPO_INTENTOS]: _i, ...dados } = item;
       const body = JSON.stringify(token ? { ...dados, token } : dados);
@@ -8175,6 +8148,12 @@ function renderizarPingsVol() {
         }
       });
     
+    marker._idPing = p.ID_Ping;   // [Trabalho 2] para achar o marcador ao mover
+    if (_movendo && _movendo.ping.ID_Ping === p.ID_Ping && marker.dragging) {   // redesenho no modo mover: segue arrastável
+      marker.setLatLng(_movendo.marker.getLatLng());
+      marker.dragging.enable();
+      _movendo.marker = marker;
+    }
     _markersVol.push(marker);
   });
   
@@ -9422,6 +9401,7 @@ function abrirBottomSheetPin(ping) {
   const btnForm = document.getElementById('bspBtnForm');
   if (btnNav)  btnNav.textContent  = CONFIG.UI_ACOES.BTN_IR_PIN;
   if (btnForm) btnForm.textContent = CONFIG.UI_ACOES.BTN_INICIAR_REL;
+  _txt('bspBtnMover', CONFIG.MOVER.BTN);
 
   // Aplicar color del status al código
   const codigoEl = document.getElementById('bspCodigo');
@@ -9449,6 +9429,138 @@ function _fecharBottomSheet() {
   _pingBspAtual = null;
 }
 
+// ── [Trabalho 2] Mover ponto — só o voluntário, só os seus pontos, dentro da área ──
+var _movendo = null;   // { ping, marker } — var: existe desde o carregamento
+
+function _onBspMover() {
+  const p = _pingBspAtual;
+  if (!p || !p._esMio) return;
+  const marker = (_markersVol || []).find(m => m._idPing === p.ID_Ping);
+  if (!marker || !marker.dragging) return;
+  _fecharBottomSheet();
+  if (_movendo) _cancelarMover();
+  _movendo = { ping: p, marker: marker };
+  marker.dragging.enable();
+  _barraMover(true);
+}
+
+function _barraMover(mostrar) {
+  const M = CONFIG.MOVER;
+  let el = document.getElementById('barraMover');
+  if (!mostrar) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'barraMover';
+    el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:3000;' +
+      'background:var(--navy-mid);border:1px solid var(--orange);border-radius:12px;padding:10px 12px;' +
+      'display:flex;gap:8px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:calc(100% - 24px)';
+    document.body.appendChild(el);
+  }
+  el.innerHTML =
+    `<span style="font-size:12px;color:var(--text)">${M.AVISO}</span>` +
+    `<button class="bsp-btn-form" style="padding:8px 10px" onclick="_confirmarMover()">${M.BTN_CONFIRMAR}</button>` +
+    `<button class="bsp-btn-nav" style="padding:8px 10px" onclick="_cancelarMover()">${M.BTN_CANCELAR}</button>`;
+}
+
+function _cancelarMover() {
+  if (_movendo) {
+    const { marker, ping } = _movendo;
+    if (marker.dragging) marker.dragging.disable();
+    marker.setLatLng([parseFloat(ping.Latitude), parseFloat(ping.Longitude)]);   // volta ao lugar exato
+  }
+  _movendo = null;
+  _barraMover(false);
+}
+
+function _dentroDaArea(ping, lat, lng) {
+  const area = (ESTADO.areas || []).find(a => a.ID_Area === ping.ID_Area) || _areaVolObj || null;
+  if (!area || !area.Pontos_Poligono) return true;
+  try { return puntoEnPoligono(lat, lng, JSON.parse(area.Pontos_Poligono)); } catch(e) { return true; }
+}
+
+async function _confirmarMover() {
+  if (!_movendo) return;
+  const M = CONFIG.MOVER;
+  const { marker, ping } = _movendo;
+  const pos  = marker.getLatLng();
+  const dist = _distanciaM(parseFloat(ping.Latitude), parseFloat(ping.Longitude), pos.lat, pos.lng);
+  if (!(dist >= M.SEM_MUDANCA_M)) { _cancelarMover(); return; }      // não mexeu
+  if (!_dentroDaArea(ping, pos.lat, pos.lng)) { toast(M.FORA_AREA); return; }   // segue no modo mover
+  const msg = M.PERGUNTA.replace('{codigo}', ping.Codigo || '').replace('{dist}', Math.round(dist));
+  if (!confirm(msg)) return;                                           // segue no modo mover
+  const antes = { lat: ping.Latitude, lng: ping.Longitude };           // valores exatos originais
+  if (marker.dragging) marker.dragging.disable();
+  _movendo = null;
+  _barraMover(false);
+  const ok = await _aplicarMovimento(ping.ID_Ping,
+    Number(pos.lat.toFixed(M.DECIMAIS)), Number(pos.lng.toFixed(M.DECIMAIS)));
+  if (ok) _mostrarDesfazer(ping.ID_Ping, antes);
+}
+
+// Grava o movimento: no celular primeiro, depois servidor (ou fila). Devolve true se aplicado.
+async function _aplicarMovimento(idPing, lat, lng) {
+  const M = CONFIG.MOVER;
+  const alvo = (ESTADO.pingsVol || []).find(p => p.ID_Ping === idPing);
+  if (!alvo) return false;
+  const antes = { lat: alvo.Latitude, lng: alvo.Longitude };
+  const s = ESTADO.sessao || {};
+  const salvarLocal = async () => {
+    try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e) {}
+    try { await idbSet(CONFIG.IDB.STORE_CACHE, CONFIG.PING_LOCAL.CACHE_LISTA + (s.Nome || s.nome || s.usuario || '').trim(), ESTADO.pingsVol); } catch(e) {}
+  };
+  alvo.Latitude = lat; alvo.Longitude = lng;
+  await salvarLocal();
+
+  try {
+    const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
+    const pend = fila.find(it => it.acao === CONFIG.ACOES.SALVAR_PING && it.idPing === idPing);
+    if (pend) {
+      // Ponto ainda não chegou ao servidor: corrige as coordenadas dele na própria fila
+      pend.latitude = lat; pend.longitude = lng;
+      await idbPut(CONFIG.IDB.STORE_FILA, pend);
+    } else {
+      const dados = { acao: CONFIG.ACOES.MOVER_PING, id: idPing, idPing: idPing, latitude: lat, longitude: lng };
+      let r = null;
+      if (!offlineVol) { try { r = await chamarBackend(dados); } catch(e) { r = null; } }
+      if (r && !r.sucesso) {                                   // recusado: volta ao lugar anterior
+        alvo.Latitude = antes.lat; alvo.Longitude = antes.lng;
+        await salvarLocal();
+        toast('⚠️ ' + (r.mensagem || CONFIG.UI.TOAST_BACKEND_ERR));
+        renderizarPingsVol();
+        return false;
+      }
+      if (!r) {                                                // sem sinal: fila guarda só o último movimento
+        for (const it of fila) {
+          if (it.acao === CONFIG.ACOES.MOVER_PING && it.idPing === idPing) await idbDelete(CONFIG.IDB.STORE_FILA, it._id);
+        }
+        await guardarFilaOffline(dados);
+      }
+    }
+  } catch(e) { console.warn('[Mover]', e); }
+
+  renderizarPingsVol();
+  if (typeof _atualizarBadgeSync === 'function') _atualizarBadgeSync();
+  toast(M.MOVIDO);
+  return true;
+}
+
+function _mostrarDesfazer(idPing, antes) {
+  const M = CONFIG.MOVER;
+  let el = document.getElementById('btnDesfazerMover');
+  if (el) el.remove();
+  el = document.createElement('button');
+  el.id = 'btnDesfazerMover';
+  el.className = 'bsp-btn-form';
+  el.textContent = M.BTN_DESFAZER;
+  el.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:3000;padding:12px 18px';
+  el.onclick = async () => {
+    el.remove();
+    if (await _aplicarMovimento(idPing, antes.lat, antes.lng)) toast(M.DESFEITO);
+  };
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.isConnected) el.remove(); }, M.DESFAZER_MS);
+}
+     
 // Llamado por el botón "🧭 Ir a este ponto" de la bottom sheet
 function _onBspNav() {
   if (!_pingBspAtual) return;
