@@ -3481,9 +3481,8 @@ textarea{resize:vertical;min-height:65px;}
           <div class="field">
             <label>Coordenadas GPS</label>
             <div class="gps-row">
-              <input type="text" id="fLat" placeholder="Latitude">
-              <input type="text" id="fLng" placeholder="Longitude">
-              <button class="gps-btn" id="btnGpsForm" onclick="captureGPS()"></button>
+              <input type="text" id="fLat" placeholder="Latitude" readonly tabindex="-1" style="opacity:.7">
+              <input type="text" id="fLng" placeholder="Longitude" readonly tabindex="-1" style="opacity:.7">
             </div>
           </div>
         </div>
@@ -3962,7 +3961,6 @@ function renderizarTextos() {
   _html('secFotos',      U.SEC_FOTOS);
   _txt('autosavePill',   U.FORM_AUTOSAVE);
   _txt('btnEnviarForm',  U.FORM_BTN_ENVIAR);
-  _txt('btnGpsForm',     U.FORM_GPS_BTN);
   _txt('btnAddResidente',U.FORM_ADD_RESIDENTE);
   _txt('btnSyncAgora',   U.SYNC_BTN);
 
@@ -8472,13 +8470,18 @@ async function abrirFormulario(idPingOuObj, nomeEndereco) {
       toast(CONFIG.UI_FORM_EDIT.TOAST_CARREGADO);
     }
   } else if (pingAtualDados) {
-    // Formulario nuevo — solo prellenar endereço y coords del ping
+    // Formulario nuevo — solo prellenar endereço del ping
     const endEl = document.getElementById('fEndereco');
     if (endEl && !endEl.value) endEl.value = pingAtualDados.Endereco || '';
+  }
+
+  // Coordenadas: sempre as do ponto (única fonte de verdade), só leitura
+  if (pingAtualDados) {
     const latEl = document.getElementById('fLat');
     const lngEl = document.getElementById('fLng');
-    if (latEl && !latEl.value && pingAtualDados.Latitude)  latEl.value = pingAtualDados.Latitude;
-    if (lngEl && !lngEl.value && pingAtualDados.Longitude) lngEl.value = pingAtualDados.Longitude;
+    const vazio = v => v === undefined || v === null ? '' : v;
+    if (latEl) latEl.value = vazio(pingAtualDados.Latitude);
+    if (lngEl) lngEl.value = vazio(pingAtualDados.Longitude);
   }
 }
 
@@ -8660,23 +8663,6 @@ function goStep(n) {
   }
 }
 
-function captureGPS() {
-  toast(CONFIG.UI.TOAST_GPS_CAPTURA);
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        document.getElementById('fLat').value = pos.coords.latitude.toFixed(6);
-        document.getElementById('fLng').value = pos.coords.longitude.toFixed(6);
-        toast(CONFIG.UI.TOAST_GPS_OK);
-      },
-      () => {
-        document.getElementById('fLat').value = (CONFIG.MAPA.LAT_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        document.getElementById('fLng').value = (CONFIG.MAPA.LNG_PADRAO + (Math.random()-.5)*.005).toFixed(6);
-        toast(CONFIG.UI.TOAST_GPS_SIMULADO);
-      }
-    );
-  }
-}
 
 function coletarChipsSelecionados(containerId) {
   const el = document.getElementById(containerId);
