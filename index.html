@@ -598,6 +598,22 @@ const CONFIG = {
     EXTENSOES:       ".jpg,.jpeg,.png,.webp",
   },
 
+  // ── Pontos criados no celular (sem sinal, sem duplicar) ──────
+  PING_LOCAL: {
+    PREFIXO_ID:       "PNG",            // deve bater com CONFIG.PING_NOVO.ID_REGEX do backend
+    CODIGO_PENDENTE:  "⏳ pendente",
+    TITULO_NOVO:      "Novo Ponto",
+    DIST_DUPLICADO_M: 15,               // aviso de ponto parecido (metros)
+    MSG_DUPLICADO:    "Já existe o ponto {codigo} a {dist} m ({endereco}). Criar mesmo assim?",
+    MSG_DUP_ENDERECO: "Já existe o ponto {codigo} com o mesmo endereço ({endereco}). Criar mesmo assim?",
+    ETIQUETA_MEU:     "Meu",
+    COR_MEU:          "#F4521E",
+    COR_OUTRO:        "#64748B",
+    SEM_DESIGNACAO:   "não designado",
+    MSG_OUTRO:        "ℹ️ Este ponto pertence a outro voluntário.",
+    CACHE_LISTA:      "pings_vol_",     // lista guardada no celular (abre sem sinal)
+  },
+
   // ── [V8.2] Polling de notificaciones ─────────────────────────
   POLLING: {
     INTERVALO_MS: 30000,  // 30 segundos
@@ -7225,7 +7241,11 @@ async function _atualizarBadgeSync() {
 // [E] A cada intervalo: se houver pendentes e sinal, envia em silêncio
 async function _syncAutoTick() {
   if (!ESTADO.sessao || !navigator.onLine) { _atualizarBadgeSync(); return; }
-  if (await _contarPendentes() > 0) await _sincronizarFila();
+  if (await _contarPendentes() > 0) {
+    const r = await _sincronizarFila();
+    // Ponto criado sem sinal já chegou ao servidor: recarrega para mostrar o código real
+    if (r.enviados > 0 && (ESTADO.pingsVol || []).some(p => p._pendente)) await carregarPingsVol();
+  }
   else _atualizarBadgeSync();
 }
 setInterval(_syncAutoTick, CONFIG.SYNC_AUTO.INTERVALO_MS);
@@ -7238,7 +7258,9 @@ function _enviarAoSair() {
   if (!navigator.onLine) return;
   idbGetAll(CONFIG.IDB.STORE_FILA).then(fila => {
     const token = obterToken();
-    fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_FORMULARIO).forEach(item => {
+    const pingsNaFila = new Set(fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING).map(it => it.idPing));
+    fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING ||
+                      (it.acao === CONFIG.ACOES.SALVAR_FORMULARIO && !pingsNaFila.has(it.idPing))).forEach(item => {
       const { _id, _ts, [CONFIG.IDB.CAMPO_INTENTOS]: _i, ...dados } = item;
       const body = JSON.stringify(token ? { ...dados, token } : dados);
       if (body.length > CONFIG.SYNC_AUTO.KEEPALIVE_MAX_BYTES) return;
@@ -8061,7 +8083,8 @@ async function carregarPingsVol(forcarBackend = true) {
         try { 
           sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); 
         } catch(e) {}
-        
+        // Cópia duradoura no celular: a lista aparece mesmo reabrindo a app sem sinal
+        try { await idbSet(CONFIG.IDB.STORE_CACHE, CONFIG.PING_LOCAL.CACHE_LISTA + nomeVol, ESTADO.pingsVol); } catch(e) {}        
         if (!offlineVol) precalcularRutas();
       }
     } catch(e) {
@@ -8069,11 +8092,17 @@ async function carregarPingsVol(forcarBackend = true) {
       try {
         const cached = sessionStorage.getItem(CONFIG.STORAGE.PINGS_CACHE);
         if (cached) ESTADO.pingsVol = JSON.parse(cached);
+        if (!(ESTADO.pingsVol || []).length) {
+          const salvo = await idbGet(CONFIG.IDB.STORE_CACHE,
+            CONFIG.PING_LOCAL.CACHE_LISTA + (s.Nome || s.nome || s.usuario || '').trim());
+          if (Array.isArray(salvo)) ESTADO.pingsVol = salvo;
+        }
       } catch(ce) {}
       ESTADO.pingsVol = ESTADO.pingsVol || [];
     }
   }
   
+  await _mesclarPingsPendentes();   // pontos criados sem sinal (estão na fila)
   renderizarPingsVol();
 }
 
@@ -8100,36 +8129,7 @@ function renderizarPingsVol() {
   // Renderizar lista HTML
   const pingsHTML = lista.length === 0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
-    : lista.map((p,i) => {
-        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
-        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
-        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-        const esMio = p._esMio;
-        const cardStyle = esMio ? '' : 'opacity:0.6;border-left:3px solid var(--muted);';
-        const tagOtro = esMio ? '' : `<span style="font-size:9px;color:var(--muted);margin-left:6px;font-style:italic">(${p.Voluntario_Responsavel || 'não designado'})</span>`;
-        const onclickAction = esMio 
-          ? `onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')"`
-          : `onclick="toast('ℹ️ Este ponto pertence a outro voluntário.')"`;
-        
-        return `
-        <div class="ping-card" style="animation-delay:${i*0.05}s;${cardStyle}" ${onclickAction}>
-          <div class="ping-card-inner">
-            <div class="ping-status-bar" style="background:${cor}"></div>
-            <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+(_esc(p.Codigo)||'')}${tagOtro}</div>
-              <div class="ping-meta">
-                <span>${_esc(p.Codigo)||_esc(p.ID_Area)||'—'}</span>
-                <span>${_esc(p.Tipo_Unidade)||'—'}</span>
-              </div>
-            </div>
-            <div class="ping-right">
-              <span class="status-tag ${css}">${lbl}</span>
-              ${esMio ? '' : '<span style="font-size:16px;margin-left:4px">👁</span>'}
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-
+    : _ordenarPingsVol(lista).map(_cardPingVol).join('');
   const pingListEl   = document.getElementById('pingListVol');
   const pontosListEl = document.getElementById('pontosList');
   if (pingListEl)   pingListEl.innerHTML   = pingsHTML;
@@ -8150,9 +8150,9 @@ function renderizarPingsVol() {
   lista.forEach(p => {
     if (!p.Latitude || !p.Longitude) return;
     
-    const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-    const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
     const esMio = p._esMio;
+    const cor = esMio ? (CONFIG.COR_STATUS[p.Status] || '#F59E0B') : CONFIG.PING_LOCAL.COR_OUTRO;
+    const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
     const size = esMio ? 16 : 12;
     const border = esMio ? 'white' : 'rgba(255,255,255,0.4)';
     const opacity = esMio ? 1 : 0.6;
@@ -8313,22 +8313,7 @@ function filtrarPingsView(el, tipo) {
     : ESTADO.pingsVol.filter(p => p.Status === tipo);
   document.getElementById('pontosList').innerHTML = lista.length === 0
     ? `<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px">${CONFIG.UI.VOL_SEM_PINGS}</div>`
-    : lista.map((p,i) => {
-        const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
-        const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
-        const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
-        return `
-        <div class="ping-card" style="animation-delay:${i*0.05}s" onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')">
-          <div class="ping-card-inner">
-            <div class="ping-status-bar" style="background:${cor}"></div>
-            <div class="ping-info">
-              <div class="ping-name">${_esc(p.Endereco)||'Ponto'}</div>
-              <div class="ping-meta"><span>${_esc(p.ID_Area)||'—'}</span></div>
-            </div>
-            <div class="ping-right"><span class="status-tag ${css}">${lbl}</span></div>
-          </div>
-        </div>`;
-      }).join('');
+    : _ordenarPingsVol(lista).map(_cardPingVol).join('');
 }
 
 // Preencher chips filtro pontos
@@ -9062,9 +9047,30 @@ async function createNewPing() {
     }
   }
 
+  if (_criandoPing) return;                 // [5] toque duplo: ignora
+  const enderecoCompleto = addr + (comp ? ' – ' + comp : '');
+
+  // [6] Aviso de ponto parecido (perto ou mesmo endereço) — funciona sem sinal
+  const dup = _pingParecido(parseFloat(lat), parseFloat(lng), enderecoCompleto);
+  if (dup) {
+    const P = CONFIG.PING_LOCAL;
+    const msg = (dup.d <= P.DIST_DUPLICADO_M ? P.MSG_DUPLICADO : P.MSG_DUP_ENDERECO)
+      .replace('{codigo}', dup.p.Codigo || '—')
+      .replace('{dist}', isFinite(dup.d) ? Math.round(dup.d) : '?')
+      .replace('{endereco}', dup.p.Endereco || '—');
+    if (!confirm(msg)) return;
+  }
+
+  // [5] Mesmo ponto (mesmas coordenadas e endereço) = mesmo ID: reenviar não duplica
+  const chave = [lat, lng, enderecoCompleto].join('|');
+  if (!_novoPingTentativa || _novoPingTentativa.chave !== chave) {
+    _novoPingTentativa = { id: _gerarIdPingLocal(), chave: chave };
+  }
+
   const dados = {
     acao:        CONFIG.ACOES.SALVAR_PING,
-    endereco:    addr + (comp ? ' – ' + comp : ''),
+    idPing:      _novoPingTentativa.id,
+    endereco:    enderecoCompleto,
     latitude:    lat,
     longitude:   lng,
     idArea:      areaObj ? areaObj.ID_Area : '',
@@ -9074,48 +9080,130 @@ async function createNewPing() {
     voluntarioResponsavel: s ? (s.Nome || s.nome || s.usuario) : '',
     criadoPor:   s ? (s.Nome || s.nome || s.usuario) : '',
   };
+
+  _criandoPing = true;
   try {
-    let r;
-    if (offlineVol) {
-      guardarFilaOffline({ ...dados, acao: CONFIG.ACOES.SALVAR_PING });
-      r = { sucesso:true };
-    } else {
-      r = await chamarBackend(dados);
+    let r = null;
+    if (!offlineVol) {
+      try { r = await chamarBackend(dados); } catch(e) { r = null; }   // sem resposta: vai para a fila
     }
-    if (r.sucesso) {
-      toast(CONFIG.UI.TOAST_PING_CRIADO);
-      if (offlineVol) {
-        // BUG-07: em modo offline r.dados é undefined — não abrir formulário
-        setTimeout(() => closeNewPing(), 800);
-      } else {
-        setTimeout(() => {
-          closeNewPing();
-          abrirFormulario(r.dados ? r.dados.id : null, addr||'Novo Ponto');
-        }, 800);
-      }
-      // V9.2: Agregar ping nuevo al estado local
-      if (r.dados) {
-        const nomeVol = (ESTADO.sessao.Nome || ESTADO.sessao.nome || ESTADO.sessao.usuario || '').trim();
-        ESTADO.pingsVol.push({
-          ...r.dados,
-          _esMio: true,
-          Status: CONFIG.STATUS_PING.PENDENTE,
-          Voluntario_Responsavel: nomeVol,
-        });
-        try {
-          sessionStorage.setItem(
-            CONFIG.STORAGE.PINGS_CACHE,
-            JSON.stringify(ESTADO.pingsVol)
-          );
-        } catch(e) {}
-      }
-      renderizarPingsVol();
-    } else {
-      toast('⚠️ ' + r.mensagem);
-    }
-  } catch(e) { toast(CONFIG.UI.TOAST_BACKEND_ERR); }
+    if (r && !r.sucesso) { toast('⚠️ ' + r.mensagem); return; }       // recusado pelo servidor
+    if (!r) await guardarFilaOffline(dados);                          // [1][2] sem sinal: fila
+
+    // [1] O ponto aparece já na lista e no mapa (com o código real ou "pendente")
+    const local = _pingLocalDeDados(dados, r && r.dados ? r.dados.codigo : '');
+    if (!ESTADO.pingsVol.some(p => p.ID_Ping === local.ID_Ping)) ESTADO.pingsVol.push(local);
+    try { sessionStorage.setItem(CONFIG.STORAGE.PINGS_CACHE, JSON.stringify(ESTADO.pingsVol)); } catch(e) {}
+    _novoPingTentativa = null;
+
+    toast(CONFIG.UI.TOAST_PING_CRIADO);
+    renderizarPingsVol();
+    // [2] O formulário abre mesmo sem sinal
+    setTimeout(() => {
+      closeNewPing();
+      abrirFormulario(local.ID_Ping, addr || CONFIG.PING_LOCAL.TITULO_NOVO);
+    }, 800);
+  } catch(e) {
+    toast(CONFIG.UI.TOAST_BACKEND_ERR);
+  } finally {
+    _criandoPing = false;
+  }
 }
 
+// ── Pontos criados no celular ──────────────────────────────────
+let _criandoPing = false;
+let _novoPingTentativa = null;
+
+function _gerarIdPingLocal() {
+  return CONFIG.PING_LOCAL.PREFIXO_ID + '-' + Date.now().toString(36).toUpperCase() + '-' +
+         Math.random().toString(36).substring(2, 6).toUpperCase();
+}
+
+function _pingLocalDeDados(d, codigo) {
+  return {
+    ID_Ping: d.idPing, ID_Area: d.idArea, ID_Mapa: d.idMapa,
+    Endereco: d.endereco, Latitude: d.latitude, Longitude: d.longitude,
+    Status: CONFIG.STATUS_PING.PENDENTE,
+    Voluntario_Responsavel: d.voluntarioResponsavel,
+    Codigo: codigo || CONFIG.PING_LOCAL.CODIGO_PENDENTE,
+    _esMio: true,
+    _pendente: !codigo,
+  };
+}
+
+// [1][3] Pontos ainda na fila (sobrevivem ao fechar a app) entram na lista
+async function _mesclarPingsPendentes() {
+  try {
+    const fila = await idbGetAll(CONFIG.IDB.STORE_FILA);
+    ESTADO.pingsVol = ESTADO.pingsVol || [];
+    fila.filter(it => it.acao === CONFIG.ACOES.SALVAR_PING && it.idPing).forEach(it => {
+      if (!ESTADO.pingsVol.some(p => p.ID_Ping === it.idPing)) ESTADO.pingsVol.push(_pingLocalDeDados(it, ''));
+    });
+  } catch(e) {}
+}
+
+function _distanciaM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, r = Math.PI / 180;
+  const a = Math.sin((lat2 - lat1) * r / 2) ** 2 +
+            Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lng2 - lng1) * r / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function _normEndereco(v) {
+  return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+// [6] Ponto mais próximo dentro do raio, ou com o mesmo endereço
+function _pingParecido(lat, lng, endereco) {
+  const lim = CONFIG.PING_LOCAL.DIST_DUPLICADO_M, e = _normEndereco(endereco);
+  let melhor = null;
+  (ESTADO.pingsVol || []).forEach(p => {
+    const la = parseFloat(p.Latitude), lo = parseFloat(p.Longitude);
+    const d = (isNaN(la) || isNaN(lo) || isNaN(lat) || isNaN(lng)) ? Infinity : _distanciaM(lat, lng, la, lo);
+    const mesmoEnd = !!e && _normEndereco(p.Endereco) === e;
+    if ((d <= lim || mesmoEnd) && (!melhor || d < melhor.d)) melhor = { p: p, d: d };
+  });
+  return melhor;
+}
+
+// [7] Meus pontos primeiro
+function _ordenarPingsVol(lista) {
+  return lista.slice().sort((a, b) => (b._esMio ? 1 : 0) - (a._esMio ? 1 : 0));
+}
+
+// [7] Card único da lista (meus: borda colorida + "Meu"; de outros: cinza)
+function _cardPingVol(p, i) {
+  const P = CONFIG.PING_LOCAL;
+  const css = CONFIG.STATUS_CSS[p.Status] || 's-pending';
+  const lbl = CONFIG.STATUS_LABEL[p.Status] || p.Status;
+  const cor = CONFIG.COR_STATUS[p.Status] || '#F59E0B';
+  const esMio = p._esMio;
+  const cardStyle = esMio ? `border-left:4px solid ${P.COR_MEU};` : `opacity:0.6;border-left:3px solid ${P.COR_OUTRO};`;
+  const tag = esMio
+    ? `<span style="font-size:9px;font-weight:700;color:#fff;background:${P.COR_MEU};border-radius:4px;padding:1px 5px;margin-left:6px">${P.ETIQUETA_MEU}</span>`
+    : `<span style="font-size:9px;color:var(--muted);margin-left:6px;font-style:italic">(${_esc(p.Voluntario_Responsavel) || P.SEM_DESIGNACAO})</span>`;
+  const onclickAction = esMio
+    ? `onclick="abrirFormulario('${_esc(p.ID_Ping)}','${(_esc(p.Endereco)||'Ponto').replace(/'/g,"\\'")}')"`
+    : `onclick="toast('${P.MSG_OUTRO}')"`;
+  return `
+        <div class="ping-card" style="animation-delay:${i*0.05}s;${cardStyle}" ${onclickAction}>
+          <div class="ping-card-inner">
+            <div class="ping-status-bar" style="background:${cor}"></div>
+            <div class="ping-info">
+              <div class="ping-name">${_esc(p.Endereco)||'Ponto '+(_esc(p.Codigo)||'')}${tag}</div>
+              <div class="ping-meta">
+                <span>${_esc(p.Codigo)||_esc(p.ID_Area)||'—'}</span>
+                <span>${_esc(p.Tipo_Unidade)||'—'}</span>
+              </div>
+            </div>
+            <div class="ping-right">
+              <span class="status-tag ${css}">${lbl}</span>
+              ${esMio ? '' : '<span style="font-size:16px;margin-left:4px">👁</span>'}
+            </div>
+          </div>
+        </div>`;
+}
 // ════════════════════════════════════════════════════════════════
 // UPLOAD DE FOTOS — B-20
 // ════════════════════════════════════════════════════════════════
