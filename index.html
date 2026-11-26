@@ -309,6 +309,7 @@ const CONFIG = {
     { id:"pings",       icon:"📍",  label:"Pontos (Pings)",  grupo:"Gestão",         badge:"nb-pings" },
     { id:"voluntarios", icon:"👥",  label:"Voluntários",     grupo:"Gestão",         badge:"nb-vols",  badgeClass:"g" },
     { id:"monitoreo",   icon:"📊",  label:"Progresso",       grupo:"Monitoramento",  badge:"nb-mon",   badgeClass:"y" },
+    { id:"relatorio", icon:"📋", label:"Relatório de pendências", grupo:"Monitoramento" },
   ],
 
   // ── Views do voluntário (bottom nav) ────────────────────────
@@ -10153,6 +10154,137 @@ function validarFormulario(dados, esquema) {
 <!-- ============================================================
      FIM SECCIÓN 9 — VOLUNTARIO
      ============================================================ -->
+<!-- ============================================================
+     SECCIÓN 10 — COORD: Relatório de pendências (módulo separado)
+     Ligação com o resto: 1 item em CONFIG.PAGINAS_COORD (id "relatorio").
+     ============================================================ -->
+<script id="s10-relatorio">
+const RELATORIO_UI = {
+  ID_MENU:     "relatorio",
+  ACAO:        "relatorioPendencias",
+  LIB_URL:     "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js",
+  ARQUIVO:     "Pendencias_Voluntarios_{data}.xlsx",
+  ABA:         "Pendências",
+  FONTE:       "Arial",
+  FONTE_TAM:   10,
+  COR_CAB_FUNDO: "FF0B1628",
+  COR_CAB_TEXTO: "FFFFFFFF",
+  COR_BORDA:     "FFD0D0D0",
+  COLUNAS: [
+    { titulo: "Voluntário",  campo: "voluntario", largura: 22 },
+    { titulo: "Ponto",       campo: "ponto",      largura: 8  },
+    { titulo: "Endereço",    campo: "endereco",   largura: 38 },
+    { titulo: "Pendência",   campo: "pendencia",  largura: 20 },
+    { titulo: "Detalhe",     campo: "detalhe",    largura: 40 },
+    { titulo: "O que fazer", campo: "acao",       largura: 36 },
+    { titulo: "Confirmar",   campo: "confirmar",  largura: 40 },
+  ],
+  COLUNA_COR: "pendencia",
+  CORES: {
+    SEM_FORMULARIO:  "FFFDE2E1",
+    FOTOS_QUEBRADAS: "FFFFF2CC",
+    FOTOS_FALTANDO:  "FFFFF2CC",
+    RESIDENTES:      "FFE2EFDA",
+    CAMPOS_VAZIOS:   "FFDDEBF7",
+    SO_CONFIRMAR:    "FFF2F2F2",
+  },
+  MSG: {
+    GERANDO:  "📋 Gerando relatório de pendências...",
+    PRONTO:   "✅ Relatório baixado.",
+    VAZIO:    "✅ Nenhuma pendência encontrada.",
+    ERRO:     "⚠️ Não foi possível gerar o relatório. Verifique a conexão.",
+  },
+};
 
+let _relLibPromise = null;
+let _relGerando = false;
+
+function _relCarregarLib() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (!_relLibPromise) {
+    _relLibPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = RELATORIO_UI.LIB_URL;
+      s.onload  = () => resolve(window.ExcelJS);
+      s.onerror = () => { _relLibPromise = null; reject(new Error('lib')); };
+      document.head.appendChild(s);
+    });
+  }
+  return _relLibPromise;
+}
+
+function _relMontarPlanilha(ExcelJS, linhas) {
+  const R = RELATORIO_UI;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(R.ABA, { views: [{ state: 'frozen', ySplit: 1 }] });
+  ws.columns = R.COLUNAS.map(c => ({ header: c.titulo, key: c.campo, width: c.largura }));
+  linhas.forEach(l => ws.addRow(R.COLUNAS.reduce((o, c) => (o[c.campo] = l[c.campo] || '', o), {})));
+
+  const fonte  = { name: R.FONTE, size: R.FONTE_TAM };
+  const borda  = { bottom: { style: 'thin', color: { argb: R.COR_BORDA } } };
+  const iCor   = R.COLUNAS.findIndex(c => c.campo === R.COLUNA_COR) + 1;
+  ws.eachRow((row, n) => {
+    row.eachCell({ includeEmpty: true }, cell => {
+      cell.font = fonte;
+      cell.alignment = { vertical: 'top', wrapText: true };
+      cell.border = borda;
+    });
+    if (n === 1) {
+      row.eachCell({ includeEmpty: true }, cell => {
+        cell.font = { ...fonte, bold: true, color: { argb: R.COR_CAB_TEXTO } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: R.COR_CAB_FUNDO } };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+    } else {
+      const cor = R.CORES[linhas[n - 2].tipo];
+      if (cor) row.getCell(iCor).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } };
+    }
+  });
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(ws.rowCount, 1), column: R.COLUNAS.length } };
+  return wb;
+}
+
+async function baixarRelatorioPendencias() {
+  const R = RELATORIO_UI;
+  if (_relGerando) return;
+  _relGerando = true;
+  toast(R.MSG.GERANDO);
+  try {
+    const [ExcelJS, r] = await Promise.all([ _relCarregarLib(), chamarBackend({ acao: R.ACAO }) ]);
+    if (!r || !r.sucesso || !Array.isArray(r.dados)) throw new Error((r && r.mensagem) || 'backend');
+    if (!r.dados.length) { toast(R.MSG.VAZIO); return; }
+    const buf  = await _relMontarPlanilha(ExcelJS, r.dados).xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const hoje = new Date();
+    const data = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+    a.href = url;
+    a.download = R.ARQUIVO.replace('{data}', data);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    toast(R.MSG.PRONTO);
+  } catch (e) {
+    console.warn('[Relatório]', e);
+    toast(R.MSG.ERRO);
+  } finally {
+    _relGerando = false;
+  }
+}
+
+// O item do menu chama navegarCoord(id): aqui ele baixa o relatório sem trocar de página
+(function () {
+  const _navegarOriginal = navegarCoord;
+  navegarCoord = function (pagina) {
+    if (pagina === RELATORIO_UI.ID_MENU) { baixarRelatorioPendencias(); return; }
+    return _navegarOriginal.apply(this, arguments);
+  };
+})();
+</script>
+     
+<!-- ============================================================
+     FIM SECCIÓN 10 — RELATÓRIO
+     ============================================================ -->
+     
 </body>
 </html>
