@@ -10442,11 +10442,43 @@ const LAUDOS_UI = {
     SEM_FOTOS:    "Sem fotos: Nenhuma foto anexada",
     FALHA_LEITURA:"Não foi possível carregar o formulário",
     PDF_PRONTO:   "📄 PDF baixado.",
+    APTOS:        "{n} aptos",
+    BLOQUEADOS:   "{n} bloqueados",
+    BAIXADOS:     "{n} baixados",
+    CHIP_GERANDO: "📄 Gerando laudos {i} de {n}",
+    CHIP_FIM:     "✅ ZIP baixado: {a} laudos · {b} bloqueados",
+    CHIP_ERRO:    "⚠️ A exportação falhou. Tente de novo.",
+    VER_BLOQ:     "Ver bloqueados",
+    EM_ANDAMENTO: "A exportação já está em andamento (canto inferior direito).",
   },
+  // Aparência das janelas (cores de apto/bloqueado e o aviso do canto)
+  CSS: `
+    #laudoModal{position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+    .lau-box{background:var(--navy-mid);border:1px solid var(--orange);border-radius:14px;max-width:680px;width:100%;max-height:85vh;display:flex;flex-direction:column;color:var(--text);overflow:hidden}
+    .lau-hdr{padding:18px 20px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+    .lau-tit{font-size:16px;font-weight:700;margin-bottom:6px}
+    .lau-txt{font-size:12.5px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+    .lau-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+    .lau-chip{padding:6px 14px;border-radius:999px;font-weight:700;font-size:14px}
+    .lau-ok{background:rgba(74,222,128,.14);color:#4ade80;border:1px solid rgba(74,222,128,.45)}
+    .lau-bad{background:rgba(248,113,113,.14);color:#f87171;border:1px solid rgba(248,113,113,.45)}
+    .lau-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+    .lau-lista{overflow-y:auto;padding:4px 20px 16px}
+    .lau-sub{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 0 2px}
+    .lau-item{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+    .lau-cod{font-weight:700;font-size:14px}
+    .lau-meta{font-size:12px;color:var(--muted);margin:2px 0 6px}
+    .lau-mot{font-size:12.5px;line-height:1.6;padding-left:10px;border-left:2px solid #f87171}
+    #laudoChip{position:fixed;right:16px;bottom:16px;z-index:3500;width:min(300px,calc(100vw - 32px));background:var(--navy-mid);border:1px solid var(--orange);border-radius:12px;padding:12px 14px;color:var(--text);font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+    .lau-bar{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin:8px 0}
+    .lau-bar>div{height:5px;background:var(--orange);border-radius:3px;transition:width .3s}
+    .lau-acoes{display:flex;gap:4px;justify-content:flex-end}
+    .lau-link{background:none;border:none;color:var(--orange);cursor:pointer;font-size:12px;font-weight:600;padding:4px 6px}
+  `,
   PDF: {
     TITULO:      "DEFESA CIVIL PR — Laudo de Levantamento",
     // Seções e campos do laudo. "de": primeiro valor preenchido; "junta": valores unidos;
-    // "zero": mostra 0 se vazio; "status": usa CONFIG.STATUS_LABEL; "paragrafo": texto livre sem rótulo
+    // "zero": mostra 0 se vazio; "status": usa PDF.STATUS; "data": formato local; "paragrafo": texto livre sem rótulo
     SECOES: [
       { titulo: "Dados do Ponto", campos: [
         { rot: "Código:",      de: ["ping.Codigo", "ping.ID_Ping"] },
@@ -10454,7 +10486,7 @@ const LAUDOS_UI = {
         { rot: "Coordenadas:", junta: ["ping.Latitude", "ping.Longitude"], sep: ", " },
         { rot: "Voluntário:",  de: ["ping.Voluntario_Responsavel"] },
         { rot: "Status:",      de: ["ping.Status"], status: true },
-        { rot: "Data:",        de: ["ping.Atualizado_Em", "ping.Criado_Em"] },
+        { rot: "Data:",        de: ["ping.Atualizado_Em", "ping.Criado_Em"], data: true },
       ]},
       { titulo: "Dados da Unidade", campos: [
         { rot: "Tipo de Unidade:",     de: ["unidade.Tipo_Unidade"] },
@@ -10482,6 +10514,8 @@ const LAUDOS_UI = {
                   "Vulnerabilidade: {Vulnerabilidade} · Necessidades: {Necessidades_Especificas}"],
     SEM_RES:     "Nenhum residente registrado.",
     SEC_FOTOS:   "Fotos ({n})",
+    STATUS:      { Pendente: "Pendente", Concluido: "Concluído", Critico: "Crítico", Arquivado: "Arquivado" },
+    DATA_FMT:    { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" },
     VAZIO:       "—",
     RODAPE:      "Gerado em {data} · DEFESA CIVIL PARANÁ · {versao} · Página {p} de {t}",
     MARGEM:      15,
@@ -10494,6 +10528,7 @@ const LAUDOS_UI = {
 
 let _laudoLibsPromise = null;
 let _laudoCancelar = false;
+let _laudoRodando  = false;
 
 function _laudoCarregarLibs() {
   const carregar = src => new Promise((ok, falha) => {
@@ -10534,100 +10569,143 @@ function _laudoMotivosFotos(fotos) {
   return rotas ? [T.FOTO_ROTA.replace('{n}', rotas).replace('{m}', lista.length)] : [];
 }
 
-// ── Janela de aviso (mesmo estilo da app) ──
+// ── Janelas: caixa central (resumo / bloqueio) e aviso no canto (progresso) ──
+function _laudoEstilo() {
+  if (document.getElementById('laudoCss')) return;
+  const st = document.createElement('style');
+  st.id = 'laudoCss'; st.textContent = LAUDOS_UI.CSS;
+  document.head.appendChild(st);
+}
 function _laudoModal(html) {
+  _laudoEstilo();
   let el = document.getElementById('laudoModal');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'laudoModal';
-    el.style.cssText = 'position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
-    document.body.appendChild(el);
-  }
-  el.innerHTML = `<div style="background:var(--navy-mid);border:1px solid var(--orange);border-radius:14px;padding:18px;max-width:640px;width:100%;max-height:85vh;overflow:auto;color:var(--text);font-size:13px">${html}</div>`;
-  el.style.display = 'flex';
+  if (!el) { el = document.createElement('div'); el.id = 'laudoModal'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="lau-box">${html}</div>`;
 }
 function _laudoFecharModal() { const el = document.getElementById('laudoModal'); if (el) el.remove(); }
 
+function _laudoChip(html) {
+  _laudoEstilo();
+  let el = document.getElementById('laudoChip');
+  if (!el) { el = document.createElement('div'); el.id = 'laudoChip'; document.body.appendChild(el); }
+  el.innerHTML = html;
+}
+function _laudoFecharChip() { const el = document.getElementById('laudoChip'); if (el) el.remove(); }
+
+function _laudoChips(lista) {
+  return `<div class="lau-chips">${lista.map(c => `<span class="lau-chip ${c[1]}">${c[0]}</span>`).join('')}</div>`;
+}
+function _laudoBotao(classe, acao, texto) {
+  return `<button class="btn ${classe}" onclick="${acao}">${texto}</button>`;
+}
+
 function _laudoListaBloq(bloqueados) {
-  return bloqueados.map(b =>
-    `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-       <b>${_esc(b.codigo)}</b> · ${_esc(b.voluntario)} · ${_esc(b.endereco)}<br>
-       <span style="color:var(--muted)">${b.motivos.map(_esc).join('<br>')}</span>
-     </div>`).join('');
+  if (!bloqueados.length) return '';
+  return `<div class="lau-lista"><div class="lau-sub">${LAUDOS_UI.TXT.BLOQ_TITULO}</div>` +
+    bloqueados.map(b =>
+      `<div class="lau-item">
+         <div class="lau-cod">${_esc(b.codigo)}</div>
+         <div class="lau-meta">${_esc(b.voluntario)} · ${_esc(b.endereco)}</div>
+         <div class="lau-mot">${(b.motivos || []).map(_esc).join('<br>')}</div>
+       </div>`).join('') + `</div>`;
+}
+
+function _laudoVerResultado() {
+  const T = LAUDOS_UI.TXT, r = window._laudoResultado || { gerados: 0, bloqueados: [] };
+  _laudoModal(`<div class="lau-hdr"><div class="lau-tit">${T.TITULO}</div>
+      ${_laudoChips([[T.BAIXADOS.replace('{n}', r.gerados), 'lau-ok'], [T.BLOQUEADOS.replace('{n}', r.bloqueados.length), 'lau-bad']])}
+      <div class="lau-btns">${_laudoBotao('btn-ghost', '_laudoFecharModal()', T.BTN_FECHAR)}</div></div>
+    ${_laudoListaBloq(r.bloqueados)}`);
 }
 
 // ── Exportação em massa ──
 async function exportarLaudosConcluidos() {
   const T = LAUDOS_UI.TXT;
-  _laudoModal(`<b>${T.TITULO}</b><p>${T.VERIFICANDO}</p>`);
+  if (_laudoRodando) { toast(T.EM_ANDAMENTO); return; }
+  const hdr = `<div class="lau-hdr"><div class="lau-tit">${T.TITULO}</div>`;
+  _laudoModal(`${hdr}<div class="lau-txt">${T.VERIFICANDO}</div></div>`);
   let r;
   try {
-    [, r] = await Promise.all([_laudoCarregarLibs(), chamarBackend({ acao: LAUDOS_UI.ACAO })]);
+    [, r] = await Promise.all([_laudoCarregarLibs(), chamarBackend({ acao: LAUDOS_UI.ACAO }, true)]);
     if (!r || !r.sucesso || !r.dados) throw new Error((r && r.mensagem) || 'backend');
   } catch(e) {
     console.warn('[Laudos]', e);
-    _laudoModal(`<b>${T.TITULO}</b><p>${T.ERRO}</p><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button>`);
+    _laudoModal(`${hdr}<div class="lau-txt">${T.ERRO}</div>
+      <div class="lau-btns">${_laudoBotao('btn-ghost', '_laudoFecharModal()', T.BTN_FECHAR)}</div></div>`);
     return;
   }
   const { aptos, bloqueados } = r.dados;
   window._laudoAtual = { aptos: aptos, bloqueados: bloqueados };
-  _laudoModal(
-    `<b>${T.TITULO}</b>
-     <p style="color:var(--muted)">${T.REGRA}</p>
-     <p style="font-size:16px;font-weight:700">${T.RESUMO.replace('{a}', aptos.length).replace('{b}', bloqueados.length)}</p>
-     ${bloqueados.length ? `<p><b>${T.BLOQ_TITULO}</b></p>${_laudoListaBloq(bloqueados)}` : ''}
-     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
-       <button class="btn btn-ghost" onclick="_laudoFecharModal()">${aptos.length ? T.BTN_CANCELAR : T.BTN_FECHAR}</button>
-       ${aptos.length ? `<button class="btn btn-primary" onclick="_laudoGerarZip()">${T.BTN_BAIXAR.replace('{n}', aptos.length)}</button>` : ''}
-     </div>`);
+  _laudoModal(`${hdr}<div class="lau-txt">${T.REGRA}</div>
+      ${_laudoChips([[T.APTOS.replace('{n}', aptos.length), 'lau-ok'], [T.BLOQUEADOS.replace('{n}', bloqueados.length), 'lau-bad']])}
+      <div class="lau-btns">
+        ${_laudoBotao('btn-ghost', '_laudoFecharModal()', aptos.length ? T.BTN_CANCELAR : T.BTN_FECHAR)}
+        ${aptos.length ? _laudoBotao('btn-primary', '_laudoGerarZip()', T.BTN_BAIXAR.replace('{n}', aptos.length)) : ''}
+      </div></div>
+    ${_laudoListaBloq(bloqueados)}`);
 }
 
+// Gera em segundo plano: a janela fecha e o progresso fica no canto; dá para continuar trabalhando
 async function _laudoGerarZip() {
   const T = LAUDOS_UI.TXT, L = LAUDOS_UI;
+  if (_laudoRodando) { toast(T.EM_ANDAMENTO); return; }
   const { aptos } = window._laudoAtual || { aptos: [] };
   const bloqueados = ((window._laudoAtual || {}).bloqueados || []).slice();
-  const zip = new window.JSZip();
-  const usados = {};
-  let gerados = 0;
-  _laudoCancelar = false;
-
-  for (let i = 0; i < aptos.length; i++) {
-    if (_laudoCancelar) { _laudoFecharModal(); toast(T.CANCELADO); return; }
-    const a = aptos[i];
-    _laudoModal(`<b>${T.TITULO}</b><p>${T.GERANDO.replace('{i}', i + 1).replace('{n}', aptos.length)}</p>
-      <div style="height:6px;background:rgba(255,255,255,.1);border-radius:3px"><div style="height:6px;width:${Math.round(i / aptos.length * 100)}%;background:var(--orange);border-radius:3px"></div></div>
-      <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoCancelar=true">${T.BTN_CANCELAR}</button></div>`);
-    let dados = null;
-    try {
-      const rr = await chamarBackend({ acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO, idPing: a.idPing });
-      if (rr && rr.sucesso) dados = rr.dados;
-    } catch(e) { dados = null; }
-    const motivos = dados ? _laudoMotivosFotos(dados.fotos) : [T.FALHA_LEITURA];
-    if (motivos.length) { bloqueados.push(Object.assign({}, a, { motivos: motivos })); continue; }
-    try {
-      let nome = _laudoNomePdf({ Codigo: a.codigo, ID_Ping: a.idPing });
-      if (usados[nome]) nome = nome.replace('.pdf', '_' + a.idPing + '.pdf');   // códigos repetidos
-      usados[nome] = true;
-      zip.file(nome, _laudoPdf(dados));
-      gerados++;
-    } catch(e) {
-      console.warn('[Laudos] PDF', a.codigo, e);
-      bloqueados.push(Object.assign({}, a, { motivos: [T.FALHA_LEITURA] }));
+  _laudoFecharModal();
+  _laudoRodando = true; _laudoCancelar = false;
+  try {
+    const zip = new window.JSZip();
+    const usados = {};
+    let gerados = 0;
+    for (let i = 0; i < aptos.length; i++) {
+      if (_laudoCancelar) { _laudoFecharChip(); toast(T.CANCELADO); return; }
+      const a = aptos[i];
+      _laudoChip(`<div>${T.CHIP_GERANDO.replace('{i}', i + 1).replace('{n}', aptos.length)}</div>
+        <div class="lau-bar"><div style="width:${Math.round(i / aptos.length * 100)}%"></div></div>
+        <div class="lau-acoes"><button class="lau-link" onclick="_laudoCancelar=true">${T.BTN_CANCELAR}</button></div>`);
+      let dados = null;
+      try {
+        const rr = await chamarBackend({ acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO, idPing: a.idPing }, true);
+        if (rr && rr.sucesso) dados = rr.dados;
+      } catch(e) { dados = null; }
+      const motivos = dados ? _laudoMotivosFotos(dados.fotos) : [T.FALHA_LEITURA];
+      if (motivos.length) { bloqueados.push(Object.assign({}, a, { motivos: motivos })); continue; }
+      try {
+        let nome = _laudoNomePdf({ Codigo: a.codigo, ID_Ping: a.idPing });
+        if (usados[nome]) nome = nome.replace('.pdf', '_' + a.idPing + '.pdf');   // códigos repetidos
+        usados[nome] = true;
+        zip.file(nome, _laudoPdf(dados));
+        gerados++;
+      } catch(e) {
+        console.warn('[Laudos] PDF', a.codigo, e);
+        bloqueados.push(Object.assign({}, a, { motivos: [T.FALHA_LEITURA] }));
+      }
+      await new Promise(ok => setTimeout(ok, 0));   // deixa a tela respirar entre um laudo e outro
     }
-  }
+    if (_laudoCancelar) { _laudoFecharChip(); toast(T.CANCELADO); return; }
 
-  _laudoModal(`<b>${T.TITULO}</b><p>${T.MONTANDO}</p>`);
-  const csvCampo = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-  const csv = '\uFEFF' + [L.CSV_CAB].concat(bloqueados.map(b =>
-    [b.codigo, b.voluntario, b.endereco, b.status, (b.motivos || []).join(' | ')])).map(l => l.map(csvCampo).join(L.CSV_SEP)).join('\r\n');
-  zip.file(L.CSV_NOME, csv);
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const hoje = new Date();
-  const data = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
-  _laudoBaixarBlob(blob, L.ZIP_NOME.replace('{data}', data));
-  _laudoModal(`<b>${T.TITULO}</b><p>${T.FIM.replace('{a}', gerados).replace('{b}', bloqueados.length)}</p>
-    ${bloqueados.length ? `<p><b>${T.BLOQ_TITULO}</b></p>${_laudoListaBloq(bloqueados)}` : ''}
-    <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button></div>`);
+    _laudoChip(`<div>${T.MONTANDO}</div>`);
+    const csvCampo = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = '\uFEFF' + [L.CSV_CAB].concat(bloqueados.map(b =>
+      [b.codigo, b.voluntario, b.endereco, b.status, (b.motivos || []).join(' | ')])).map(l => l.map(csvCampo).join(L.CSV_SEP)).join('\r\n');
+    zip.file(L.CSV_NOME, csv);
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const hoje = new Date();
+    const data = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+    _laudoBaixarBlob(blob, L.ZIP_NOME.replace('{data}', data));
+
+    window._laudoResultado = { gerados: gerados, bloqueados: bloqueados };
+    _laudoChip(`<div>${T.CHIP_FIM.replace('{a}', gerados).replace('{b}', bloqueados.length)}</div>
+      <div class="lau-acoes" style="margin-top:6px">
+        ${bloqueados.length ? `<button class="lau-link" onclick="_laudoVerResultado()">${T.VER_BLOQ}</button>` : ''}
+        <button class="lau-link" onclick="_laudoFecharChip()">${T.BTN_FECHAR}</button>
+      </div>`);
+  } catch(e) {
+    console.warn('[Laudos] exportação', e);
+    _laudoChip(`<div>${T.CHIP_ERRO}</div><div class="lau-acoes"><button class="lau-link" onclick="_laudoFecharChip()">${T.BTN_FECHAR}</button></div>`);
+  } finally {
+    _laudoRodando = false;
+  }
 }
 
 function _laudoBaixarBlob(blob, nome) {
@@ -10678,7 +10756,13 @@ function _laudoPdf(d) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); cor(P.COR_TEXTO);
     doc.splitTextToSize(txt(t), CW).forEach(l => { quebra(5); doc.text(l, M, y); y += 4.6; });
   };
-
+  const fmtData = v => {   // 2026-11-27T12:55:48Z ou 2026-11-27 09:55:48 → 27/11/2026 09:55; o resto fica igual
+    const loc = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(:[\d.]+)?$/.exec(v);   // já em hora local
+    if (loc) return `${loc[3]}/${loc[2]}/${loc[1]} ${loc[4]}:${loc[5]}`;
+    if (!/^\d{4}-\d{2}-\d{2}T.*(Z|[+-]\d{2}:?\d{2})$/.test(v)) return v;
+    const dt = new Date(v);
+    return isNaN(dt) ? v : dt.toLocaleString(CONFIG.APP.LOCALE, Object.assign({ timeZone: CONFIG.APP.FUSO }, P.DATA_FMT)).replace(',', '');
+  };
   const ctx = { ping: ping, unidade: u };
   const valor = c => { const [o, k] = c.split('.'); const v = (ctx[o] || {})[k]; return (v === undefined || v === null) ? '' : String(v).trim(); };
   P.SECOES.forEach(sec => {
@@ -10687,7 +10771,8 @@ function _laudoPdf(d) {
       if (c.paragrafo) { if (valor(c.paragrafo)) { y += 1; paragrafo(valor(c.paragrafo)); } return; }
       let v = c.junta ? c.junta.map(k => valor(k) || P.VAZIO).join(c.sep)
                       : (c.de.map(valor).find(x => x) || '');
-      if (c.status && v) v = (CONFIG.STATUS_LABEL && CONFIG.STATUS_LABEL[v]) || v;
+      if (c.status && v) v = P.STATUS[v] || v;
+      if (c.data && v) v = fmtData(v);
       if (!v && c.zero) v = '0';
       linha(c.rot, v);
     });
@@ -10723,7 +10808,7 @@ function _laudoPdf(d) {
   if (col === 1) y += alturaLinha;
 
   const total = doc.getNumberOfPages();
-  const gerado = new Date().toLocaleString(CONFIG.APP.LOCALE);
+  const gerado = fmtData(new Date().toISOString());
   for (let p = 1; p <= total; p++) {
     doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); cor(P.COR_LABEL);
     doc.text(P.RODAPE.replace('{data}', gerado).replace('{versao}', CONFIG.APP.VERSAO).replace('{p}', p).replace('{t}', total), W / 2, H - 8, { align: 'center' });
@@ -10749,9 +10834,11 @@ async function laudoMotivosBloqueio(dados) {
 
 function laudoAvisoBloqueio(dados, motivos) {
   const T = LAUDOS_UI.TXT, p = (dados && dados.ping) || {};
-  _laudoModal(`<b>${T.IND_TITULO}</b><p><b>${_esc(p.Codigo || p.ID_Ping || '')}</b> · ${_esc(p.Voluntario_Responsavel || '')}</p>
-    <p style="color:var(--muted)">${T.IND_REGRA}</p>${motivos.map(m => `<div>• ${_esc(m)}</div>`).join('')}
-    <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button></div>`);
+  _laudoModal(`<div class="lau-hdr"><div class="lau-tit">${T.IND_TITULO}</div>
+      <div class="lau-cod">${_esc(p.Codigo || p.ID_Ping || '')} <span class="lau-meta">· ${_esc(p.Voluntario_Responsavel || '')}</span></div>
+      <div class="lau-txt" style="margin-top:8px">${T.IND_REGRA}</div>
+      <div class="lau-mot" style="margin-bottom:14px">${motivos.map(_esc).join('<br>')}</div>
+      <div class="lau-btns">${_laudoBotao('btn-ghost', '_laudoFecharModal()', T.BTN_FECHAR)}</div></div>`);
 }
 
 // Botão "Baixar PDF" do formulário (seção Pings): verifica, gera e baixa
