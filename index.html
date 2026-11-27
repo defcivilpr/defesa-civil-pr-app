@@ -310,6 +310,7 @@ const CONFIG = {
     { id:"voluntarios", icon:"👥",  label:"Voluntários",     grupo:"Gestão",         badge:"nb-vols",  badgeClass:"g" },
     { id:"monitoreo",   icon:"📊",  label:"Progresso",       grupo:"Monitoramento",  badge:"nb-mon",   badgeClass:"y" },
     { id:"relatorio", icon:"📋", label:"Relatório de pendências", grupo:"Monitoramento" },
+    { id:"laudos",    icon:"📄", label:"Exportar Laudos Concluídos", grupo:"Monitoramento" },
   ],
 
   // ── Views do voluntário (bottom nav) ────────────────────────
@@ -10044,11 +10045,11 @@ function renderizarFormularioCompleto(dados) {
         </div>
         <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_FERIDOS}</span>
-          <span class="form-view-value">${unidade.Feridos || '0'}</span>
+          <span class="form-view-value">${unidade.Num_Feridos || '0'}</span>
         </div>
         <div class="form-view-row">          
           <span class="form-view-label">${UI.LBL_OBITOS}</span>
-          <span class="form-view-value">${unidade.Obitos || '0'}</span>
+          <span class="form-view-value">${unidade.Num_Obitos || '0'}</span>
         </div>
         <div class="form-view-row">
           <span class="form-view-label">${UI.LBL_DESAPARECIDOS}</span>
@@ -10169,107 +10170,13 @@ function fecharLightbox() {
 // ════════════════════════════════════════════════════════════════
 // [V8.2] DESCARGA PDF DE FORMULARIO INDIVIDUAL
 // ════════════════════════════════════════════════════════════════
-function baixarPdfFormulario() {
+async function baixarPdfFormulario() {
   if (!_formularioAtual) {
     toast('⚠️ Nenhum formulário carregado.');
     return;
   }
-  
-  const ping = _formularioAtual.ping || {};
-  const unidade = _formularioAtual.unidade || {};
-  const residentes = _formularioAtual.residentes || [];
-  const fotos = _formularioAtual.fotos || [];
-  const UI = CONFIG.UI_FORMULARIO;
-  
-  // Crear contenido HTML para el PDF
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Formulário ${ping.Codigo || ping.ID_Ping}</title>
-      <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 20px; }
-        h1 { color: #F4521E; font-size: 18px; border-bottom: 2px solid #F4521E; padding-bottom: 8px; }
-        h2 { color: #666; font-size: 14px; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-        .row { display: flex; padding: 6px 0; border-bottom: 1px solid #eee; }
-        .label { color: #666; width: 40%; }
-        .value { font-weight: 500; }
-        .obs { background: #f5f5f5; padding: 10px; border-radius: 4px; margin-top: 8px; white-space: pre-wrap; }
-        .residente { background: #f9f9f9; padding: 10px; margin: 8px 0; border-radius: 4px; }
-        .foto-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .foto { max-width: 250px; height: auto; object-fit: contain; border-radius: 4px; }
-        .footer { margin-top: 30px; text-align: center; color: #999; font-size: 10px; }
-      </style>
-    </head>
-    <body>
-      <h1>🛡️ DEFESA CIVIL PR — Formulário de Levantamento</h1>
-      
-      <h2>📍 Dados do Ponto</h2>
-      <div class="row"><span class="label">Código:</span><span class="value">${_esc(ping.Codigo || ping.ID_Ping || '—')}</span></div>
-      <div class="row"><span class="label">Endereço:</span><span class="value">${_esc(unidade.Endereco || ping.Endereco || '—')}</span></div>
-      <div class="row"><span class="label">Coordenadas:</span><span class="value">${ping.Latitude || '—'}, ${ping.Longitude || '—'}</span></div>
-      <div class="row"><span class="label">Voluntário:</span><span class="value">${_esc(ping.Voluntario_Responsavel || '—')}</span></div>
-      <div class="row"><span class="label">Status:</span><span class="value">${ping.Status || '—'}</span></div>
-      <div class="row"><span class="label">Data:</span><span class="value">${ping.Atualizado_Em || ping.Criado_Em || '—'}</span></div>
-      
-      <h2>🏠 Dados da Unidade</h2>
-      <div class="row"><span class="label">Tipo de Unidade:</span><span class="value">${_esc(unidade.Tipo_Unidade || '—')}</span></div>
-      <div class="row"><span class="label">Tipo de Construção:</span><span class="value">${_esc(unidade.Tipo_Construcao || '—')}</span></div>
-      <div class="row"><span class="label">Nº Pessoas:</span><span class="value">${unidade.Num_Pessoas || '0'}</span></div>
-      <div class="row"><span class="label">Feridos:</span><span class="value">${unidade.Feridos || '0'}</span></div>
-      <div class="row"><span class="label">Óbitos:</span><span class="value">${unidade.Obitos || '0'}</span></div>
-      <div class="row"><span class="label">Desaparecidos:</span><span class="value">${unidade.Num_Desaparecidos || '0'}</span></div>
-      <div class="row"><span class="label">Animais Domésticos:</span><span class="value">${_esc(unidade.Animais_Domesticos || '—')}</span></div>
-      <div class="row"><span class="label">Necessidades Gerais:</span><span class="value">${_esc(unidade.Necessidades_Gerais || '—')}</span></div>
-      
-      <h2>⚠️ Danos</h2>
-      <div class="row"><span class="label">Tipo de Dano:</span><span class="value">${_esc(unidade.Tipo_Dano || '—')}</span></div>
-      <div class="row"><span class="label">Grau do Dano:</span><span class="value">${_esc(unidade.Grau_Dano || '—')}</span></div>
-      <div class="row"><span class="label">Habitável:</span><span class="value">${_esc(unidade.Unidade_Habitavel || '—')}</span></div>
-      <div class="row"><span class="label">Necessita Evacuação:</span><span class="value">${_esc(unidade.Necessita_Evacuacao || '—')}</span></div>
-      <div class="row"><span class="label">Serviços Afetados:</span><span class="value">${_esc(unidade.Servicos_Afetados || '—')}</span></div>
-      <div class="row"><span class="label">Riscos Imediatos:</span><span class="value">${_esc(unidade.Riscos_Imediatos || '—')}</span></div>
-      ${unidade.Observacoes ? `<div class="obs">${_esc(unidade.Observacoes)}</div>` : ''}
-      
-      <h2>👥 Residentes (${residentes.length})</h2>
-      ${residentes.length === 0 
-        ? '<p style="color:#999">Nenhum residente registrado.</p>'
-        : residentes.map(r => `
-          <div class="residente">
-            <strong>${_esc(r.Nome || 'Sem nome')}</strong><br>
-            Idade: ${r.Idade || '—'} · CPF: ${_esc(r.CPF || '—')} · Condição: ${_esc(r.Condicao || '—')}<br>
-            Vulnerabilidade: ${_esc(r.Vulnerabilidade || '—')} · Necessidades: ${_esc(r.Necessidades_Especificas || '—')}
-          </div>
-        `).join('')
-      }
-      
-      <h2>📸 Fotos (${fotos.length})</h2>
-      ${fotos.length === 0 
-        ? '<p style="color:#999">Nenhuma foto anexada.</p>'
-        : `<div class="foto-grid">
-            ${fotos.map(f => `<div style="text-align:center"><img class="foto" src="data:${f.Mime_Type || 'image/jpeg'};base64,${f.Dados_Base64 || ''}" alt="Foto"><div style="font-size:10px;color:#666;margin-top:2px">${_esc(f.Descricao || '')}</div></div>`).join('')}
-          </div>`
-      }
-      
-      <div class="footer">
-        Gerado em ${new Date().toLocaleString(CONFIG.APP.LOCALE)} · DEFESA CIVIL PARANÁ · ${CONFIG.APP.VERSAO}
-      </div>
-    </body>
-    </html>
-  `;
-  
-  // Abrir en nueva ventana para imprimir/guardar como PDF
-  const printWindow = window.open('', '_blank');
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-  
-  // Esperar a que cargue y abrir diálogo de impresión
-  setTimeout(() => {
-    printWindow.print();
-  }, 500);
-  
-  toast('📄 PDF pronto para impressão/download');
+  // Gera o PDF real só se o laudo não tiver pendências (Seção 11 — Laudos)
+  await laudoBaixarIndividual(_formularioAtual);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -10394,6 +10301,7 @@ const RELATORIO_UI = {
     RESIDENTES:      "FFE2EFDA",
     CAMPOS_VAZIOS:   "FFDDEBF7",
     SO_CONFIRMAR:    "FFF2F2F2",
+    SEM_FOTOS:       "FFFFF2CC",
   },
   MSG: {
     GERANDO:  "📋 Gerando relatório de pendências...",
@@ -10491,6 +10399,384 @@ async function baixarRelatorioPendencias() {
      
 <!-- ============================================================
      FIM SECCIÓN 10 — RELATÓRIO
+     ============================================================ -->
+
+<!-- ============================================================
+     SECCIÓN 11 — COORD: Exportar Laudos Concluídos (módulo separado)
+     Regras: as mesmas do Relatório de pendências (Relatorio.gs → laudosAptos).
+     Nenhum PDF é gerado com pendências, sem importar o status.
+     Ligação com o resto: 1 item em CONFIG.PAGINAS_COORD (id "laudos")
+     e a verificação no PDF individual (baixarPdfFormulario).
+     ============================================================ -->
+<script id="s11-laudos">
+const LAUDOS_UI = {
+  ID_MENU:    "laudos",
+  ACAO:       "laudosAptos",
+  LIB_JSPDF:  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+  LIB_JSZIP:  "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js",
+  ZIP_NOME:   "Laudos_Concluidos_{data}.zip",
+  PDF_NOME:   "Laudo_{codigo}.pdf",
+  CSV_NOME:   "bloqueados.csv",
+  URL_MS:     10000,
+  CSV_CAB:    ["Codigo", "Voluntario", "Endereco", "Status", "Motivos"],
+  CSV_SEP:    ";",
+  FOTO_MIN_B64: 16,      // menos que isso = foto vazia
+  FOTO_FIM_B64: 1024,    // trecho final verificado (múltiplo de 4)
+  TXT: {
+    TITULO:       "📄 Exportar Laudos Concluídos",
+    REGRA:        "Somente laudos concluídos (Concluído ou Crítico) e sem pendências. Cada laudo é um PDF separado, dentro de um ZIP.",
+    VERIFICANDO:  "Verificando pendências...",
+    RESUMO:       "{a} aptos · {b} bloqueados",
+    BLOQ_TITULO:  "Bloqueados (não serão gerados):",
+    BTN_BAIXAR:   "⬇ Baixar ZIP ({n})",
+    BTN_CANCELAR: "Cancelar",
+    BTN_FECHAR:   "Fechar",
+    GERANDO:      "Gerando laudo {i} de {n}...",
+    MONTANDO:     "Montando o ZIP...",
+    FIM:          "✅ {a} laudos baixados · {b} bloqueados (veja bloqueados.csv no ZIP)",
+    CANCELADO:    "Exportação cancelada.",
+    ERRO:         "⚠️ Não foi possível verificar as pendências. Verifique a conexão.",
+    IND_TITULO:   "⛔ Este laudo não pode ser gerado",
+    IND_REGRA:    "Nenhum PDF é gerado com pendências. Corrija o formulário e tente de novo:",
+    FOTO_ROTA:    "Fotos quebradas: {n} de {m} fotos danificadas",
+    SEM_FOTOS:    "Sem fotos: Nenhuma foto anexada",
+    FALHA_LEITURA:"Não foi possível carregar o formulário",
+    PDF_PRONTO:   "📄 PDF baixado.",
+  },
+  PDF: {
+    TITULO:      "DEFESA CIVIL PR — Laudo de Levantamento",
+    // Seções e campos do laudo. "de": primeiro valor preenchido; "junta": valores unidos;
+    // "zero": mostra 0 se vazio; "status": usa CONFIG.STATUS_LABEL; "paragrafo": texto livre sem rótulo
+    SECOES: [
+      { titulo: "Dados do Ponto", campos: [
+        { rot: "Código:",      de: ["ping.Codigo", "ping.ID_Ping"] },
+        { rot: "Endereço:",    de: ["unidade.Endereco", "ping.Endereco"] },
+        { rot: "Coordenadas:", junta: ["ping.Latitude", "ping.Longitude"], sep: ", " },
+        { rot: "Voluntário:",  de: ["ping.Voluntario_Responsavel"] },
+        { rot: "Status:",      de: ["ping.Status"], status: true },
+        { rot: "Data:",        de: ["ping.Atualizado_Em", "ping.Criado_Em"] },
+      ]},
+      { titulo: "Dados da Unidade", campos: [
+        { rot: "Tipo de Unidade:",     de: ["unidade.Tipo_Unidade"] },
+        { rot: "Tipo de Construção:",  de: ["unidade.Tipo_Construcao"] },
+        { rot: "Nº Pessoas:",          de: ["unidade.Num_Pessoas"], zero: true },
+        { rot: "Feridos:",             de: ["unidade.Num_Feridos"], zero: true },
+        { rot: "Óbitos:",              de: ["unidade.Num_Obitos"], zero: true },
+        { rot: "Desaparecidos:",       de: ["unidade.Num_Desaparecidos"], zero: true },
+        { rot: "Animais Domésticos:",  de: ["unidade.Animais_Domesticos"] },
+        { rot: "Necessidades Gerais:", de: ["unidade.Necessidades_Gerais"] },
+      ]},
+      { titulo: "Danos", campos: [
+        { rot: "Tipo de Dano:",        de: ["unidade.Tipo_Dano"] },
+        { rot: "Grau do Dano:",        de: ["unidade.Grau_Dano"] },
+        { rot: "Habitável:",           de: ["unidade.Unidade_Habitavel"] },
+        { rot: "Necessita Evacuação:", de: ["unidade.Necessita_Evacuacao"] },
+        { rot: "Serviços Afetados:",   de: ["unidade.Servicos_Afetados"] },
+        { rot: "Riscos Imediatos:",    de: ["unidade.Riscos_Imediatos"] },
+        { paragrafo: "unidade.Observacoes" },
+      ]},
+    ],
+    SEC_RES:     "Residentes ({n})",
+    RES_NOME:    "Nome",
+    RES_LINHAS:  ["Idade: {Idade} · CPF: {CPF} · Condição: {Condicao}",
+                  "Vulnerabilidade: {Vulnerabilidade} · Necessidades: {Necessidades_Especificas}"],
+    SEM_RES:     "Nenhum residente registrado.",
+    SEC_FOTOS:   "Fotos ({n})",
+    VAZIO:       "—",
+    RODAPE:      "Gerado em {data} · DEFESA CIVIL PARANÁ · {versao} · Página {p} de {t}",
+    MARGEM:      15,
+    COR_TITULO:  [244, 82, 30],
+    COR_LABEL:   [110, 110, 110],
+    COR_TEXTO:   [40, 40, 40],
+    FOTO_MAX_H:  95,
+  },
+};
+
+let _laudoLibsPromise = null;
+let _laudoCancelar = false;
+
+function _laudoCarregarLibs() {
+  const carregar = src => new Promise((ok, falha) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = () => falha(new Error('lib'));
+    document.head.appendChild(s);
+  });
+  if (window.jspdf && window.JSZip) return Promise.resolve();
+  if (!_laudoLibsPromise) {
+    _laudoLibsPromise = Promise.all([
+      window.jspdf ? null : carregar(LAUDOS_UI.LIB_JSPDF),
+      window.JSZip ? null : carregar(LAUDOS_UI.LIB_JSZIP),
+    ]).catch(e => { _laudoLibsPromise = null; throw e; });
+  }
+  return _laudoLibsPromise;
+}
+
+// ── Fotos: verifica se o arquivo está completo (JPG termina em FFD9, PNG em IEND) ──
+function _laudoFotoCompleta(f) {
+  let b64 = String((f && f.Dados_Base64) || '').replace(/^data:[^,]*,/, '').replace(/\s/g, '');
+  if (b64.length < LAUDOS_UI.FOTO_MIN_B64) return false;
+  while (b64.length % 4) b64 += '=';
+  try {
+    const a = atob(b64.substring(0, 8));
+    const z = atob(b64.substring(b64.length - LAUDOS_UI.FOTO_FIM_B64));
+    const b0 = a.charCodeAt(0), b1 = a.charCodeAt(1);
+    if (b0 === 0xFF && b1 === 0xD8) return z.indexOf('\xFF\xD9') !== -1;     // JPG: marcador final FFD9
+    if (b0 === 0x89 && b1 === 0x50) return z.indexOf('IEND') !== -1;          // PNG: bloco final IEND
+    return true;   // outro formato: sem verificação de fim
+  } catch(e) { return false; }
+}
+
+function _laudoMotivosFotos(fotos) {
+  const T = LAUDOS_UI.TXT;
+  const lista = fotos || [];
+  if (!lista.length) return [T.SEM_FOTOS];
+  const rotas = lista.filter(f => !_laudoFotoCompleta(f)).length;
+  return rotas ? [T.FOTO_ROTA.replace('{n}', rotas).replace('{m}', lista.length)] : [];
+}
+
+// ── Janela de aviso (mesmo estilo da app) ──
+function _laudoModal(html) {
+  let el = document.getElementById('laudoModal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'laudoModal';
+    el.style.cssText = 'position:fixed;inset:0;z-index:4000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `<div style="background:var(--navy-mid);border:1px solid var(--orange);border-radius:14px;padding:18px;max-width:640px;width:100%;max-height:85vh;overflow:auto;color:var(--text);font-size:13px">${html}</div>`;
+  el.style.display = 'flex';
+}
+function _laudoFecharModal() { const el = document.getElementById('laudoModal'); if (el) el.remove(); }
+
+function _laudoListaBloq(bloqueados) {
+  return bloqueados.map(b =>
+    `<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+       <b>${_esc(b.codigo)}</b> · ${_esc(b.voluntario)} · ${_esc(b.endereco)}<br>
+       <span style="color:var(--muted)">${b.motivos.map(_esc).join('<br>')}</span>
+     </div>`).join('');
+}
+
+// ── Exportação em massa ──
+async function exportarLaudosConcluidos() {
+  const T = LAUDOS_UI.TXT;
+  _laudoModal(`<b>${T.TITULO}</b><p>${T.VERIFICANDO}</p>`);
+  let r;
+  try {
+    [, r] = await Promise.all([_laudoCarregarLibs(), chamarBackend({ acao: LAUDOS_UI.ACAO })]);
+    if (!r || !r.sucesso || !r.dados) throw new Error((r && r.mensagem) || 'backend');
+  } catch(e) {
+    console.warn('[Laudos]', e);
+    _laudoModal(`<b>${T.TITULO}</b><p>${T.ERRO}</p><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button>`);
+    return;
+  }
+  const { aptos, bloqueados } = r.dados;
+  window._laudoAtual = { aptos: aptos, bloqueados: bloqueados };
+  _laudoModal(
+    `<b>${T.TITULO}</b>
+     <p style="color:var(--muted)">${T.REGRA}</p>
+     <p style="font-size:16px;font-weight:700">${T.RESUMO.replace('{a}', aptos.length).replace('{b}', bloqueados.length)}</p>
+     ${bloqueados.length ? `<p><b>${T.BLOQ_TITULO}</b></p>${_laudoListaBloq(bloqueados)}` : ''}
+     <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+       <button class="btn btn-ghost" onclick="_laudoFecharModal()">${aptos.length ? T.BTN_CANCELAR : T.BTN_FECHAR}</button>
+       ${aptos.length ? `<button class="btn btn-primary" onclick="_laudoGerarZip()">${T.BTN_BAIXAR.replace('{n}', aptos.length)}</button>` : ''}
+     </div>`);
+}
+
+async function _laudoGerarZip() {
+  const T = LAUDOS_UI.TXT, L = LAUDOS_UI;
+  const { aptos } = window._laudoAtual || { aptos: [] };
+  const bloqueados = ((window._laudoAtual || {}).bloqueados || []).slice();
+  const zip = new window.JSZip();
+  const usados = {};
+  let gerados = 0;
+  _laudoCancelar = false;
+
+  for (let i = 0; i < aptos.length; i++) {
+    if (_laudoCancelar) { _laudoFecharModal(); toast(T.CANCELADO); return; }
+    const a = aptos[i];
+    _laudoModal(`<b>${T.TITULO}</b><p>${T.GERANDO.replace('{i}', i + 1).replace('{n}', aptos.length)}</p>
+      <div style="height:6px;background:rgba(255,255,255,.1);border-radius:3px"><div style="height:6px;width:${Math.round(i / aptos.length * 100)}%;background:var(--orange);border-radius:3px"></div></div>
+      <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoCancelar=true">${T.BTN_CANCELAR}</button></div>`);
+    let dados = null;
+    try {
+      const rr = await chamarBackend({ acao: CONFIG.ACOES.OBTER_FORMULARIO_COMPLETO, idPing: a.idPing });
+      if (rr && rr.sucesso) dados = rr.dados;
+    } catch(e) { dados = null; }
+    const motivos = dados ? _laudoMotivosFotos(dados.fotos) : [T.FALHA_LEITURA];
+    if (motivos.length) { bloqueados.push(Object.assign({}, a, { motivos: motivos })); continue; }
+    try {
+      let nome = _laudoNomePdf({ Codigo: a.codigo, ID_Ping: a.idPing });
+      if (usados[nome]) nome = nome.replace('.pdf', '_' + a.idPing + '.pdf');   // códigos repetidos
+      usados[nome] = true;
+      zip.file(nome, _laudoPdf(dados));
+      gerados++;
+    } catch(e) {
+      console.warn('[Laudos] PDF', a.codigo, e);
+      bloqueados.push(Object.assign({}, a, { motivos: [T.FALHA_LEITURA] }));
+    }
+  }
+
+  _laudoModal(`<b>${T.TITULO}</b><p>${T.MONTANDO}</p>`);
+  const csvCampo = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const csv = '\uFEFF' + [L.CSV_CAB].concat(bloqueados.map(b =>
+    [b.codigo, b.voluntario, b.endereco, b.status, (b.motivos || []).join(' | ')])).map(l => l.map(csvCampo).join(L.CSV_SEP)).join('\r\n');
+  zip.file(L.CSV_NOME, csv);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const hoje = new Date();
+  const data = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0') + '-' + String(hoje.getDate()).padStart(2, '0');
+  _laudoBaixarBlob(blob, L.ZIP_NOME.replace('{data}', data));
+  _laudoModal(`<b>${T.TITULO}</b><p>${T.FIM.replace('{a}', gerados).replace('{b}', bloqueados.length)}</p>
+    ${bloqueados.length ? `<p><b>${T.BLOQ_TITULO}</b></p>${_laudoListaBloq(bloqueados)}` : ''}
+    <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button></div>`);
+}
+
+function _laudoBaixarBlob(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = nome;
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), LAUDOS_UI.URL_MS);
+}
+
+function _laudoNomePdf(ping) {
+  return LAUDOS_UI.PDF_NOME.replace('{codigo}', String(ping.Codigo || ping.ID_Ping || '').replace(/[^\w.-]+/g, '_'));
+}
+
+// ── PDF de um laudo (mesmo conteúdo do PDF individual) ──
+function _laudoPdf(d) {
+  const P = LAUDOS_UI.PDF;
+  const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const M = P.MARGEM, CW = W - 2 * M;
+  const ping = d.ping || {}, u = d.unidade || {}, res = d.residentes || [], fotos = d.fotos || [];
+  const txt = v => (v === undefined || v === null || String(v).trim() === '') ? P.VAZIO : String(v)
+    .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  let y = M;
+  const quebra = h => { if (y + h > H - M - 6) { doc.addPage(); y = M; } };
+  const cor = c => doc.setTextColor(c[0], c[1], c[2]);
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); cor(P.COR_TITULO);
+  doc.text(P.TITULO, M, y + 6); y += 9;
+  doc.setDrawColor(P.COR_TITULO[0], P.COR_TITULO[1], P.COR_TITULO[2]); doc.setLineWidth(0.6); doc.line(M, y, W - M, y); y += 4;
+
+  const secao = t => {
+    quebra(14); y += 4;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); cor(P.COR_LABEL);
+    doc.text(t, M, y); y += 2;
+    doc.setDrawColor(210); doc.setLineWidth(0.2); doc.line(M, y, W - M, y); y += 5;
+  };
+  const linha = (rot, val) => {
+    doc.setFontSize(10);
+    const partes = doc.splitTextToSize(txt(val), CW * 0.6);
+    const h = partes.length * 4.6;
+    quebra(h + 1);
+    doc.setFont('helvetica', 'normal'); cor(P.COR_LABEL); doc.text(rot, M, y);
+    doc.setFont('helvetica', 'bold'); cor(P.COR_TEXTO); doc.text(partes, M + CW * 0.4, y);
+    y += h + 1;
+  };
+  const paragrafo = t => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); cor(P.COR_TEXTO);
+    doc.splitTextToSize(txt(t), CW).forEach(l => { quebra(5); doc.text(l, M, y); y += 4.6; });
+  };
+
+  const ctx = { ping: ping, unidade: u };
+  const valor = c => { const [o, k] = c.split('.'); const v = (ctx[o] || {})[k]; return (v === undefined || v === null) ? '' : String(v).trim(); };
+  P.SECOES.forEach(sec => {
+    secao(sec.titulo);
+    sec.campos.forEach(c => {
+      if (c.paragrafo) { if (valor(c.paragrafo)) { y += 1; paragrafo(valor(c.paragrafo)); } return; }
+      let v = c.junta ? c.junta.map(k => valor(k) || P.VAZIO).join(c.sep)
+                      : (c.de.map(valor).find(x => x) || '');
+      if (c.status && v) v = (CONFIG.STATUS_LABEL && CONFIG.STATUS_LABEL[v]) || v;
+      if (!v && c.zero) v = '0';
+      linha(c.rot, v);
+    });
+  });
+
+  secao(P.SEC_RES.replace('{n}', res.length));
+  if (!res.length) paragrafo(P.SEM_RES);
+  res.forEach(r => {
+    quebra(14);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); cor(P.COR_TEXTO); doc.text(txt(r[P.RES_NOME]), M, y); y += 4.6;
+    P.RES_LINHAS.forEach(l => paragrafo(l.replace(/\{(\w+)\}/g, (_, k) => txt(r[k]))));
+    y += 1.5;
+  });
+
+  if (fotos.length) quebra(P.FOTO_MAX_H + 14);   // título junto da 1ª foto
+  secao(P.SEC_FOTOS.replace('{n}', fotos.length));
+  const colW = (CW - 6) / 2;
+  let col = 0, alturaLinha = 0;
+  fotos.forEach(f => {
+    const b64 = String(f.Dados_Base64 || '').replace(/^data:[^,]*,/, '');
+    const fmt = b64.startsWith('iVBOR') ? 'PNG' : 'JPEG';
+    const src = 'data:image/' + fmt.toLowerCase() + ';base64,' + b64;
+    const prop = doc.getImageProperties(src);
+    let w = colW, h = w * prop.height / prop.width;
+    if (h > P.FOTO_MAX_H) { h = P.FOTO_MAX_H; w = h * prop.width / prop.height; }
+    if (col === 0) quebra(h + 8);
+    const x = M + col * (colW + 6);
+    doc.addImage(src, fmt, x, y, w, h);
+    if (f.Descricao) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8); cor(P.COR_LABEL); doc.text(doc.splitTextToSize(txt(f.Descricao), colW), x, y + h + 3.5); }
+    alturaLinha = Math.max(alturaLinha, h + 7);
+    if (col === 1) { y += alturaLinha; alturaLinha = 0; col = 0; } else col = 1;
+  });
+  if (col === 1) y += alturaLinha;
+
+  const total = doc.getNumberOfPages();
+  const gerado = new Date().toLocaleString(CONFIG.APP.LOCALE);
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); cor(P.COR_LABEL);
+    doc.text(P.RODAPE.replace('{data}', gerado).replace('{versao}', CONFIG.APP.VERSAO).replace('{p}', p).replace('{t}', total), W / 2, H - 8, { align: 'center' });
+  }
+  return doc.output('arraybuffer');
+}
+
+// ── PDF individual: mesma regra (servidor + fotos completas) ──
+async function laudoMotivosBloqueio(dados) {
+  const idPing = dados && dados.ping && dados.ping.ID_Ping;
+  try {
+    const r = await chamarBackend({ acao: LAUDOS_UI.ACAO, idPing: idPing });
+    if (!r || !r.sucesso || !r.dados) throw new Error((r && r.mensagem) || 'backend');
+    const bloq = r.dados.bloqueados.find(b => b.idPing === idPing);
+    const motivos = bloq ? bloq.motivos.slice() : [];
+    _laudoMotivosFotos(dados.fotos).forEach(m => { if (!motivos.some(x => x.split(':')[0] === m.split(':')[0])) motivos.push(m); });
+    return motivos;
+  } catch(e) {
+    console.warn('[Laudos] verificação', e);
+    return [LAUDOS_UI.TXT.ERRO];
+  }
+}
+
+function laudoAvisoBloqueio(dados, motivos) {
+  const T = LAUDOS_UI.TXT, p = (dados && dados.ping) || {};
+  _laudoModal(`<b>${T.IND_TITULO}</b><p><b>${_esc(p.Codigo || p.ID_Ping || '')}</b> · ${_esc(p.Voluntario_Responsavel || '')}</p>
+    <p style="color:var(--muted)">${T.IND_REGRA}</p>${motivos.map(m => `<div>• ${_esc(m)}</div>`).join('')}
+    <div style="text-align:right;margin-top:12px"><button class="btn btn-ghost" onclick="_laudoFecharModal()">${T.BTN_FECHAR}</button></div>`);
+}
+
+// Botão "Baixar PDF" do formulário (seção Pings): verifica, gera e baixa
+async function laudoBaixarIndividual(dados) {
+  const T = LAUDOS_UI.TXT;
+  toast(T.VERIFICANDO);
+  const motivos = await laudoMotivosBloqueio(dados);
+  if (motivos.length) { laudoAvisoBloqueio(dados, motivos); return; }
+  try { await _laudoCarregarLibs(); }
+  catch(e) { laudoAvisoBloqueio(dados, [T.ERRO]); return; }
+  _laudoBaixarBlob(new Blob([_laudoPdf(dados)], { type: 'application/pdf' }), _laudoNomePdf(dados.ping || {}));
+  toast(T.PDF_PRONTO);
+}
+
+// O item do menu chama navegarCoord(id): aqui ele abre a exportação sem trocar de página
+(function () {
+  const _navegarAnterior = navegarCoord;
+  navegarCoord = function (pagina) {
+    if (pagina === LAUDOS_UI.ID_MENU) { exportarLaudosConcluidos(); return; }
+    return _navegarAnterior.apply(this, arguments);
+  };
+})();
+</script>
+<!-- ============================================================
+     FIM SECCIÓN 11 — LAUDOS
      ============================================================ -->
      
 </body>
